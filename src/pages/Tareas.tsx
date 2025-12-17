@@ -12,8 +12,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useStore } from '@/hooks/useStore';
 import { initialTimeAuditTasks, initialStrategicTasks } from '@/data/initialData';
 import { TimeAuditTask, StrategicTask, TaskCategory, EnergyLevel, DelegationDecision } from '@/types/torii';
+import { TeamUser } from '@/pages/Usuarios';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, Clock, Zap, Target, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Zap, Target, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const categoryColors: Record<TaskCategory, string> = {
@@ -35,22 +36,17 @@ const xdsColors: Record<DelegationDecision, string> = {
   'D': 'bg-success/20 text-success'
 };
 
-// Calculate hours in minutes from "H:MM" format
-const parseHours = (timeStr: string): number => {
-  const [hours, mins] = timeStr.split(':').map(Number);
-  return (hours || 0) * 60 + (mins || 0);
-};
-
-const formatTotalHours = (minutes: number): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${m.toString().padStart(2, '0')}`;
-};
+const initialUsers: TeamUser[] = [
+  { id: '1', name: 'Admin Torii', email: 'admin@torii.com', role: 'admin', assignedTasks: ['1', '3'], createdAt: '2024-01-01' },
+  { id: '2', name: 'Carlos Mendez', email: 'carlos@torii.com', role: 'socio', assignedTasks: ['2', '4'], createdAt: '2024-02-15' },
+  { id: '3', name: 'Ana García', email: 'ana@torii.com', role: 'socio', assignedTasks: ['5'], createdAt: '2024-03-10' },
+];
 
 export default function Tareas() {
   const [timeAuditTasks, setTimeAuditTasks] = useStore('tareas_audit', initialTimeAuditTasks);
   const [strategicTasks, setStrategicTasks] = useStore('tareas_estrategicas', initialStrategicTasks);
-  const [activeTab, setActiveTab] = useState('audit');
+  const [users] = useStore<TeamUser[]>('usuarios', initialUsers);
+  const [activeTab, setActiveTab] = useState('strategic');
   const [search, setSearch] = useState('');
   const [isAuditDialogOpen, setIsAuditDialogOpen] = useState(false);
   const [isStrategicDialogOpen, setIsStrategicDialogOpen] = useState(false);
@@ -66,26 +62,30 @@ export default function Tareas() {
     title: '', description: '', deadline: '', completed: false
   });
 
-  // Time Audit Stats
-  const totalMinutes = timeAuditTasks.reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0);
+  // Time Audit Stats (simplified without hours)
   const categoryStats = {
-    '1-Admin': timeAuditTasks.filter(t => t.category === '1-Admin').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
-    '2-Técnico': timeAuditTasks.filter(t => t.category === '2-Técnico').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
-    '3-Manager': timeAuditTasks.filter(t => t.category === '3-Manager').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
-    '4-Ejecutivo': timeAuditTasks.filter(t => t.category === '4-Ejecutivo').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
+    '1-Admin': timeAuditTasks.filter(t => t.category === '1-Admin').length,
+    '2-Técnico': timeAuditTasks.filter(t => t.category === '2-Técnico').length,
+    '3-Manager': timeAuditTasks.filter(t => t.category === '3-Manager').length,
+    '4-Ejecutivo': timeAuditTasks.filter(t => t.category === '4-Ejecutivo').length,
   };
   const energyStats = {
-    'Me Da Energía': timeAuditTasks.filter(t => t.energy === 'Me Da Energía').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
-    'Neutral': timeAuditTasks.filter(t => t.energy === 'Neutral').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
-    'Me Quita Energía': timeAuditTasks.filter(t => t.energy === 'Me Quita Energía').reduce((sum, t) => sum + parseHours(t.hoursPerWeek), 0),
+    'Me Da Energía': timeAuditTasks.filter(t => t.energy === 'Me Da Energía').length,
+    'Neutral': timeAuditTasks.filter(t => t.energy === 'Neutral').length,
+    'Me Quita Energía': timeAuditTasks.filter(t => t.energy === 'Me Quita Energía').length,
   };
 
   // Strategic Tasks Stats
   const completedStrategic = strategicTasks.filter(t => t.completed).length;
 
   const calculateScore = (form: Partial<TimeAuditTask>): number => {
-    const hours = parseHours(form.hoursPerWeek || '0:00') / 60;
-    return parseFloat(((form.knowledge || 0) + (form.impact || 0) + (form.delegationCost || 0) + hours / 10).toFixed(2));
+    return parseFloat(((form.knowledge || 0) + (form.impact || 0) + (form.delegationCost || 0)).toFixed(2));
+  };
+
+  // Get user name by finding who has this task assigned
+  const getResponsibleName = (taskId: string): string | null => {
+    const user = users.find(u => u.assignedTasks.includes(taskId));
+    return user ? user.name : null;
   };
 
   // Audit Task CRUD
@@ -190,9 +190,92 @@ export default function Tareas() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-secondary/50">
-          <TabsTrigger value="audit">Auditoría de Tiempo</TabsTrigger>
           <TabsTrigger value="strategic">Tareas Estratégicas</TabsTrigger>
+          <TabsTrigger value="audit">Auditoría de Tiempo</TabsTrigger>
         </TabsList>
+
+        {/* STRATEGIC TASKS TAB */}
+        <TabsContent value="strategic" className="space-y-4 mt-4">
+          <div className="grid grid-cols-3 gap-4">
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Total Tareas</p>
+                <p className="text-xl font-bold">{strategicTasks.length}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Completadas</p>
+                <p className="text-xl font-bold text-success">{completedStrategic}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground mb-1">Pendientes</p>
+                <p className="text-xl font-bold text-warning">{strategicTasks.length - completedStrategic}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Search className="h-4 w-4 text-muted-foreground" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tarea..." className="bg-secondary/50" />
+            </div>
+            <Dialog open={isStrategicDialogOpen} onOpenChange={(open) => { setIsStrategicDialogOpen(open); if (!open) resetStrategicForm(); }}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary"><Plus className="h-4 w-4 mr-2" />Nueva Tarea</Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader><DialogTitle>{editingStrategicTask ? 'Editar' : 'Nueva'} Tarea Estratégica</DialogTitle></DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div><Label>Tarea *</Label><Input value={strategicForm.title} onChange={e => setStrategicForm({ ...strategicForm, title: e.target.value })} className="bg-secondary/50" /></div>
+                  <div><Label>Descripción</Label><Textarea value={strategicForm.description || ''} onChange={e => setStrategicForm({ ...strategicForm, description: e.target.value })} className="bg-secondary/50" /></div>
+                  <div><Label>Deadline</Label><Input type="date" value={strategicForm.deadline || ''} onChange={e => setStrategicForm({ ...strategicForm, deadline: e.target.value })} className="bg-secondary/50" /></div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => { setIsStrategicDialogOpen(false); resetStrategicForm(); }}>Cancelar</Button>
+                    <Button onClick={handleStrategicSubmit} className="bg-primary">{editingStrategicTask ? 'Guardar' : 'Agregar'}</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Strategic Tasks List */}
+          <Card className="bg-card border-border/50">
+            <CardContent className="p-0">
+              {filteredStrategic.map((task, idx) => {
+                const responsible = getResponsibleName(task.id);
+                return (
+                  <div key={task.id} className={cn('flex items-center gap-4 p-4 hover:bg-secondary/20', idx !== filteredStrategic.length - 1 && 'border-b border-border/30')}>
+                    <Checkbox checked={task.completed} onCheckedChange={() => toggleStrategicComplete(task.id)} />
+                    <div className="flex-1">
+                      <p className={cn('font-medium', task.completed && 'line-through text-muted-foreground')}>{task.title}</p>
+                      {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
+                    </div>
+                    {responsible && (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <User className="h-3 w-3" />{responsible}
+                      </Badge>
+                    )}
+                    {task.deadline && (
+                      <Badge variant="outline" className="text-xs">
+                        <Target className="h-3 w-3 mr-1" />{task.deadline}
+                      </Badge>
+                    )}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editStrategicTask(task)}><Edit2 className="h-3 w-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteStrategicTask(task.id)}><Trash2 className="h-3 w-3" /></Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredStrategic.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">No hay tareas estratégicas</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* TIME AUDIT TAB */}
         <TabsContent value="audit" className="space-y-4 mt-4">
@@ -200,15 +283,15 @@ export default function Tareas() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card className="bg-card border-border/50">
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Total Horas/Semana</p>
-                <p className="text-xl font-bold">{formatTotalHours(totalMinutes)}</p>
+                <p className="text-xs text-muted-foreground mb-1">Total Tareas</p>
+                <p className="text-xl font-bold">{timeAuditTasks.length}</p>
               </CardContent>
             </Card>
-            {Object.entries(categoryStats).map(([cat, mins]) => (
+            {Object.entries(categoryStats).map(([cat, count]) => (
               <Card key={cat} className="bg-card border-border/50">
                 <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground mb-1">{cat}</p>
-                  <p className="text-xl font-bold">{totalMinutes > 0 ? ((mins / totalMinutes) * 100).toFixed(1) : 0}%</p>
+                  <p className="text-xl font-bold">{count}</p>
                 </CardContent>
               </Card>
             ))}
@@ -216,13 +299,13 @@ export default function Tareas() {
 
           {/* Energy Stats */}
           <div className="grid grid-cols-3 gap-4">
-            {Object.entries(energyStats).map(([energy, mins]) => (
+            {Object.entries(energyStats).map(([energy, count]) => (
               <Card key={energy} className="bg-card border-border/50">
                 <CardContent className="p-4 flex items-center gap-3">
                   <Zap className={cn('h-5 w-5', energyColors[energy as EnergyLevel])} />
                   <div>
                     <p className="text-xs text-muted-foreground">{energy}</p>
-                    <p className="font-bold">{totalMinutes > 0 ? ((mins / totalMinutes) * 100).toFixed(1) : 0}%</p>
+                    <p className="font-bold">{count}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -242,9 +325,9 @@ export default function Tareas() {
               <DialogContent className="bg-card border-border max-w-xl">
                 <DialogHeader><DialogTitle>{editingAuditTask ? 'Editar' : 'Nueva'} Tarea de Auditoría</DialogTitle></DialogHeader>
                 <div className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Tarea específica *</Label><Input value={auditForm.taskName} onChange={e => setAuditForm({ ...auditForm, taskName: e.target.value })} className="bg-secondary/50" /></div>
-                    <div><Label>Horas/Semana (H:MM)</Label><Input value={auditForm.hoursPerWeek} onChange={e => setAuditForm({ ...auditForm, hoursPerWeek: e.target.value })} placeholder="0:00" className="bg-secondary/50" /></div>
+                  <div>
+                    <Label>Tarea específica *</Label>
+                    <Input value={auditForm.taskName} onChange={e => setAuditForm({ ...auditForm, taskName: e.target.value })} className="bg-secondary/50" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div><Label>Categoría</Label>
@@ -304,7 +387,6 @@ export default function Tareas() {
                 <thead className="bg-secondary/30 border-b border-border/50">
                   <tr>
                     <th className="text-left p-3 font-medium">Tarea específica</th>
-                    <th className="text-center p-3 font-medium">Horas/Sem</th>
                     <th className="text-left p-3 font-medium">Categoría</th>
                     <th className="text-left p-3 font-medium">Energía</th>
                     <th className="text-center p-3 font-medium">Conocim.</th>
@@ -320,7 +402,6 @@ export default function Tareas() {
                   {filteredAudit.map(task => (
                     <tr key={task.id} className="border-b border-border/30 hover:bg-secondary/20">
                       <td className="p-3 font-medium">{task.taskName}</td>
-                      <td className="p-3 text-center"><Clock className="h-3 w-3 inline mr-1 text-muted-foreground" />{task.hoursPerWeek}</td>
                       <td className="p-3"><Badge className={cn('text-xs border-0', categoryColors[task.category])}>{task.category}</Badge></td>
                       <td className="p-3"><span className={cn('text-xs', energyColors[task.energy])}>{task.energy}</span></td>
                       <td className="p-3 text-center">{task.knowledge}</td>
@@ -340,81 +421,6 @@ export default function Tareas() {
                 </tbody>
               </table>
             </div>
-          </Card>
-        </TabsContent>
-
-        {/* STRATEGIC TASKS TAB */}
-        <TabsContent value="strategic" className="space-y-4 mt-4">
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="bg-card border-border/50">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Total Tareas</p>
-                <p className="text-xl font-bold">{strategicTasks.length}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border/50">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Completadas</p>
-                <p className="text-xl font-bold text-success">{completedStrategic}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-card border-border/50">
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground mb-1">Pendientes</p>
-                <p className="text-xl font-bold text-warning">{strategicTasks.length - completedStrategic}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tarea..." className="bg-secondary/50" />
-            </div>
-            <Dialog open={isStrategicDialogOpen} onOpenChange={(open) => { setIsStrategicDialogOpen(open); if (!open) resetStrategicForm(); }}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary"><Plus className="h-4 w-4 mr-2" />Nueva Tarea</Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border">
-                <DialogHeader><DialogTitle>{editingStrategicTask ? 'Editar' : 'Nueva'} Tarea Estratégica</DialogTitle></DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div><Label>Tarea *</Label><Input value={strategicForm.title} onChange={e => setStrategicForm({ ...strategicForm, title: e.target.value })} className="bg-secondary/50" /></div>
-                  <div><Label>Descripción</Label><Textarea value={strategicForm.description || ''} onChange={e => setStrategicForm({ ...strategicForm, description: e.target.value })} className="bg-secondary/50" /></div>
-                  <div><Label>Deadline</Label><Input type="date" value={strategicForm.deadline || ''} onChange={e => setStrategicForm({ ...strategicForm, deadline: e.target.value })} className="bg-secondary/50" /></div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={() => { setIsStrategicDialogOpen(false); resetStrategicForm(); }}>Cancelar</Button>
-                    <Button onClick={handleStrategicSubmit} className="bg-primary">{editingStrategicTask ? 'Guardar' : 'Agregar'}</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Strategic Tasks List */}
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-0">
-              {filteredStrategic.map((task, idx) => (
-                <div key={task.id} className={cn('flex items-center gap-4 p-4 hover:bg-secondary/20', idx !== filteredStrategic.length - 1 && 'border-b border-border/30')}>
-                  <Checkbox checked={task.completed} onCheckedChange={() => toggleStrategicComplete(task.id)} />
-                  <div className="flex-1">
-                    <p className={cn('font-medium', task.completed && 'line-through text-muted-foreground')}>{task.title}</p>
-                    {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
-                  </div>
-                  {task.deadline && (
-                    <Badge variant="outline" className="text-xs">
-                      <Target className="h-3 w-3 mr-1" />{task.deadline}
-                    </Badge>
-                  )}
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => editStrategicTask(task)}><Edit2 className="h-3 w-3" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteStrategicTask(task.id)}><Trash2 className="h-3 w-3" /></Button>
-                  </div>
-                </div>
-              ))}
-              {filteredStrategic.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">No hay tareas estratégicas</div>
-              )}
-            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
