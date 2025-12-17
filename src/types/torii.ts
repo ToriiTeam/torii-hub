@@ -7,7 +7,62 @@ export interface User {
   avatar?: string;
 }
 
-// Task types
+// ========== CLIENT TYPES (Sheet 1 - Clientes/Pagos) ==========
+export type OfferType = 'DWY' | 'DFY';
+export type ClientStatus = 'activo' | 'pausado' | 'finalizado' | 'cancelado';
+export type PaymentType = 'Upfront' | 'Mensual' | 'Cuotas';
+export type PaymentPlatform = 'Stripe' | 'Binance' | 'Transfer';
+
+export interface Client {
+  id: string;
+  name: string;
+  offerType: OfferType;
+  startDate: string;
+  endDate?: string;
+  status: ClientStatus;
+  paymentType: PaymentType;
+  totalInstallments: number;
+  paidInstallments: number;
+  installmentAmount: number;
+  nextDueDate?: string;
+  platform: PaymentPlatform;
+  platformFee: number;
+  country: string;
+  notes?: string;
+  email?: string;
+  phone?: string;
+}
+
+// ========== TIME AUDIT TASK TYPES (Sheet 2 - Auditoría de Tiempo) ==========
+export type TaskCategory = '1-Admin' | '2-Técnico' | '3-Manager' | '4-Ejecutivo';
+export type EnergyLevel = 'Me Da Energía' | 'Neutral' | 'Me Quita Energía';
+export type DelegationDecision = 'X' | 'S+D' | 'D';
+
+export interface TimeAuditTask {
+  id: string;
+  taskName: string;
+  hoursPerWeek: string; // Format: "H:MM"
+  category: TaskCategory;
+  energy: EnergyLevel;
+  knowledge: number; // 1-5
+  impact: number; // 1-5
+  delegationCost: number; // 1-5
+  score: number; // Calculated sum
+  xds: DelegationDecision;
+  newOwner?: string;
+  processesToCreate?: string;
+}
+
+// ========== STRATEGIC TASK TYPES (Sheet 3 - Tareas Estratégicas) ==========
+export interface StrategicTask {
+  id: string;
+  title: string;
+  description?: string;
+  deadline?: string;
+  completed: boolean;
+}
+
+// ========== LEGACY TASK TYPE (for compatibility) ==========
 export type TaskPriority = 'alta' | 'media' | 'baja';
 export type TaskStatus = 'pendiente' | 'en_progreso' | 'completada';
 
@@ -123,22 +178,7 @@ export interface Document {
   fileType: string;
 }
 
-// Client types
-export type ClientStatus = 'lead' | 'prospecto' | 'activo' | 'inactivo';
-
-export interface Client {
-  id: string;
-  name: string;
-  company?: string;
-  email: string;
-  phone: string;
-  status: ClientStatus;
-  contractValue: number;
-  startDate: string;
-  responsibleId: string;
-  notes?: string;
-}
-
+// Client objective types
 export interface ClientObjective {
   id: string;
   clientId: string;
