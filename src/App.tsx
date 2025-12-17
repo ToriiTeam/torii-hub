@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import Usuarios from "@/pages/Usuarios";
 import Tareas from "@/pages/Tareas";
 import Finanzas from "@/pages/Finanzas";
 import Setters from "@/pages/Setters";
@@ -30,6 +31,7 @@ function AppContent() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/usuarios" element={<Usuarios />} />
         <Route path="/tareas" element={<Tareas />} />
         <Route path="/finanzas" element={<Finanzas />} />
         <Route path="/setters" element={<Setters />} />
