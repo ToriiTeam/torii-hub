@@ -14,6 +14,7 @@ import Closers from "@/pages/Closers";
 import Documentos from "@/pages/Documentos";
 import Clientes from "@/pages/Clientes";
 import Disponibilidad from "@/pages/Disponibilidad";
+import Reportes from "@/pages/Reportes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ function AppContent() {
         <Route path="/documentos" element={<Documentos />} />
         <Route path="/clientes" element={<Clientes />} />
         <Route path="/disponibilidad" element={<Disponibilidad />} />
+        <Route path="/reportes" element={<Reportes />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

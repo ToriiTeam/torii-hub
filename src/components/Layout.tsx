@@ -33,6 +33,7 @@ const navigation = [
   { name: 'Documentación', href: '/documentos', icon: FileText },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Disponibilidad', href: '/disponibilidad', icon: MessageSquare },
+  { name: 'Reportes', href: '/reportes', icon: FileText },
 ];
 
 interface LayoutProps {
