@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { 
   CheckSquare, 
   DollarSign, 
@@ -10,23 +10,40 @@ import {
   FileText,
   TrendingUp,
   TrendingDown,
-  ArrowRight
+  ArrowRight,
+  Clock,
+  CheckCircle2,
+  Circle,
+  AlertCircle
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useStore } from '@/hooks/useStore';
-import { 
-  initialTasks, 
-  initialIncomes, 
-  initialVariableCosts, 
-  initialFixedCosts,
-  initialSetters,
-  initialClosers,
-  initialClients,
-  initialDocuments,
-  initialAnnouncements,
-  userNames
-} from '@/data/initialData';
+import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
+import { format, isToday, isYesterday, isThisWeek, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  important: boolean;
+  created_at: string;
+  author_id: string;
+}
+
+interface TeamUser {
+  id: string;
+  name: string;
+}
 
 const revenueData = [
   { month: 'Jul', ingresos: 18000, gastos: 12000 },
@@ -45,36 +62,122 @@ const performanceData = [
 ];
 
 export default function Dashboard() {
-  const [tasks] = useStore('tareas', initialTasks);
-  const [incomes] = useStore('ingresos', initialIncomes);
-  const [variableCosts] = useStore('gastos_variables', initialVariableCosts);
-  const [fixedCosts] = useStore('gastos_fijos', initialFixedCosts);
-  const [setters] = useStore('setters', initialSetters);
-  const [closers] = useStore('closers', initialClosers);
-  const [clients] = useStore('clientes', initialClients);
-  const [documents] = useStore('documentos', initialDocuments);
-  const [announcements] = useStore('anuncios', initialAnnouncements);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Stats
+  const [clientCount, setClientCount] = useState(0);
+  const [documentCount, setDocumentCount] = useState(0);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [setterCalls, setSetterCalls] = useState(0);
+  const [closerValue, setCloserValue] = useState(0);
 
-  const pendingTasks = tasks.filter(t => t.status !== 'completada').length;
-  const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
-  const totalExpenses = variableCosts.reduce((sum, c) => sum + c.amount, 0) + 
-                        fixedCosts.reduce((sum, c) => sum + c.amount, 0);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Load tasks
+      const { data: tasksData } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+      if (tasksData) setTasks(tasksData);
+
+      // Load announcements
+      const { data: announcementsData } = await supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(3);
+      if (announcementsData) setAnnouncements(announcementsData);
+
+      // Load team users
+      const { data: usersData } = await supabase.from('team_users').select('id, name');
+      if (usersData) setTeamUsers(usersData);
+
+      // Load clients count
+      const { count: activeClients } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'activo');
+      setClientCount(activeClients || 0);
+
+      // Load documents count
+      const { count: docs } = await supabase.from('documents').select('*', { count: 'exact', head: true });
+      setDocumentCount(docs || 0);
+
+      // Load incomes sum
+      const { data: incomesData } = await supabase.from('incomes').select('amount');
+      if (incomesData) setTotalIncome(incomesData.reduce((sum, i) => sum + Number(i.amount), 0));
+
+      // Load expenses sum
+      const { data: fixedData } = await supabase.from('fixed_costs').select('amount');
+      const { data: variableData } = await supabase.from('variable_costs').select('amount');
+      const fixedSum = fixedData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      const variableSum = variableData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      setTotalExpenses(fixedSum + variableSum);
+
+      // Load setter meetings count
+      const { count: meetings } = await supabase.from('setter_meetings').select('*', { count: 'exact', head: true });
+      setSetterCalls(meetings || 0);
+
+      // Load closer calls value
+      const { data: closerCallsData } = await supabase.from('closer_calls').select('price').eq('paid', true);
+      if (closerCallsData) setCloserValue(closerCallsData.reduce((sum, c) => sum + Number(c.price || 0), 0));
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Task stats
+  const pendingTasks = tasks.filter(t => t.status === 'pendiente').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'en_progreso').length;
+  const completedTasks = tasks.filter(t => t.status === 'completada').length;
+  
+  // Recent tasks grouped by time
+  const recentTasks = tasks.slice(0, 10);
+  const todayTasks = recentTasks.filter(t => isToday(parseISO(t.created_at)));
+  const yesterdayTasks = recentTasks.filter(t => isYesterday(parseISO(t.created_at)));
+  const weekTasks = recentTasks.filter(t => isThisWeek(parseISO(t.created_at)) && !isToday(parseISO(t.created_at)) && !isYesterday(parseISO(t.created_at)));
+
   const balance = totalIncome - totalExpenses;
-  
-  const totalSetterCalls = setters.reduce((sum, s) => sum + s.metrics.calls, 0);
-  const totalSetterLeads = setters.reduce((sum, s) => sum + s.metrics.leads, 0);
-  const totalCloserMeetings = closers.reduce((sum, c) => sum + c.metrics.meetings, 0);
-  const totalCloserValue = closers.reduce((sum, c) => sum + c.metrics.totalValue, 0);
-  
-  const activeClients = clients.filter(c => c.status === 'activo').length;
 
-  const recentActivities = [
-    { id: 1, action: 'Tarea completada', detail: 'Actualizar SOPs de ventas', time: 'Hace 2h', type: 'task' },
-    { id: 2, action: 'Nuevo ingreso', detail: 'Contrato MediaPlus - $4,200', time: 'Hace 5h', type: 'income' },
-    { id: 3, action: 'Cliente agregado', detail: 'DataDrive - Lead', time: 'Hace 1d', type: 'client' },
-    { id: 4, action: 'Cita confirmada', detail: 'Laura Sánchez - 3 citas', time: 'Hace 1d', type: 'setter' },
-    { id: 5, action: 'Cierre registrado', detail: 'Patricia Gómez - $8,500', time: 'Hace 2d', type: 'closer' },
-  ];
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completada': return <CheckCircle2 className="h-4 w-4 text-success" />;
+      case 'en_progreso': return <Clock className="h-4 w-4 text-warning" />;
+      default: return <Circle className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completada': return <Badge className="bg-success/20 text-success border-0 text-xs">Completada</Badge>;
+      case 'en_progreso': return <Badge className="bg-warning/20 text-warning border-0 text-xs">En Progreso</Badge>;
+      default: return <Badge className="bg-muted text-muted-foreground border-0 text-xs">Pendiente</Badge>;
+    }
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    switch (priority) {
+      case 'alta': return <Badge className="bg-destructive/20 text-destructive border-0 text-xs">Alta</Badge>;
+      case 'media': return <Badge className="bg-warning/20 text-warning border-0 text-xs">Media</Badge>;
+      default: return <Badge className="bg-info/20 text-info border-0 text-xs">Baja</Badge>;
+    }
+  };
+
+  const getUserName = (userId: string) => {
+    return teamUsers.find(u => u.id === userId)?.name || 'Usuario';
+  };
+
+  const formatTime = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    return format(date, "HH:mm", { locale: es });
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    return format(date, "dd MMM, HH:mm", { locale: es });
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -121,10 +224,9 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <PhoneCall className="h-8 w-8 text-info" />
-                <span className="text-xs text-muted-foreground">{totalSetterLeads} leads</span>
               </div>
-              <p className="text-2xl font-bold mt-3">{totalSetterCalls}</p>
-              <p className="text-xs text-muted-foreground">Llamadas setters</p>
+              <p className="text-2xl font-bold mt-3">{setterCalls}</p>
+              <p className="text-xs text-muted-foreground">Reuniones agendadas</p>
             </CardContent>
           </Card>
         </Link>
@@ -134,9 +236,8 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <Handshake className="h-8 w-8 text-warning" />
-                <span className="text-xs text-muted-foreground">{totalCloserMeetings} reuniones</span>
               </div>
-              <p className="text-2xl font-bold mt-3">${totalCloserValue.toLocaleString()}</p>
+              <p className="text-2xl font-bold mt-3">${closerValue.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground">Valor cerrado</p>
             </CardContent>
           </Card>
@@ -149,7 +250,7 @@ export default function Dashboard() {
                 <Users className="h-8 w-8 text-primary" />
                 <Badge className="text-xs bg-success/20 text-success border-0">Activos</Badge>
               </div>
-              <p className="text-2xl font-bold mt-3">{activeClients}</p>
+              <p className="text-2xl font-bold mt-3">{clientCount}</p>
               <p className="text-xs text-muted-foreground">Clientes activos</p>
             </CardContent>
           </Card>
@@ -161,12 +262,107 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <FileText className="h-8 w-8 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-3">{documents.length}</p>
+              <p className="text-2xl font-bold mt-3">{documentCount}</p>
               <p className="text-xs text-muted-foreground">Documentos</p>
             </CardContent>
           </Card>
         </Link>
       </div>
+
+      {/* Task Report Section */}
+      <Card className="bg-card border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium flex items-center gap-2">
+            <CheckSquare className="h-5 w-5 text-primary" />
+            Informe de Tareas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Task Summary Stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="p-4 rounded-lg bg-muted/30 border border-border/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Circle className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Pendientes</span>
+              </div>
+              <p className="text-2xl font-bold">{pendingTasks}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-warning/10 border border-warning/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4 text-warning" />
+                <span className="text-sm text-muted-foreground">En Progreso</span>
+              </div>
+              <p className="text-2xl font-bold text-warning">{inProgressTasks}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <span className="text-sm text-muted-foreground">Completadas</span>
+              </div>
+              <p className="text-2xl font-bold text-success">{completedTasks}</p>
+            </div>
+          </div>
+
+          {/* Recent Tasks List */}
+          <div className="space-y-4">
+            {todayTasks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">Hoy</p>
+                <div className="space-y-2">
+                  {todayTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                      {getStatusIcon(task.status)}
+                      <span className="flex-1 text-sm font-medium">{task.title}</span>
+                      {getStatusBadge(task.status)}
+                      {getPriorityBadge(task.priority)}
+                      <span className="text-xs text-muted-foreground">{formatTime(task.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {yesterdayTasks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">Ayer</p>
+                <div className="space-y-2">
+                  {yesterdayTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                      {getStatusIcon(task.status)}
+                      <span className="flex-1 text-sm font-medium">{task.title}</span>
+                      {getStatusBadge(task.status)}
+                      {getPriorityBadge(task.priority)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {weekTasks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">Esta Semana</p>
+                <div className="space-y-2">
+                  {weekTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
+                      {getStatusIcon(task.status)}
+                      <span className="flex-1 text-sm font-medium">{task.title}</span>
+                      {getStatusBadge(task.status)}
+                      {getPriorityBadge(task.priority)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recentTasks.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No hay tareas registradas</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -228,59 +424,30 @@ export default function Dashboard() {
 
       {/* Bottom section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <Card className="lg:col-span-2 bg-card border-border/50">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-medium">Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    activity.type === 'task' ? 'bg-primary/20 text-primary' :
-                    activity.type === 'income' ? 'bg-success/20 text-success' :
-                    activity.type === 'client' ? 'bg-info/20 text-info' :
-                    activity.type === 'setter' ? 'bg-info/20 text-info' :
-                    'bg-warning/20 text-warning'
-                  }`}>
-                    {activity.type === 'task' && <CheckSquare className="h-5 w-5" />}
-                    {activity.type === 'income' && <DollarSign className="h-5 w-5" />}
-                    {activity.type === 'client' && <Users className="h-5 w-5" />}
-                    {activity.type === 'setter' && <PhoneCall className="h-5 w-5" />}
-                    {activity.type === 'closer' && <Handshake className="h-5 w-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{activity.action}</p>
-                    <p className="text-xs text-muted-foreground truncate">{activity.detail}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{activity.time}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Announcements */}
-        <Card className="bg-card border-border/50">
+        <Card className="lg:col-span-3 bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-base font-medium">Anuncios</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {announcements.slice(0, 3).map((announcement) => (
-                <div key={announcement.id} className="p-3 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {announcements.map((announcement) => (
+                <div key={announcement.id} className="p-4 rounded-lg border border-border/50 hover:border-primary/30 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
                     {announcement.important && (
                       <Badge className="bg-primary/20 text-primary border-0 text-xs">Importante</Badge>
                     )}
-                    <span className="text-xs text-muted-foreground">{announcement.date}</span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(announcement.created_at)}</span>
                   </div>
                   <p className="text-sm font-medium mb-1">{announcement.title}</p>
                   <p className="text-xs text-muted-foreground line-clamp-2">{announcement.content}</p>
-                  <p className="text-xs text-muted-foreground mt-2">— {userNames[announcement.authorId]}</p>
                 </div>
               ))}
+              {announcements.length === 0 && (
+                <div className="col-span-3 text-center py-8 text-muted-foreground">
+                  No hay anuncios
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
