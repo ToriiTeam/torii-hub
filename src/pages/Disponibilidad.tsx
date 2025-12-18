@@ -1,17 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { useStore } from '@/hooks/useStore';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
-import { initialTeamMembers, initialAnnouncements, userNames } from '@/data/initialData';
-import { AvailabilityStatus, Announcement } from '@/types/torii';
+import { userNames } from '@/data/initialData';
 import { CalendarStatus } from '@/types/integrations';
 import { toast } from 'sonner';
 import { Circle, Send, Calendar, CalendarCheck, RefreshCw, Loader2, Clock, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+type AvailabilityStatus = 'disponible' | 'ocupado' | 'ausente' | 'vacaciones';
+
+interface TeamMember {
+  id: string;
+  user_id: string;
+  status: AvailabilityStatus;
+  work_schedule_start: string;
+  work_schedule_end: string;
+}
+
+interface TeamUser {
+  id: string;
+  name: string;
+}
+
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  created_at: string;
+  important: boolean;
+}
 
 const statusConfig: Record<AvailabilityStatus, { label: string; color: string }> = {
   disponible: { label: 'Disponible', color: 'bg-success' },
@@ -30,9 +53,11 @@ const calendarStatusConfig: Record<CalendarStatus['status'], { label: string; co
 
 export default function Disponibilidad() {
   const { user } = useAuth();
-  const [team, setTeam] = useStore('equipo', initialTeamMembers);
-  const [announcements, setAnnouncements] = useStore('anuncios', initialAnnouncements);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const {
     connectionStatus,
@@ -45,20 +70,58 @@ export default function Disponibilidad() {
     refreshEvents,
   } = useGoogleCalendar();
 
-  const updateStatus = (userId: string, status: AvailabilityStatus) => {
-    setTeam(prev => prev.map(m => m.userId === userId ? { ...m, status } : m));
-    toast.success('Estado actualizado');
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [availabilityRes, usersRes, announcementsRes] = await Promise.all([
+      supabase.from('team_availability').select('*'),
+      supabase.from('team_users').select('id, name'),
+      supabase.from('announcements').select('*').order('created_at', { ascending: false })
+    ]);
+    
+    if (availabilityRes.data) setTeam(availabilityRes.data as TeamMember[]);
+    if (usersRes.data) setTeamUsers(usersRes.data as TeamUser[]);
+    if (announcementsRes.data) setAnnouncements(announcementsRes.data as Announcement[]);
+    setLoading(false);
   };
 
-  const addAnnouncement = () => {
+  const updateStatus = async (userId: string, status: AvailabilityStatus) => {
+    const existingRecord = team.find(m => m.user_id === userId);
+    
+    if (existingRecord) {
+      const { error } = await supabase
+        .from('team_availability')
+        .update({ status })
+        .eq('user_id', userId);
+      if (error) { toast.error('Error al actualizar'); return; }
+    } else {
+      const { error } = await supabase
+        .from('team_availability')
+        .insert({ user_id: userId, status });
+      if (error) { toast.error('Error al crear'); return; }
+    }
+    
+    toast.success('Estado actualizado');
+    fetchData();
+  };
+
+  const addAnnouncement = async () => {
     if (!newMessage.trim()) return;
-    const announcement: Announcement = {
-      id: Date.now().toString(), title: 'Mensaje', content: newMessage,
-      authorId: user?.id || '1', date: new Date().toISOString().split('T')[0], important: false
-    };
-    setAnnouncements(prev => [announcement, ...prev]);
+    
+    const { error } = await supabase.from('announcements').insert({
+      title: 'Mensaje',
+      content: newMessage,
+      author_id: user?.id || null,
+      important: false
+    });
+    
+    if (error) { toast.error('Error al publicar'); return; }
     setNewMessage('');
     toast.success('Mensaje publicado');
+    fetchData();
   };
 
   const formatEventTime = (dateTime?: string, date?: string) => {
@@ -71,10 +134,19 @@ export default function Disponibilidad() {
     return '';
   };
 
+  const getUserName = (userId: string) => {
+    const teamUser = teamUsers.find(u => u.id === userId);
+    return teamUser?.name || userNames[userId] || 'Usuario';
+  };
+
   // Get next 5 events across all users
   const upcomingEvents = calendarEvents
     .filter(e => new Date(e.start.dateTime || e.start.date || '') > new Date())
     .slice(0, 5);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -122,21 +194,23 @@ export default function Disponibilidad() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {team.map(member => {
-              const calendarStatus = userStatuses[member.userId];
-              const isCurrentUser = member.userId === user?.id;
+            {teamUsers.map(teamUser => {
+              const member = team.find(m => m.user_id === teamUser.id);
+              const calendarStatus = userStatuses[teamUser.id];
+              const isCurrentUser = teamUser.id === user?.id;
+              const memberStatus = member?.status || 'disponible';
               
               // Use calendar status if connected, otherwise use manual status
               const displayStatus = connectionStatus.connected && calendarStatus 
                 ? calendarStatusConfig[calendarStatus.status]
-                : statusConfig[member.status];
+                : statusConfig[memberStatus];
 
               return (
-                <div key={member.id} className="p-4 rounded-lg bg-secondary/30 space-y-3">
+                <div key={teamUser.id} className="p-4 rounded-lg bg-secondary/30 space-y-3">
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-lg">
-                        {userNames[member.userId]?.charAt(0)}
+                        {teamUser.name?.charAt(0)}
                       </div>
                       <div className={cn(
                         "absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card",
@@ -144,13 +218,13 @@ export default function Disponibilidad() {
                       )} />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{userNames[member.userId]}</p>
+                      <p className="font-medium">{teamUser.name}</p>
                       <div className="flex items-center gap-2 text-sm">
                         <span className={cn("flex items-center gap-1", displayStatus.color.replace('bg-', 'text-'))}>
                           {displayStatus.label}
                         </span>
                         <span className="text-muted-foreground">•</span>
-                        <span className="text-muted-foreground">{member.workSchedule.start} - {member.workSchedule.end}</span>
+                        <span className="text-muted-foreground">{member?.work_schedule_start || '09:00'} - {member?.work_schedule_end || '18:00'}</span>
                       </div>
                     </div>
                   </div>
@@ -194,9 +268,9 @@ export default function Disponibilidad() {
                           size="sm" 
                           className={cn(
                             "h-7 px-2", 
-                            member.status === status && statusConfig[status].color + '/20'
+                            memberStatus === status && statusConfig[status].color + '/20'
                           )} 
-                          onClick={() => updateStatus(member.userId, status)}
+                          onClick={() => updateStatus(teamUser.id, status)}
                         >
                           <Circle className={cn(
                             "h-2 w-2 mr-1", 
@@ -272,7 +346,7 @@ export default function Disponibilidad() {
                   <div key={a.id} className={cn("p-3 rounded-lg border", a.important ? "border-primary/50 bg-primary/5" : "border-border/50")}>
                     {a.important && <Badge className="bg-primary/20 text-primary border-0 text-xs mb-2">Importante</Badge>}
                     <p className="text-sm">{a.content}</p>
-                    <p className="text-xs text-muted-foreground mt-2">— {userNames[a.authorId]} • {a.date}</p>
+                    <p className="text-xs text-muted-foreground mt-2">— {getUserName(a.author_id || '')} • {new Date(a.created_at).toLocaleDateString('es-ES')}</p>
                   </div>
                 ))}
               </div>
