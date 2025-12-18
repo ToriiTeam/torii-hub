@@ -16,7 +16,7 @@ import {
   Circle,
   AlertCircle
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
 import { format, isToday, isYesterday, isThisWeek, parseISO } from 'date-fns';
@@ -364,7 +364,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Charts */}
+      {/* Charts - Minimalist Style */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border/50">
           <CardHeader>
@@ -374,22 +374,58 @@ export default function Dashboard() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={revenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `$${v/1000}k`} />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={11} 
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={11} 
+                    tickFormatter={(v) => `$${v/1000}k`}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: '12px'
                     }}
                     formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                   />
-                  <Legend />
-                  <Line type="monotone" dataKey="ingresos" stroke="hsl(var(--success))" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="gastos" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ingresos" 
+                    stroke="hsl(var(--success))" 
+                    strokeWidth={2} 
+                    dot={false}
+                    name="Ingresos"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="gastos" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    strokeWidth={1.5} 
+                    strokeDasharray="4 4"
+                    dot={false}
+                    name="Gastos"
+                  />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+            <div className="flex gap-6 justify-center mt-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-success rounded" />
+                <span className="text-muted-foreground">Ingresos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-muted-foreground rounded border-dashed border-t" />
+                <span className="text-muted-foreground">Gastos</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -401,22 +437,56 @@ export default function Dashboard() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                <LineChart data={performanceData}>
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={11}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--card))', 
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
+                      borderRadius: '8px',
+                      fontSize: '12px'
                     }}
                   />
-                  <Legend />
-                  <Bar dataKey="setters" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="closers" fill="hsl(var(--warning))" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Line 
+                    type="monotone" 
+                    dataKey="setters" 
+                    stroke="hsl(var(--info))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--info))', strokeWidth: 0, r: 3 }}
+                    name="Setters"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="closers" 
+                    stroke="hsl(var(--warning))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--warning))', strokeWidth: 0, r: 3 }}
+                    name="Closers"
+                  />
+                </LineChart>
               </ResponsiveContainer>
+            </div>
+            <div className="flex gap-6 justify-center mt-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-info" />
+                <span className="text-muted-foreground">Setters</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-warning" />
+                <span className="text-muted-foreground">Closers</span>
+              </div>
             </div>
           </CardContent>
         </Card>
