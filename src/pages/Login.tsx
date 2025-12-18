@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
+import toriiLogo from '@/assets/torii-logo.jpg';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,12 +36,7 @@ export default function Login() {
         <CardHeader className="text-center pb-2">
           {/* Logo */}
           <div className="mx-auto mb-6">
-            <div className="relative">
-              <h1 className="text-5xl font-bold tracking-wider text-foreground">
-                TORII
-              </h1>
-              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-16 h-1 bg-primary rounded-full glow-red" />
-            </div>
+            <img src={toriiLogo} alt="Torii" className="h-24 w-auto mx-auto" />
           </div>
           <p className="text-muted-foreground text-sm">
             Plataforma de Gestión Interna

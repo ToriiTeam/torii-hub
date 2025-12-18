@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import toriiLogo from '@/assets/torii-logo.jpg';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -83,7 +84,7 @@ export default function Layout({ children }: LayoutProps) {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           {!collapsed && (
-            <h1 className="text-xl font-bold tracking-wider">TORII</h1>
+            <img src={toriiLogo} alt="Torii" className="h-10 w-auto" />
           )}
           <Button
             variant="ghost"
@@ -120,7 +121,7 @@ export default function Layout({ children }: LayoutProps) {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-border">
           <div className="h-16 flex items-center px-4 border-b border-border">
-            <h1 className="text-xl font-bold tracking-wider">TORII</h1>
+            <img src={toriiLogo} alt="Torii" className="h-10 w-auto" />
           </div>
           <ScrollArea className="flex-1 py-4 h-[calc(100vh-8rem)]">
             <NavItems onNavigate={() => setSidebarOpen(false)} />
