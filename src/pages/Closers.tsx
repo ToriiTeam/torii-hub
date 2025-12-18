@@ -220,8 +220,12 @@ export default function Closers() {
   };
 
   const handleCallSubmit = async () => {
-    if (!callForm.closer_id || !callForm.lead_name.trim()) {
-      toast.error('Closer y nombre del lead son requeridos');
+    if (!callForm.closer_id) {
+      toast.error('Debes seleccionar un closer');
+      return;
+    }
+    if (!callForm.lead_name.trim()) {
+      toast.error('El nombre del lead es requerido');
       return;
     }
 
@@ -244,11 +248,19 @@ export default function Closers() {
 
     if (editingCall) {
       const { error } = await supabase.from('closer_calls').update(data).eq('id', editingCall.id);
-      if (error) { toast.error('Error al actualizar'); return; }
+      if (error) { 
+        console.error('Error updating call:', error);
+        toast.error('Error al actualizar: ' + error.message); 
+        return; 
+      }
       toast.success('Llamada actualizada');
     } else {
       const { error } = await supabase.from('closer_calls').insert(data);
-      if (error) { toast.error('Error al crear'); return; }
+      if (error) { 
+        console.error('Error creating call:', error);
+        toast.error('Error al crear: ' + error.message); 
+        return; 
+      }
       toast.success('Llamada registrada');
     }
     

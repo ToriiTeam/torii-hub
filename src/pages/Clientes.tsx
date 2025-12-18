@@ -61,6 +61,12 @@ interface ClientTask {
   status: TaskStatus;
   due_date?: string;
   progress: number;
+  assigned_to?: string;
+}
+
+interface TeamUser {
+  id: string;
+  name: string;
 }
 
 const statusColors: Record<ClientStatus, string> = {
@@ -93,6 +99,7 @@ export default function Clientes() {
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<ClientProduct[]>([]);
   const [tasks, setTasks] = useState<ClientTask[]>([]);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -110,7 +117,7 @@ export default function Clientes() {
   });
 
   const [productForm, setProductForm] = useState({ product_name: '', description: '', price: '', sold_date: '' });
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', status: 'pendiente' as TaskStatus, due_date: '', progress: '0' });
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', status: 'pendiente' as TaskStatus, due_date: '', progress: '0', assigned_to: '' });
 
   useEffect(() => {
     fetchData();
@@ -118,15 +125,17 @@ export default function Clientes() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsRes, productsRes, tasksRes] = await Promise.all([
+    const [clientsRes, productsRes, tasksRes, teamUsersRes] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('client_products').select('*'),
-      supabase.from('client_tasks').select('*')
+      supabase.from('client_tasks').select('*'),
+      supabase.from('team_users').select('id, name').order('name')
     ]);
     
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (productsRes.data) setProducts(productsRes.data as ClientProduct[]);
     if (tasksRes.data) setTasks(tasksRes.data as ClientTask[]);
+    if (teamUsersRes.data) setTeamUsers(teamUsersRes.data as TeamUser[]);
     setLoading(false);
   };
 
@@ -259,12 +268,13 @@ export default function Clientes() {
       description: taskForm.description || null,
       status: taskForm.status,
       due_date: taskForm.due_date || null,
-      progress: parseInt(taskForm.progress) || 0
+      progress: parseInt(taskForm.progress) || 0,
+      assigned_to: taskForm.assigned_to || null
     });
 
     if (error) { toast.error('Error al crear'); return; }
     toast.success('Tarea agregada');
-    setTaskForm({ title: '', description: '', status: 'pendiente', due_date: '', progress: '0' });
+    setTaskForm({ title: '', description: '', status: 'pendiente', due_date: '', progress: '0', assigned_to: '' });
     setIsTaskDialogOpen(false);
     fetchData();
   };
@@ -491,6 +501,16 @@ export default function Clientes() {
                       </div>
                       <div><Label>Fecha Límite</Label><Input type="date" value={taskForm.due_date} onChange={e => setTaskForm({ ...taskForm, due_date: e.target.value })} className="bg-secondary/50" /></div>
                     </div>
+                    <div>
+                      <Label>Responsable</Label>
+                      <Select value={taskForm.assigned_to} onValueChange={v => setTaskForm({ ...taskForm, assigned_to: v })}>
+                        <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Sin asignar</SelectItem>
+                          {teamUsers.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex justify-end gap-2 pt-4">
                       <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
                       <Button onClick={handleTaskSubmit}>Agregar</Button>
@@ -500,27 +520,36 @@ export default function Clientes() {
               </Dialog>
             </div>
             <div className="grid gap-3">
-              {clientTasks.map(task => (
-                <Card key={task.id} className="bg-card border-border/50">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <Checkbox checked={task.status === 'completada'} onCheckedChange={(c) => updateTaskStatus(task.id, c ? 'completada' : 'pendiente')} />
-                      <div className="flex-1">
-                        <p className={cn("font-medium", task.status === 'completada' && "line-through text-muted-foreground")}>{task.title}</p>
-                        {task.description && <p className="text-sm text-muted-foreground">{task.description}</p>}
+              {clientTasks.map(task => {
+                const assignee = teamUsers.find(u => u.id === task.assigned_to);
+                return (
+                  <Card key={task.id} className="bg-card border-border/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <Checkbox checked={task.status === 'completada'} onCheckedChange={(c) => updateTaskStatus(task.id, c ? 'completada' : 'pendiente')} />
+                        <div className="flex-1">
+                          <p className={cn("font-medium", task.status === 'completada' && "line-through text-muted-foreground")}>{task.title}</p>
+                          {task.description && <p className="text-sm text-muted-foreground">{task.description}</p>}
+                          {assignee && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <User className="h-3 w-3" />
+                              {assignee.name}
+                            </p>
+                          )}
+                        </div>
+                        <Badge className={cn('text-xs', taskStatusColors[task.status])}>{taskStatusLabels[task.status]}</Badge>
+                        {task.due_date && <span className="text-sm text-muted-foreground">{task.due_date}</span>}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTask(task.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Badge className={cn('text-xs', taskStatusColors[task.status])}>{taskStatusLabels[task.status]}</Badge>
-                      {task.due_date && <span className="text-sm text-muted-foreground">{task.due_date}</span>}
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteTask(task.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {task.progress > 0 && task.progress < 100 && (
-                      <Progress value={task.progress} className="h-1 mt-2" />
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      {task.progress > 0 && task.progress < 100 && (
+                        <Progress value={task.progress} className="h-1 mt-2" />
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
               {clientTasks.length === 0 && (
                 <Card className="bg-card border-border/50"><CardContent className="p-8 text-center text-muted-foreground">No hay tareas</CardContent></Card>
               )}
