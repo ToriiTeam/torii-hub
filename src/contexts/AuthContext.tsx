@@ -1,125 +1,122 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@/types/torii';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Profile {
+  id: string;
+  email: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  role: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  session: Session | null;
+  profile: Profile | null;
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SESSION_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-const SESSION_KEY = 'torii_session';
-
-interface StoredSession {
-  user: User;
-  expiresAt: number;
-}
-
-// Hardcoded users
-const USERS: { email: string; password: string; user: User }[] = [
-  {
-    email: 'admin@torii.com',
-    password: 'admin123',
-    user: {
-      id: '1',
-      email: 'admin@torii.com',
-      name: 'Admin Torii',
-      role: 'admin',
-    },
-  },
-  {
-    email: 'benjamin@torii.com',
-    password: 'benjamin123',
-    user: {
-      id: '2',
-      email: 'benjamin@torii.com',
-      name: 'Benjamin',
-      role: 'socio',
-    },
-  },
-  {
-    email: 'luciano@torii.com',
-    password: 'luciano123',
-    user: {
-      id: '3',
-      email: 'luciano@torii.com',
-      name: 'Luciano',
-      role: 'socio',
-    },
-  },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const storedSession = localStorage.getItem(SESSION_KEY);
-    if (storedSession) {
-      try {
-        const session: StoredSession = JSON.parse(storedSession);
-        if (session.expiresAt > Date.now()) {
-          setUser(session.user);
-        } else {
-          localStorage.removeItem(SESSION_KEY);
-        }
-      } catch {
-        localStorage.removeItem(SESSION_KEY);
-      }
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
     }
-  }, []);
-
-  // Check session expiry periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const storedSession = localStorage.getItem(SESSION_KEY);
-      if (storedSession) {
-        try {
-          const session: StoredSession = JSON.parse(storedSession);
-          if (session.expiresAt <= Date.now()) {
-            setUser(null);
-            localStorage.removeItem(SESSION_KEY);
-          }
-        } catch {
-          localStorage.removeItem(SESSION_KEY);
-        }
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const login = (email: string, password: string): boolean => {
-    const found = USERS.find(
-      (u) => u.email === email && u.password === password
-    );
-    if (found) {
-      const session: StoredSession = {
-        user: found.user,
-        expiresAt: Date.now() + SESSION_DURATION,
-      };
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      setUser(found.user);
-      return true;
-    }
-    return false;
+    return data;
   };
 
-  const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Defer profile fetch to avoid deadlock
+        if (session?.user) {
+          setTimeout(() => {
+            fetchProfile(session.user.id).then(setProfile);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id).then(setProfile);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error };
+  };
+
+  const signUp = async (email: string, password: string, name?: string) => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          name: name || email,
+        },
+      },
+    });
+    return { error };
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    setProfile(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        login,
-        logout,
-        isAuthenticated: !!user,
+        session,
+        profile,
+        isLoading,
+        signIn,
+        signUp,
+        signOut,
+        isAuthenticated: !!session,
       }}
     >
       {children}
