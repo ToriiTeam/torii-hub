@@ -68,6 +68,16 @@ interface UserPerformance {
   sleep_time: string | null;
   focus_hours: string | null;
   notes: string | null;
+  custom_1: boolean;
+  custom_2: boolean;
+  custom_3: boolean;
+  custom_4: boolean;
+  custom_5: boolean;
+  custom_6: boolean;
+  custom_7: boolean;
+  custom_8: boolean;
+  custom_9: boolean;
+  custom_10: boolean;
 }
 
 interface TaskConfig {
@@ -429,19 +439,20 @@ export default function Tareas() {
     return total > 0 ? Math.round((trueCount / total) * 100) : 0;
   };
 
-  // Semanal = porcentaje de una tarea completada a lo largo de la semana
+  // Semanal = porcentaje de una tarea completada a lo largo de la semana (solo cuenta días con datos)
   const calculateWeeklyRowCompletion = (userId: string, fieldKey: string): number => {
     let trueCount = 0;
-    let falseCount = 0;
+    let daysWithData = 0;
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const perf = getPerformance(userId, dateStr);
-      const value = perf ? perf[fieldKey as keyof UserPerformance] : false;
-      if (value === true) trueCount++;
-      else falseCount++;
+      if (perf) {
+        daysWithData++;
+        const value = perf[fieldKey as keyof UserPerformance];
+        if (value === true) trueCount++;
+      }
     });
-    const total = trueCount + falseCount;
-    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+    return daysWithData > 0 ? Math.round((trueCount / daysWithData) * 100) : 0;
   };
 
   // Total (diario) = todas las tareas de un día
@@ -459,21 +470,108 @@ export default function Tareas() {
     return total > 0 ? Math.round((trueCount / total) * 100) : 0;
   };
 
-  // Total Semanal = todas las tareas de toda la semana
+  // Total Semanal = todas las tareas de toda la semana (solo cuenta días con datos)
   const calculateWeeklyTotal = (userId: string): number => {
     let trueCount = 0;
-    let falseCount = 0;
+    let totalFields = 0;
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const perf = getPerformance(userId, dateStr);
-      allCheckboxFields.forEach(field => {
-        const value = perf ? perf[field.key as keyof UserPerformance] : false;
-        if (value === true) trueCount++;
-        else falseCount++;
-      });
+      if (perf) {
+        allCheckboxFields.forEach(field => {
+          totalFields++;
+          const value = perf[field.key as keyof UserPerformance];
+          if (value === true) trueCount++;
+        });
+      }
     });
-    const total = trueCount + falseCount;
-    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+    return totalFields > 0 ? Math.round((trueCount / totalFields) * 100) : 0;
+  };
+
+  // Agregar nueva actividad
+  const [isAddActivityDialogOpen, setIsAddActivityDialogOpen] = useState(false);
+  const [newActivityForm, setNewActivityForm] = useState({ label: '', category: 'daily' });
+
+  const getNextAvailableCustomField = (): string | null => {
+    const usedKeys = [...dailyFields, ...workflowFields, ...weeklyFields].map(f => f.key);
+    for (let i = 1; i <= 10; i++) {
+      const key = `custom_${i}`;
+      if (!usedKeys.includes(key)) return key;
+    }
+    return null;
+  };
+
+  const addNewActivity = async () => {
+    if (!newActivityForm.label.trim()) {
+      toast.error('El nombre es requerido');
+      return;
+    }
+
+    const nextKey = getNextAvailableCustomField();
+    if (!nextKey) {
+      toast.error('Has alcanzado el límite de actividades personalizadas (10)');
+      return;
+    }
+
+    try {
+      const currentFields = newActivityForm.category === 'daily' ? dailyFields 
+        : newActivityForm.category === 'workflow' ? workflowFields : weeklyFields;
+      
+      const { error } = await supabase.from('performance_task_config').insert({
+        field_key: nextKey,
+        custom_label: newActivityForm.label.trim(),
+        category: newActivityForm.category,
+        display_order: currentFields.length
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      const newField = { key: nextKey, label: newActivityForm.label.trim() };
+      if (newActivityForm.category === 'daily') {
+        setDailyFields(prev => [...prev, newField]);
+      } else if (newActivityForm.category === 'workflow') {
+        setWorkflowFields(prev => [...prev, newField]);
+      } else {
+        setWeeklyFields(prev => [...prev, newField]);
+      }
+
+      toast.success('Actividad agregada');
+      setIsAddActivityDialogOpen(false);
+      setNewActivityForm({ label: '', category: 'daily' });
+    } catch (error: any) {
+      toast.error('Error: ' + error.message);
+    }
+  };
+
+  const deleteActivity = async (fieldKey: string, category: 'daily' | 'workflow' | 'weekly') => {
+    // Only allow deleting custom fields
+    if (!fieldKey.startsWith('custom_')) {
+      toast.error('Solo puedes eliminar actividades personalizadas');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('performance_task_config')
+        .delete()
+        .eq('field_key', fieldKey);
+
+      if (error) throw error;
+
+      // Update local state
+      if (category === 'daily') {
+        setDailyFields(prev => prev.filter(f => f.key !== fieldKey));
+      } else if (category === 'workflow') {
+        setWorkflowFields(prev => prev.filter(f => f.key !== fieldKey));
+      } else {
+        setWeeklyFields(prev => prev.filter(f => f.key !== fieldKey));
+      }
+
+      toast.success('Actividad eliminada');
+    } catch (error: any) {
+      toast.error('Error: ' + error.message);
+    }
   };
 
   return (
@@ -777,9 +875,52 @@ export default function Tareas() {
                 <span className="text-sm font-medium">
                   {format(weekStart, "dd MMM", { locale: es })} - {format(addDays(weekStart, 6), "dd MMM yyyy", { locale: es })}
                 </span>
-                <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, 7))}>
-                  Semana Siguiente
-                </Button>
+                <div className="flex gap-2">
+                  <Dialog open={isAddActivityDialogOpen} onOpenChange={setIsAddActivityDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Plus className="h-4 w-4 mr-1" />
+                        Actividad
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-card border-border">
+                      <DialogHeader><DialogTitle>Nueva Actividad</DialogTitle></DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Nombre de la actividad</Label>
+                          <Input
+                            value={newActivityForm.label}
+                            onChange={e => setNewActivityForm(prev => ({ ...prev, label: e.target.value }))}
+                            placeholder="Ej: Leer 30 minutos"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Categoría</Label>
+                          <Select
+                            value={newActivityForm.category}
+                            onValueChange={v => setNewActivityForm(prev => ({ ...prev, category: v }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Hábitos Diarios</SelectItem>
+                              <SelectItem value="workflow">Workflow</SelectItem>
+                              <SelectItem value="weekly">Tareas Semanales</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="outline" onClick={() => setIsAddActivityDialogOpen(false)}>Cancelar</Button>
+                          <Button onClick={addNewActivity}>Agregar</Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="outline" size="sm" onClick={() => setWeekStart(addDays(weekStart, 7))}>
+                    Semana Siguiente
+                  </Button>
+                </div>
               </div>
 
               {/* Performance Grid (like Google Sheet) */}
@@ -811,26 +952,38 @@ export default function Tareas() {
                       {dailyFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
                           <td className="p-3 text-muted-foreground">
-                            {editingFieldLabel === field.key ? (
-                              <Input
-                                autoFocus
-                                value={editFieldValue}
-                                onChange={e => setEditFieldValue(e.target.value)}
-                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'daily')}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'daily');
-                                  if (e.key === 'Escape') setEditingFieldLabel(null);
-                                }}
-                                className="h-7 text-sm bg-secondary/50 w-full"
-                              />
-                            ) : (
-                              <span 
-                                className="cursor-pointer hover:text-foreground"
-                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
-                              >
-                                {field.label}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {editingFieldLabel === field.key ? (
+                                <Input
+                                  autoFocus
+                                  value={editFieldValue}
+                                  onChange={e => setEditFieldValue(e.target.value)}
+                                  onBlur={() => updateFieldLabel(field.key, editFieldValue, 'daily')}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'daily');
+                                    if (e.key === 'Escape') setEditingFieldLabel(null);
+                                  }}
+                                  className="h-7 text-sm bg-secondary/50 w-full"
+                                />
+                              ) : (
+                                <span 
+                                  className="cursor-pointer hover:text-foreground flex-1"
+                                  onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                                >
+                                  {field.label}
+                                </span>
+                              )}
+                              {field.key.startsWith('custom_') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => deleteActivity(field.key, 'daily')}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
@@ -859,26 +1012,38 @@ export default function Tareas() {
                       {workflowFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
                           <td className="p-3 text-muted-foreground">
-                            {editingFieldLabel === field.key ? (
-                              <Input
-                                autoFocus
-                                value={editFieldValue}
-                                onChange={e => setEditFieldValue(e.target.value)}
-                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'workflow')}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'workflow');
-                                  if (e.key === 'Escape') setEditingFieldLabel(null);
-                                }}
-                                className="h-7 text-sm bg-secondary/50 w-full"
-                              />
-                            ) : (
-                              <span 
-                                className="cursor-pointer hover:text-foreground"
-                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
-                              >
-                                {field.label}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {editingFieldLabel === field.key ? (
+                                <Input
+                                  autoFocus
+                                  value={editFieldValue}
+                                  onChange={e => setEditFieldValue(e.target.value)}
+                                  onBlur={() => updateFieldLabel(field.key, editFieldValue, 'workflow')}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'workflow');
+                                    if (e.key === 'Escape') setEditingFieldLabel(null);
+                                  }}
+                                  className="h-7 text-sm bg-secondary/50 w-full"
+                                />
+                              ) : (
+                                <span 
+                                  className="cursor-pointer hover:text-foreground flex-1"
+                                  onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                                >
+                                  {field.label}
+                                </span>
+                              )}
+                              {field.key.startsWith('custom_') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => deleteActivity(field.key, 'workflow')}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
@@ -907,26 +1072,38 @@ export default function Tareas() {
                       {weeklyFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
                           <td className="p-3 text-muted-foreground">
-                            {editingFieldLabel === field.key ? (
-                              <Input
-                                autoFocus
-                                value={editFieldValue}
-                                onChange={e => setEditFieldValue(e.target.value)}
-                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'weekly')}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'weekly');
-                                  if (e.key === 'Escape') setEditingFieldLabel(null);
-                                }}
-                                className="h-7 text-sm bg-secondary/50 w-full"
-                              />
-                            ) : (
-                              <span 
-                                className="cursor-pointer hover:text-foreground"
-                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
-                              >
-                                {field.label}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {editingFieldLabel === field.key ? (
+                                <Input
+                                  autoFocus
+                                  value={editFieldValue}
+                                  onChange={e => setEditFieldValue(e.target.value)}
+                                  onBlur={() => updateFieldLabel(field.key, editFieldValue, 'weekly')}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'weekly');
+                                    if (e.key === 'Escape') setEditingFieldLabel(null);
+                                  }}
+                                  className="h-7 text-sm bg-secondary/50 w-full"
+                                />
+                              ) : (
+                                <span 
+                                  className="cursor-pointer hover:text-foreground flex-1"
+                                  onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                                >
+                                  {field.label}
+                                </span>
+                              )}
+                              {field.key.startsWith('custom_') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive hover:text-destructive"
+                                  onClick={() => deleteActivity(field.key, 'weekly')}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
                           </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');

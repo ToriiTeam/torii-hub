@@ -850,6 +850,16 @@ export type Database = {
           actual: number | null
           cold_shower: boolean | null
           created_at: string
+          custom_1: boolean | null
+          custom_10: boolean | null
+          custom_2: boolean | null
+          custom_3: boolean | null
+          custom_4: boolean | null
+          custom_5: boolean | null
+          custom_6: boolean | null
+          custom_7: boolean | null
+          custom_8: boolean | null
+          custom_9: boolean | null
           daily_planning: boolean | null
           date: string
           desk_order: boolean | null
@@ -876,6 +886,16 @@ export type Database = {
           actual?: number | null
           cold_shower?: boolean | null
           created_at?: string
+          custom_1?: boolean | null
+          custom_10?: boolean | null
+          custom_2?: boolean | null
+          custom_3?: boolean | null
+          custom_4?: boolean | null
+          custom_5?: boolean | null
+          custom_6?: boolean | null
+          custom_7?: boolean | null
+          custom_8?: boolean | null
+          custom_9?: boolean | null
           daily_planning?: boolean | null
           date: string
           desk_order?: boolean | null
@@ -902,6 +922,16 @@ export type Database = {
           actual?: number | null
           cold_shower?: boolean | null
           created_at?: string
+          custom_1?: boolean | null
+          custom_10?: boolean | null
+          custom_2?: boolean | null
+          custom_3?: boolean | null
+          custom_4?: boolean | null
+          custom_5?: boolean | null
+          custom_6?: boolean | null
+          custom_7?: boolean | null
+          custom_8?: boolean | null
+          custom_9?: boolean | null
           daily_planning?: boolean | null
           date?: string
           desk_order?: boolean | null
