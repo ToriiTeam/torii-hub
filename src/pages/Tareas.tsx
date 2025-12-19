@@ -427,16 +427,13 @@ export default function Tareas() {
   // Rendimiento por día (solo checkboxes de una sección específica)
   const calculateDailyRendimiento = (userId: string, dateStr: string, fields: { key: string }[]): number => {
     const perf = getPerformance(userId, dateStr);
-    if (!perf) return 0;
+    if (!perf || fields.length === 0) return 0;
     let trueCount = 0;
-    let falseCount = 0;
     fields.forEach(field => {
       const value = perf[field.key as keyof UserPerformance];
       if (value === true) trueCount++;
-      else falseCount++;
     });
-    const total = trueCount + falseCount;
-    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+    return Math.round((trueCount / fields.length) * 100);
   };
 
   // Semanal = porcentaje de una tarea completada a lo largo de la semana (sobre 7 días)
@@ -456,16 +453,13 @@ export default function Tareas() {
   // Total (diario) = todas las tareas de un día
   const calculateDailyTotal = (userId: string, dateStr: string): number => {
     const perf = getPerformance(userId, dateStr);
-    if (!perf) return 0;
+    if (!perf || allCheckboxFields.length === 0) return 0;
     let trueCount = 0;
-    let falseCount = 0;
     allCheckboxFields.forEach(field => {
       const value = perf[field.key as keyof UserPerformance];
       if (value === true) trueCount++;
-      else falseCount++;
     });
-    const total = trueCount + falseCount;
-    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+    return Math.round((trueCount / allCheckboxFields.length) * 100);
   };
 
   // Total Semanal = todas las tareas de toda la semana (sobre 7 días × total de campos)
