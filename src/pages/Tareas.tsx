@@ -439,20 +439,18 @@ export default function Tareas() {
     return total > 0 ? Math.round((trueCount / total) * 100) : 0;
   };
 
-  // Semanal = porcentaje de una tarea completada a lo largo de la semana (solo cuenta días con datos)
+  // Semanal = porcentaje de una tarea completada a lo largo de la semana (sobre 7 días)
   const calculateWeeklyRowCompletion = (userId: string, fieldKey: string): number => {
     let trueCount = 0;
-    let daysWithData = 0;
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const perf = getPerformance(userId, dateStr);
       if (perf) {
-        daysWithData++;
         const value = perf[fieldKey as keyof UserPerformance];
         if (value === true) trueCount++;
       }
     });
-    return daysWithData > 0 ? Math.round((trueCount / daysWithData) * 100) : 0;
+    return Math.round((trueCount / 7) * 100);
   };
 
   // Total (diario) = todas las tareas de un día
@@ -470,22 +468,21 @@ export default function Tareas() {
     return total > 0 ? Math.round((trueCount / total) * 100) : 0;
   };
 
-  // Total Semanal = todas las tareas de toda la semana (solo cuenta días con datos)
+  // Total Semanal = todas las tareas de toda la semana (sobre 7 días × total de campos)
   const calculateWeeklyTotal = (userId: string): number => {
     let trueCount = 0;
-    let totalFields = 0;
+    const totalPossible = allCheckboxFields.length * 7; // Total de checkboxes posibles en la semana
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const perf = getPerformance(userId, dateStr);
       if (perf) {
         allCheckboxFields.forEach(field => {
-          totalFields++;
           const value = perf[field.key as keyof UserPerformance];
           if (value === true) trueCount++;
         });
       }
     });
-    return totalFields > 0 ? Math.round((trueCount / totalFields) * 100) : 0;
+    return Math.round((trueCount / totalPossible) * 100);
   };
 
   // Agregar nueva actividad
