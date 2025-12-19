@@ -45,21 +45,17 @@ interface TeamUser {
   name: string;
 }
 
-const revenueData = [
-  { month: 'Jul', ingresos: 18000, gastos: 12000 },
-  { month: 'Ago', ingresos: 22000, gastos: 14000 },
-  { month: 'Sep', ingresos: 25000, gastos: 15000 },
-  { month: 'Oct', ingresos: 28000, gastos: 16000 },
-  { month: 'Nov', ingresos: 32000, gastos: 18000 },
-  { month: 'Dic', ingresos: 35000, gastos: 19000 },
-];
+interface RevenueData {
+  month: string;
+  ingresos: number;
+  gastos: number;
+}
 
-const performanceData = [
-  { name: 'Semana 1', setters: 25, closers: 8 },
-  { name: 'Semana 2', setters: 32, closers: 12 },
-  { name: 'Semana 3', setters: 28, closers: 10 },
-  { name: 'Semana 4', setters: 35, closers: 15 },
-];
+interface PerformanceData {
+  name: string;
+  setters: number;
+  closers: number;
+}
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -74,9 +70,59 @@ export default function Dashboard() {
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [setterCalls, setSetterCalls] = useState(0);
   const [closerValue, setCloserValue] = useState(0);
+  
+  // Chart data
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
+  const [performanceData, setPerformanceData] = useState<PerformanceData[]>([]);
 
   useEffect(() => {
     loadData();
+    
+    // Set up realtime subscriptions for dashboard data
+    const tasksChannel = supabase
+      .channel('dashboard-tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadData())
+      .subscribe();
+    
+    const incomesChannel = supabase
+      .channel('dashboard-incomes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incomes' }, () => loadData())
+      .subscribe();
+    
+    const fixedCostsChannel = supabase
+      .channel('dashboard-fixed-costs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fixed_costs' }, () => loadData())
+      .subscribe();
+    
+    const variableCostsChannel = supabase
+      .channel('dashboard-variable-costs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'variable_costs' }, () => loadData())
+      .subscribe();
+    
+    const clientsChannel = supabase
+      .channel('dashboard-clients')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => loadData())
+      .subscribe();
+    
+    const setterMeetingsChannel = supabase
+      .channel('dashboard-setter-meetings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'setter_meetings' }, () => loadData())
+      .subscribe();
+    
+    const closerCallsChannel = supabase
+      .channel('dashboard-closer-calls')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'closer_calls' }, () => loadData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tasksChannel);
+      supabase.removeChannel(incomesChannel);
+      supabase.removeChannel(fixedCostsChannel);
+      supabase.removeChannel(variableCostsChannel);
+      supabase.removeChannel(clientsChannel);
+      supabase.removeChannel(setterMeetingsChannel);
+      supabase.removeChannel(closerCallsChannel);
+    };
   }, []);
 
   const loadData = async () => {
@@ -102,24 +148,71 @@ export default function Dashboard() {
       const { count: docs } = await supabase.from('documents').select('*', { count: 'exact', head: true });
       setDocumentCount(docs || 0);
 
-      // Load incomes sum
-      const { data: incomesData } = await supabase.from('incomes').select('amount');
+      // Load incomes with date for chart
+      const { data: incomesData } = await supabase.from('incomes').select('amount, date');
       if (incomesData) setTotalIncome(incomesData.reduce((sum, i) => sum + Number(i.amount), 0));
 
       // Load expenses sum
       const { data: fixedData } = await supabase.from('fixed_costs').select('amount');
-      const { data: variableData } = await supabase.from('variable_costs').select('amount');
+      const { data: variableData } = await supabase.from('variable_costs').select('amount, date');
       const fixedSum = fixedData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
       const variableSum = variableData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
       setTotalExpenses(fixedSum + variableSum);
 
       // Load setter meetings count
-      const { count: meetings } = await supabase.from('setter_meetings').select('*', { count: 'exact', head: true });
-      setSetterCalls(meetings || 0);
+      const { data: meetingsData } = await supabase.from('setter_meetings').select('scheduled_date');
+      setSetterCalls(meetingsData?.length || 0);
 
       // Load closer calls value
-      const { data: closerCallsData } = await supabase.from('closer_calls').select('price').eq('paid', true);
-      if (closerCallsData) setCloserValue(closerCallsData.reduce((sum, c) => sum + Number(c.price || 0), 0));
+      const { data: closerCallsData } = await supabase.from('closer_calls').select('price, first_call_date, paid');
+      if (closerCallsData) setCloserValue(closerCallsData.filter(c => c.paid).reduce((sum, c) => sum + Number(c.price || 0), 0));
+
+      // Build revenue chart data (last 6 months)
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const now = new Date();
+      const chartData: RevenueData[] = [];
+      
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        const monthIncome = incomesData?.filter(inc => inc.date?.startsWith(monthStr)).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+        const monthExpenses = (variableData?.filter(v => v.date?.startsWith(monthStr)).reduce((sum, v) => sum + Number(v.amount), 0) || 0) + (fixedSum / 12);
+        
+        chartData.push({
+          month: months[date.getMonth()],
+          ingresos: monthIncome,
+          gastos: Math.round(monthExpenses)
+        });
+      }
+      setRevenueData(chartData);
+
+      // Build performance chart data (last 4 weeks)
+      const perfData: PerformanceData[] = [];
+      for (let i = 3; i >= 0; i--) {
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - (i * 7) - now.getDay() + 1);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        
+        const weekMeetings = meetingsData?.filter(m => {
+          const d = new Date(m.scheduled_date);
+          return d >= weekStart && d <= weekEnd;
+        }).length || 0;
+        
+        const weekClosers = closerCallsData?.filter(c => {
+          if (!c.first_call_date) return false;
+          const d = new Date(c.first_call_date);
+          return d >= weekStart && d <= weekEnd && c.paid;
+        }).length || 0;
+        
+        perfData.push({
+          name: `Semana ${4 - i}`,
+          setters: weekMeetings,
+          closers: weekClosers
+        });
+      }
+      setPerformanceData(perfData);
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);

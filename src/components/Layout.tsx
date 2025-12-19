@@ -26,7 +26,6 @@ import {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Usuarios', href: '/usuarios', icon: User },
   { name: 'Productividad', href: '/tareas', icon: CheckSquare },
   { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
   { name: 'Setters', href: '/setters', icon: PhoneCall },
