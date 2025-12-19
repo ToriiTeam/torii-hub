@@ -37,6 +37,7 @@ interface Client {
   total_installments: number;
   paid_installments: number;
   installment_amount: number;
+  total_amount: number;
   next_due_date?: string;
   platform: PaymentPlatform;
   platform_fee: number;
@@ -112,7 +113,7 @@ export default function Clientes() {
   const [clientForm, setClientForm] = useState({
     name: '', email: '', phone: '', offer_type: 'DFY' as OfferType, start_date: '', end_date: '',
     status: 'activo' as ClientStatus, payment_type: 'Cuotas' as PaymentType, total_installments: '1',
-    paid_installments: '0', installment_amount: '0', next_due_date: '', platform: 'Stripe' as PaymentPlatform,
+    paid_installments: '0', installment_amount: '0', total_amount: '0', next_due_date: '', platform: 'Stripe' as PaymentPlatform,
     platform_fee: '2.9', country: '', notes: ''
   });
 
@@ -163,6 +164,7 @@ export default function Clientes() {
       total_installments: parseInt(clientForm.total_installments) || 1,
       paid_installments: parseInt(clientForm.paid_installments) || 0,
       installment_amount: parseFloat(clientForm.installment_amount) || 0,
+      total_amount: parseFloat(clientForm.total_amount) || 0,
       next_due_date: clientForm.next_due_date || null,
       platform: clientForm.platform,
       platform_fee: parseFloat(clientForm.platform_fee) || 0,
@@ -191,7 +193,7 @@ export default function Clientes() {
     setClientForm({
       name: '', email: '', phone: '', offer_type: 'DFY', start_date: '', end_date: '',
       status: 'activo', payment_type: 'Cuotas', total_installments: '1', paid_installments: '0',
-      installment_amount: '0', next_due_date: '', platform: 'Stripe', platform_fee: '2.9', country: '', notes: ''
+      installment_amount: '0', total_amount: '0', next_due_date: '', platform: 'Stripe', platform_fee: '2.9', country: '', notes: ''
     });
     setEditingClient(null);
     setIsClientDialogOpen(false);
@@ -211,6 +213,7 @@ export default function Clientes() {
       total_installments: client.total_installments.toString(),
       paid_installments: client.paid_installments.toString(),
       installment_amount: client.installment_amount.toString(),
+      total_amount: (client.total_amount || 0).toString(),
       next_due_date: client.next_due_date || '',
       platform: client.platform,
       platform_fee: client.platform_fee.toString(),
@@ -297,8 +300,12 @@ export default function Clientes() {
   const getClientTasks = (clientId: string) => tasks.filter(t => t.client_id === clientId);
 
   const activeClients = clients.filter(c => c.status === 'activo');
-  const totalContractValue = activeClients.reduce((s, c) => s + (c.installment_amount * c.total_installments), 0);
-  const totalPending = activeClients.reduce((s, c) => s + (c.installment_amount * (c.total_installments - c.paid_installments)), 0);
+  const totalContractValue = activeClients.reduce((s, c) => s + (c.total_amount || 0), 0);
+  const totalPending = activeClients.reduce((s, c) => {
+    const remaining = c.total_installments - c.paid_installments;
+    const avgPerInstallment = c.total_installments > 0 ? (c.total_amount || 0) / c.total_installments : 0;
+    return s + (avgPerInstallment * remaining);
+  }, 0);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
@@ -334,8 +341,8 @@ export default function Clientes() {
               <div className="flex items-center gap-3">
                 <DollarSign className="h-8 w-8 text-success" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Valor Contrato</p>
-                  <p className="text-xl font-bold">${(selectedClient.installment_amount * selectedClient.total_installments).toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Monto Total</p>
+                  <p className="text-xl font-bold">${(selectedClient.total_amount || 0).toLocaleString()}</p>
                 </div>
               </div>
             </CardContent>
@@ -345,8 +352,8 @@ export default function Clientes() {
               <div className="flex items-center gap-3">
                 <CreditCard className="h-8 w-8 text-warning" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Pagos</p>
-                  <p className="text-xl font-bold">{selectedClient.paid_installments}/{selectedClient.total_installments}</p>
+                  <p className="text-xs text-muted-foreground">Cuotas Pagadas / Restantes</p>
+                  <p className="text-xl font-bold">{selectedClient.paid_installments} / {selectedClient.total_installments - selectedClient.paid_installments}</p>
                 </div>
               </div>
             </CardContent>
@@ -405,7 +412,7 @@ export default function Clientes() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><span className="text-muted-foreground">Tipo:</span> <span className="font-medium">{selectedClient.payment_type}</span></div>
                     <div><span className="text-muted-foreground">Plataforma:</span> <span className="font-medium">{selectedClient.platform} ({selectedClient.platform_fee}%)</span></div>
-                    <div><span className="text-muted-foreground">Cuota:</span> <span className="font-medium">${selectedClient.installment_amount.toLocaleString()}</span></div>
+                    <div><span className="text-muted-foreground">Total Cuotas:</span> <span className="font-medium">{selectedClient.total_installments}</span></div>
                     <div><span className="text-muted-foreground">Próx. Venc:</span> <span className="font-medium">{selectedClient.next_due_date || '-'}</span></div>
                   </div>
                   <div className="pt-2">
@@ -598,6 +605,9 @@ export default function Clientes() {
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
+                <div><Label>Monto Total</Label><Input type="number" min="0" value={clientForm.total_amount} onChange={e => setClientForm({ ...clientForm, total_amount: e.target.value })} className="bg-secondary/50" /></div>
+                <div><Label>Total Cuotas</Label><Input type="number" min="1" value={clientForm.total_installments} onChange={e => setClientForm({ ...clientForm, total_installments: e.target.value })} className="bg-secondary/50" /></div>
+                <div><Label>Cuotas Pagadas</Label><Input type="number" min="0" value={clientForm.paid_installments} onChange={e => setClientForm({ ...clientForm, paid_installments: e.target.value })} className="bg-secondary/50" /></div>
                 <div><Label>Tipo Pago</Label>
                   <Select value={clientForm.payment_type} onValueChange={v => setClientForm({ ...clientForm, payment_type: v as PaymentType })}>
                     <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
@@ -608,9 +618,6 @@ export default function Clientes() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div><Label>Total Cuotas</Label><Input type="number" min="1" value={clientForm.total_installments} onChange={e => setClientForm({ ...clientForm, total_installments: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Pagadas</Label><Input type="number" min="0" value={clientForm.paid_installments} onChange={e => setClientForm({ ...clientForm, paid_installments: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Monto/Cuota</Label><Input type="number" min="0" value={clientForm.installment_amount} onChange={e => setClientForm({ ...clientForm, installment_amount: e.target.value })} className="bg-secondary/50" /></div>
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <div><Label>Próx. Venc.</Label><Input type="date" value={clientForm.next_due_date} onChange={e => setClientForm({ ...clientForm, next_due_date: e.target.value })} className="bg-secondary/50" /></div>
@@ -693,8 +700,8 @@ export default function Clientes() {
                   <span>{client.platform}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Pagos: {client.paid_installments}/{client.total_installments}</span>
-                  <span className="font-medium">${client.installment_amount.toLocaleString()}/cuota</span>
+                  <span className="text-muted-foreground">Cuotas: {client.paid_installments}/{client.total_installments} (faltan {client.total_installments - client.paid_installments})</span>
+                  <span className="font-medium">${(client.total_amount || 0).toLocaleString()}</span>
                 </div>
                 <Progress value={progress} className="h-1.5 mb-3" />
                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/30">

@@ -208,6 +208,7 @@ export type Database = {
           platform_fee: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["client_status"] | null
+          total_amount: number | null
           total_installments: number | null
           updated_at: string
         }
@@ -229,6 +230,7 @@ export type Database = {
           platform_fee?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["client_status"] | null
+          total_amount?: number | null
           total_installments?: number | null
           updated_at?: string
         }
@@ -250,6 +252,7 @@ export type Database = {
           platform_fee?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["client_status"] | null
+          total_amount?: number | null
           total_installments?: number | null
           updated_at?: string
         }
