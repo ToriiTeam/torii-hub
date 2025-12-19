@@ -70,6 +70,14 @@ interface UserPerformance {
   notes: string | null;
 }
 
+interface TaskConfig {
+  id: string;
+  field_key: string;
+  custom_label: string;
+  category: string;
+  display_order: number;
+}
+
 export default function Tareas() {
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -98,6 +106,7 @@ export default function Tareas() {
 
   useEffect(() => {
     loadData();
+    loadTaskConfig();
   }, []);
 
   const loadData = async () => {
@@ -118,6 +127,29 @@ export default function Tareas() {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTaskConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('performance_task_config')
+        .select('*')
+        .order('display_order');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const daily = data.filter(d => d.category === 'daily').map(d => ({ key: d.field_key, label: d.custom_label }));
+        const workflow = data.filter(d => d.category === 'workflow').map(d => ({ key: d.field_key, label: d.custom_label }));
+        const weekly = data.filter(d => d.category === 'weekly').map(d => ({ key: d.field_key, label: d.custom_label }));
+        
+        if (daily.length > 0) setDailyFields(daily);
+        if (workflow.length > 0) setWorkflowFields(workflow);
+        if (weekly.length > 0) setWeeklyFields(weekly);
+      }
+    } catch (error) {
+      console.error('Error loading task config:', error);
     }
   };
 
@@ -349,7 +381,8 @@ export default function Tareas() {
     { key: 'program_content', label: 'Contenido del programa' },
   ]);
 
-  const updateFieldLabel = (fieldKey: string, newLabel: string, category: 'daily' | 'workflow' | 'weekly') => {
+  const updateFieldLabel = async (fieldKey: string, newLabel: string, category: 'daily' | 'workflow' | 'weekly') => {
+    // Update local state
     if (category === 'daily') {
       setDailyFields(prev => prev.map(f => f.key === fieldKey ? { ...f, label: newLabel } : f));
     } else if (category === 'workflow') {
@@ -358,6 +391,19 @@ export default function Tareas() {
       setWeeklyFields(prev => prev.map(f => f.key === fieldKey ? { ...f, label: newLabel } : f));
     }
     setEditingFieldLabel(null);
+
+    // Save to database
+    try {
+      const { error } = await supabase
+        .from('performance_task_config')
+        .update({ custom_label: newLabel })
+        .eq('field_key', fieldKey);
+      
+      if (error) throw error;
+      toast.success('Nombre actualizado');
+    } catch (error: any) {
+      toast.error('Error al guardar: ' + error.message);
+    }
   };
 
   // Calculate formulas like in Excel
