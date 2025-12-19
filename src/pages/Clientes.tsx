@@ -37,7 +37,7 @@ interface Client {
   total_installments: number;
   paid_installments: number;
   installment_amount: number;
-  total_amount: number;
+  total_amount?: number;
   next_due_date?: string;
   platform: PaymentPlatform;
   platform_fee: number;
