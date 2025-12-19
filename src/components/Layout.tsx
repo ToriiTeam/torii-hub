@@ -42,7 +42,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const { user, logout } = useAuth();
+  const { profile, signOut } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -108,8 +108,8 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user?.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
+                <p className="text-sm font-medium truncate">{profile?.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{profile?.role}</p>
               </div>
             )}
           </div>
@@ -131,8 +131,8 @@ export default function Layout({ children }: LayoutProps) {
                 <User className="h-4 w-4 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user?.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
+                <p className="text-sm font-medium truncate">{profile?.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{profile?.role}</p>
               </div>
             </div>
           </div>
@@ -204,7 +204,7 @@ export default function Layout({ children }: LayoutProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={logout}
+              onClick={signOut}
               className="text-muted-foreground hover:text-destructive"
             >
               <LogOut className="h-5 w-5" />
