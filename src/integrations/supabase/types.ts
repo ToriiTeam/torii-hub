@@ -516,6 +516,36 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_task_config: {
+        Row: {
+          category: string
+          created_at: string
+          custom_label: string
+          display_order: number | null
+          field_key: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          custom_label: string
+          display_order?: number | null
+          field_key: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          custom_label?: string
+          display_order?: number | null
+          field_key?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
