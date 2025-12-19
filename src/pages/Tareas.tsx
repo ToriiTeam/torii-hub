@@ -322,46 +322,112 @@ export default function Tareas() {
     }
   };
 
-  // Performance fields for the tracker (like Google Sheet)
-  const dailyFields = [
+  // Performance fields for the tracker (like Google Sheet) - EDITABLE
+  const [editingFieldLabel, setEditingFieldLabel] = useState<string | null>(null);
+  const [editFieldValue, setEditFieldValue] = useState('');
+  
+  const [dailyFields, setDailyFields] = useState([
     { key: 'morning_routine', label: 'Rutina de mañana' },
     { key: 'desk_order', label: 'Orden del escritorio' },
     { key: 'cold_shower', label: 'Ducha fría' },
     { key: 'exercise', label: 'Entrenamiento' },
     { key: 'meditation', label: 'Meditación' },
     { key: 'accountability', label: 'Accountability' },
-  ];
+  ]);
 
-  const workflowFields = [
+  const [workflowFields, setWorkflowFields] = useState([
     { key: 'daily_planning', label: 'Planificación diaria' },
     { key: 'focus_hours_logged', label: '10h enfoque registradas' },
     { key: 'success_tracker', label: 'Success tracker' },
     { key: 'time_tracking', label: 'Medir tiempo con toggle' },
-  ];
+  ]);
 
-  const weeklyFields = [
+  const [weeklyFields, setWeeklyFields] = useState([
     { key: 'weekly_planning', label: 'Planificación semanal' },
     { key: 'mentoring', label: 'Mentoría 1-a-1' },
     { key: 'weekly_tasks_complete', label: 'Tareas semana 100%' },
     { key: 'program_content', label: 'Contenido del programa' },
-  ];
+  ]);
 
-  // Calculate weekly completion
-  const calculateWeeklyCompletion = (userId: string): number => {
-    const allFields = [...dailyFields, ...workflowFields, ...weeklyFields];
-    let completed = 0;
-    let total = 0;
+  const updateFieldLabel = (fieldKey: string, newLabel: string, category: 'daily' | 'workflow' | 'weekly') => {
+    if (category === 'daily') {
+      setDailyFields(prev => prev.map(f => f.key === fieldKey ? { ...f, label: newLabel } : f));
+    } else if (category === 'workflow') {
+      setWorkflowFields(prev => prev.map(f => f.key === fieldKey ? { ...f, label: newLabel } : f));
+    } else {
+      setWeeklyFields(prev => prev.map(f => f.key === fieldKey ? { ...f, label: newLabel } : f));
+    }
+    setEditingFieldLabel(null);
+  };
 
+  // Calculate formulas like in Excel
+  // Rendimiento (diario) = VERDADEROS / (VERDADEROS + FALSOS) en un día para una sección
+  // Semanal = VERDADEROS / (VERDADEROS + FALSOS) en una fila para toda la semana
+  // Total = VERDADEROS / (VERDADEROS + FALSOS) en un día para todas las secciones
+  // Total Semanal = VERDADEROS / (VERDADEROS + FALSOS) de toda la semana para todas las secciones
+
+  const allCheckboxFields = [...dailyFields, ...workflowFields, ...weeklyFields];
+
+  // Rendimiento por día (solo checkboxes de una sección específica)
+  const calculateDailyRendimiento = (userId: string, dateStr: string, fields: { key: string }[]): number => {
+    const perf = getPerformance(userId, dateStr);
+    if (!perf) return 0;
+    let trueCount = 0;
+    let falseCount = 0;
+    fields.forEach(field => {
+      const value = perf[field.key as keyof UserPerformance];
+      if (value === true) trueCount++;
+      else falseCount++;
+    });
+    const total = trueCount + falseCount;
+    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+  };
+
+  // Semanal = porcentaje de una tarea completada a lo largo de la semana
+  const calculateWeeklyRowCompletion = (userId: string, fieldKey: string): number => {
+    let trueCount = 0;
+    let falseCount = 0;
     weekDays.forEach(day => {
       const dateStr = format(day, 'yyyy-MM-dd');
       const perf = getPerformance(userId, dateStr);
-      allFields.forEach(field => {
-        total++;
-        if (perf && perf[field.key as keyof UserPerformance]) completed++;
+      const value = perf ? perf[fieldKey as keyof UserPerformance] : false;
+      if (value === true) trueCount++;
+      else falseCount++;
+    });
+    const total = trueCount + falseCount;
+    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+  };
+
+  // Total (diario) = todas las tareas de un día
+  const calculateDailyTotal = (userId: string, dateStr: string): number => {
+    const perf = getPerformance(userId, dateStr);
+    if (!perf) return 0;
+    let trueCount = 0;
+    let falseCount = 0;
+    allCheckboxFields.forEach(field => {
+      const value = perf[field.key as keyof UserPerformance];
+      if (value === true) trueCount++;
+      else falseCount++;
+    });
+    const total = trueCount + falseCount;
+    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
+  };
+
+  // Total Semanal = todas las tareas de toda la semana
+  const calculateWeeklyTotal = (userId: string): number => {
+    let trueCount = 0;
+    let falseCount = 0;
+    weekDays.forEach(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const perf = getPerformance(userId, dateStr);
+      allCheckboxFields.forEach(field => {
+        const value = perf ? perf[field.key as keyof UserPerformance] : false;
+        if (value === true) trueCount++;
+        else falseCount++;
       });
     });
-
-    return total > 0 ? Math.round((completed / total) * 100) : 0;
+    const total = trueCount + falseCount;
+    return total > 0 ? Math.round((trueCount / total) * 100) : 0;
   };
 
   return (
@@ -422,7 +488,7 @@ export default function Tareas() {
             {teamUsers.map(user => {
               const userTasks = getUserTasks(user.id);
               const completedTasks = userTasks.filter(t => t.status === 'completada').length;
-              const weeklyCompletion = calculateWeeklyCompletion(user.id);
+              const weeklyCompletion = calculateWeeklyTotal(user.id);
               
               return (
                 <Card 
@@ -686,16 +752,40 @@ export default function Tareas() {
                             <div className={cn("font-bold", isToday(day) && "text-primary")}>{format(day, 'd')}</div>
                           </th>
                         ))}
+                        <th className="p-3 text-center min-w-[80px] bg-secondary/50">
+                          <div className="text-xs text-muted-foreground">Semanal</div>
+                          <div className="font-bold">%</div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {/* SEMANAL (Daily habits) */}
                       <tr className="bg-secondary/20">
-                        <td colSpan={8} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Semanal</td>
+                        <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Hábitos Diarios</td>
                       </tr>
                       {dailyFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
-                          <td className="p-3 text-muted-foreground">{field.label}</td>
+                          <td className="p-3 text-muted-foreground">
+                            {editingFieldLabel === field.key ? (
+                              <Input
+                                autoFocus
+                                value={editFieldValue}
+                                onChange={e => setEditFieldValue(e.target.value)}
+                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'daily')}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'daily');
+                                  if (e.key === 'Escape') setEditingFieldLabel(null);
+                                }}
+                                className="h-7 text-sm bg-secondary/50 w-full"
+                              />
+                            ) : (
+                              <span 
+                                className="cursor-pointer hover:text-foreground"
+                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                              >
+                                {field.label}
+                              </span>
+                            )}
+                          </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const perf = getPerformance(selectedUser.id, dateStr);
@@ -710,16 +800,40 @@ export default function Tareas() {
                               </td>
                             );
                           })}
+                          <td className="p-3 text-center font-medium bg-secondary/30">
+                            {calculateWeeklyRowCompletion(selectedUser.id, field.key)}%
+                          </td>
                         </tr>
                       ))}
 
                       {/* WORKFLOW */}
                       <tr className="bg-secondary/20">
-                        <td colSpan={8} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Workflow</td>
+                        <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Workflow</td>
                       </tr>
                       {workflowFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
-                          <td className="p-3 text-muted-foreground">{field.label}</td>
+                          <td className="p-3 text-muted-foreground">
+                            {editingFieldLabel === field.key ? (
+                              <Input
+                                autoFocus
+                                value={editFieldValue}
+                                onChange={e => setEditFieldValue(e.target.value)}
+                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'workflow')}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'workflow');
+                                  if (e.key === 'Escape') setEditingFieldLabel(null);
+                                }}
+                                className="h-7 text-sm bg-secondary/50 w-full"
+                              />
+                            ) : (
+                              <span 
+                                className="cursor-pointer hover:text-foreground"
+                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                              >
+                                {field.label}
+                              </span>
+                            )}
+                          </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const perf = getPerformance(selectedUser.id, dateStr);
@@ -734,16 +848,40 @@ export default function Tareas() {
                               </td>
                             );
                           })}
+                          <td className="p-3 text-center font-medium bg-secondary/30">
+                            {calculateWeeklyRowCompletion(selectedUser.id, field.key)}%
+                          </td>
                         </tr>
                       ))}
 
                       {/* SEMANAL (Weekly tasks) */}
                       <tr className="bg-secondary/20">
-                        <td colSpan={8} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Semanal</td>
+                        <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Tareas Semanales</td>
                       </tr>
                       {weeklyFields.map(field => (
                         <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
-                          <td className="p-3 text-muted-foreground">{field.label}</td>
+                          <td className="p-3 text-muted-foreground">
+                            {editingFieldLabel === field.key ? (
+                              <Input
+                                autoFocus
+                                value={editFieldValue}
+                                onChange={e => setEditFieldValue(e.target.value)}
+                                onBlur={() => updateFieldLabel(field.key, editFieldValue, 'weekly')}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') updateFieldLabel(field.key, editFieldValue, 'weekly');
+                                  if (e.key === 'Escape') setEditingFieldLabel(null);
+                                }}
+                                className="h-7 text-sm bg-secondary/50 w-full"
+                              />
+                            ) : (
+                              <span 
+                                className="cursor-pointer hover:text-foreground"
+                                onDoubleClick={() => { setEditingFieldLabel(field.key); setEditFieldValue(field.label); }}
+                              >
+                                {field.label}
+                              </span>
+                            )}
+                          </td>
                           {weekDays.map(day => {
                             const dateStr = format(day, 'yyyy-MM-dd');
                             const perf = getPerformance(selectedUser.id, dateStr);
@@ -758,12 +896,15 @@ export default function Tareas() {
                               </td>
                             );
                           })}
+                          <td className="p-3 text-center font-medium bg-secondary/30">
+                            {calculateWeeklyRowCompletion(selectedUser.id, field.key)}%
+                          </td>
                         </tr>
                       ))}
 
                       {/* RENDIMIENTO */}
                       <tr className="bg-secondary/20">
-                        <td colSpan={8} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Rendimiento</td>
+                        <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Rendimiento</td>
                       </tr>
                       <tr className="border-b border-border/20 hover:bg-secondary/10">
                         <td className="p-3 text-muted-foreground">Hora de despertar</td>
@@ -820,7 +961,7 @@ export default function Tareas() {
 
                       {/* TOTAL */}
                       <tr className="bg-secondary/20">
-                        <td colSpan={8} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Total</td>
+                        <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Total</td>
                       </tr>
                       <tr className="border-b border-border/20 hover:bg-secondary/10">
                         <td className="p-3 text-muted-foreground">Target (Diario)</td>
@@ -882,7 +1023,7 @@ export default function Tareas() {
                 <Card className="bg-card border-border/50">
                   <CardContent className="p-4 text-center">
                     <p className="text-xs text-muted-foreground mb-1">Completitud Semanal</p>
-                    <p className="text-2xl font-bold">{calculateWeeklyCompletion(selectedUser.id)}%</p>
+                    <p className="text-2xl font-bold">{calculateWeeklyTotal(selectedUser.id)}%</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-card border-border/50">
