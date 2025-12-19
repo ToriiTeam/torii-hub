@@ -542,19 +542,12 @@ export default function Tareas() {
   };
 
   const deleteActivity = async (fieldKey: string, category: 'daily' | 'workflow' | 'weekly') => {
-    // Only allow deleting custom fields
-    if (!fieldKey.startsWith('custom_')) {
-      toast.error('Solo puedes eliminar actividades personalizadas');
-      return;
-    }
-
     try {
-      const { error } = await supabase
+      // Delete from config table if it exists there
+      await supabase
         .from('performance_task_config')
         .delete()
         .eq('field_key', fieldKey);
-
-      if (error) throw error;
 
       // Update local state
       if (category === 'daily') {
@@ -947,7 +940,7 @@ export default function Tareas() {
                         <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Hábitos Diarios</td>
                       </tr>
                       {dailyFields.map(field => (
-                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
+                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10 group">
                           <td className="p-3 text-muted-foreground">
                             <div className="flex items-center gap-2">
                               {editingFieldLabel === field.key ? (
@@ -970,16 +963,14 @@ export default function Tareas() {
                                   {field.label}
                                 </span>
                               )}
-                              {field.key.startsWith('custom_') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-destructive hover:text-destructive"
-                                  onClick={() => deleteActivity(field.key, 'daily')}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => deleteActivity(field.key, 'daily')}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </td>
                           {weekDays.map(day => {
@@ -1007,7 +998,7 @@ export default function Tareas() {
                         <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Workflow</td>
                       </tr>
                       {workflowFields.map(field => (
-                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
+                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10 group">
                           <td className="p-3 text-muted-foreground">
                             <div className="flex items-center gap-2">
                               {editingFieldLabel === field.key ? (
@@ -1030,16 +1021,14 @@ export default function Tareas() {
                                   {field.label}
                                 </span>
                               )}
-                              {field.key.startsWith('custom_') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-destructive hover:text-destructive"
-                                  onClick={() => deleteActivity(field.key, 'workflow')}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => deleteActivity(field.key, 'workflow')}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </td>
                           {weekDays.map(day => {
@@ -1067,7 +1056,7 @@ export default function Tareas() {
                         <td colSpan={9} className="p-2 font-bold text-xs uppercase tracking-wider text-muted-foreground">Tareas Semanales</td>
                       </tr>
                       {weeklyFields.map(field => (
-                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10">
+                        <tr key={field.key} className="border-b border-border/20 hover:bg-secondary/10 group">
                           <td className="p-3 text-muted-foreground">
                             <div className="flex items-center gap-2">
                               {editingFieldLabel === field.key ? (
@@ -1090,16 +1079,14 @@ export default function Tareas() {
                                   {field.label}
                                 </span>
                               )}
-                              {field.key.startsWith('custom_') && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-destructive hover:text-destructive"
-                                  onClick={() => deleteActivity(field.key, 'weekly')}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => deleteActivity(field.key, 'weekly')}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </td>
                           {weekDays.map(day => {
