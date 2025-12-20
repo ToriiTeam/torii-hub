@@ -272,7 +272,7 @@ export default function Clientes() {
       status: taskForm.status,
       due_date: taskForm.due_date || null,
       progress: parseInt(taskForm.progress) || 0,
-      assigned_to: taskForm.assigned_to || null
+      assigned_to: taskForm.assigned_to && taskForm.assigned_to !== 'none' ? taskForm.assigned_to : null
     });
 
     if (error) { toast.error('Error al crear'); return; }
@@ -499,7 +499,7 @@ export default function Clientes() {
                 <Select value={taskForm.assigned_to} onValueChange={v => setTaskForm({ ...taskForm, assigned_to: v })}>
                   <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin asignar</SelectItem>
+                    <SelectItem value="none">Sin asignar</SelectItem>
                     {teamUsers.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
