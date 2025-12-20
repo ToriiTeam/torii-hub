@@ -97,6 +97,53 @@ export type Database = {
           },
         ]
       }
+      client_installments: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          due_date: string | null
+          id: string
+          installment_number: number
+          notes: string | null
+          paid: boolean | null
+          paid_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          client_id: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          installment_number: number
+          notes?: string | null
+          paid?: boolean | null
+          paid_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          installment_number?: number
+          notes?: string | null
+          paid?: boolean | null
+          paid_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_installments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_products: {
         Row: {
           client_id: string
