@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Search, DollarSign, Trash2, Edit2, Globe, X, Package, CheckSquare, CreditCard, ArrowLeft, User } from 'lucide-react';
+import { Plus, Search, DollarSign, Trash2, Edit2, Globe, X, Package, CheckSquare, CreditCard, ArrowLeft, User, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -65,6 +65,17 @@ interface ClientTask {
   assigned_to?: string;
 }
 
+interface ClientInstallment {
+  id: string;
+  client_id: string;
+  installment_number: number;
+  amount: number;
+  due_date?: string;
+  paid: boolean;
+  paid_date?: string;
+  notes?: string;
+}
+
 interface TeamUser {
   id: string;
   name: string;
@@ -100,6 +111,7 @@ export default function Clientes() {
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<ClientProduct[]>([]);
   const [tasks, setTasks] = useState<ClientTask[]>([]);
+  const [installments, setInstallments] = useState<ClientInstallment[]>([]);
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -107,7 +119,9 @@ export default function Clientes() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isInstallmentDialogOpen, setIsInstallmentDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [editingInstallment, setEditingInstallment] = useState<ClientInstallment | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const [clientForm, setClientForm] = useState({
@@ -119,6 +133,7 @@ export default function Clientes() {
 
   const [productForm, setProductForm] = useState({ product_name: '', description: '', price: '', sold_date: '' });
   const [taskForm, setTaskForm] = useState({ title: '', description: '', status: 'pendiente' as TaskStatus, due_date: '', progress: '0', assigned_to: '' });
+  const [installmentForm, setInstallmentForm] = useState({ installment_number: '', amount: '', due_date: '', notes: '' });
 
   useEffect(() => {
     fetchData();
@@ -126,17 +141,19 @@ export default function Clientes() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsRes, productsRes, tasksRes, teamUsersRes] = await Promise.all([
+    const [clientsRes, productsRes, tasksRes, teamUsersRes, installmentsRes] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('client_products').select('*'),
       supabase.from('client_tasks').select('*'),
-      supabase.from('team_users').select('id, name').order('name')
+      supabase.from('team_users').select('id, name').order('name'),
+      supabase.from('client_installments').select('*').order('installment_number')
     ]);
     
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (productsRes.data) setProducts(productsRes.data as ClientProduct[]);
     if (tasksRes.data) setTasks(tasksRes.data as ClientTask[]);
     if (teamUsersRes.data) setTeamUsers(teamUsersRes.data as TeamUser[]);
+    if (installmentsRes.data) setInstallments(installmentsRes.data as ClientInstallment[]);
     setLoading(false);
   };
 
@@ -296,8 +313,112 @@ export default function Clientes() {
     fetchData();
   };
 
+  // Installment handlers
+  const handleInstallmentSubmit = async () => {
+    if (!selectedClient || !installmentForm.amount) {
+      toast.error('El monto es requerido');
+      return;
+    }
+
+    const data = {
+      client_id: selectedClient.id,
+      installment_number: parseInt(installmentForm.installment_number) || 1,
+      amount: parseFloat(installmentForm.amount) || 0,
+      due_date: installmentForm.due_date || null,
+      notes: installmentForm.notes || null
+    };
+
+    if (editingInstallment) {
+      const { error } = await supabase.from('client_installments').update(data).eq('id', editingInstallment.id);
+      if (error) { toast.error('Error al actualizar'); return; }
+      toast.success('Cuota actualizada');
+    } else {
+      const { error } = await supabase.from('client_installments').insert(data);
+      if (error) { toast.error('Error al crear'); return; }
+      toast.success('Cuota agregada');
+    }
+    
+    resetInstallmentForm();
+    fetchData();
+  };
+
+  const resetInstallmentForm = () => {
+    setInstallmentForm({ installment_number: '', amount: '', due_date: '', notes: '' });
+    setEditingInstallment(null);
+    setIsInstallmentDialogOpen(false);
+  };
+
+  const editInstallment = (inst: ClientInstallment) => {
+    setEditingInstallment(inst);
+    setInstallmentForm({
+      installment_number: inst.installment_number.toString(),
+      amount: inst.amount.toString(),
+      due_date: inst.due_date || '',
+      notes: inst.notes || ''
+    });
+    setIsInstallmentDialogOpen(true);
+  };
+
+  const toggleInstallmentPaid = async (inst: ClientInstallment) => {
+    const { error } = await supabase.from('client_installments').update({
+      paid: !inst.paid,
+      paid_date: !inst.paid ? new Date().toISOString().split('T')[0] : null
+    }).eq('id', inst.id);
+    if (error) { toast.error('Error al actualizar'); return; }
+    
+    // Also update the client's paid_installments count
+    const clientInstallments = installments.filter(i => i.client_id === inst.client_id);
+    const newPaidCount = clientInstallments.filter(i => i.id === inst.id ? !inst.paid : i.paid).length;
+    await supabase.from('clients').update({ paid_installments: newPaidCount }).eq('id', inst.client_id);
+    
+    fetchData();
+  };
+
+  const deleteInstallment = async (id: string) => {
+    const { error } = await supabase.from('client_installments').delete().eq('id', id);
+    if (error) { toast.error('Error al eliminar'); return; }
+    toast.success('Cuota eliminada');
+    fetchData();
+  };
+
+  const generateInstallments = async () => {
+    if (!selectedClient) return;
+    
+    const count = selectedClient.total_installments;
+    const baseAmount = selectedClient.total_amount ? selectedClient.total_amount / count : 0;
+    const startDate = selectedClient.start_date ? new Date(selectedClient.start_date) : new Date();
+    
+    const existingNumbers = installments.filter(i => i.client_id === selectedClient.id).map(i => i.installment_number);
+    const newInstallments = [];
+    
+    for (let i = 1; i <= count; i++) {
+      if (!existingNumbers.includes(i)) {
+        const dueDate = new Date(startDate);
+        dueDate.setMonth(dueDate.getMonth() + (i - 1));
+        newInstallments.push({
+          client_id: selectedClient.id,
+          installment_number: i,
+          amount: baseAmount,
+          due_date: dueDate.toISOString().split('T')[0],
+          paid: i <= selectedClient.paid_installments
+        });
+      }
+    }
+    
+    if (newInstallments.length === 0) {
+      toast.info('Ya existen todas las cuotas');
+      return;
+    }
+    
+    const { error } = await supabase.from('client_installments').insert(newInstallments);
+    if (error) { toast.error('Error al generar cuotas'); return; }
+    toast.success(`${newInstallments.length} cuotas generadas`);
+    fetchData();
+  };
+
   const getClientProducts = (clientId: string) => products.filter(p => p.client_id === clientId);
   const getClientTasks = (clientId: string) => tasks.filter(t => t.client_id === clientId);
+  const getClientInstallments = (clientId: string) => installments.filter(i => i.client_id === clientId).sort((a, b) => a.installment_number - b.installment_number);
 
   const activeClients = clients.filter(c => c.status === 'activo');
   const totalContractValue = activeClients.reduce((s, c) => s + (c.total_amount || 0), 0);
@@ -387,8 +508,12 @@ export default function Clientes() {
   if (selectedClient) {
     const clientProducts = getClientProducts(selectedClient.id);
     const clientTasks = getClientTasks(selectedClient.id);
+    const clientInstallments = getClientInstallments(selectedClient.id);
     const totalProductValue = clientProducts.reduce((s, p) => s + (p.price || 0), 0);
     const completedTasks = clientTasks.filter(t => t.status === 'completada').length;
+    const paidInstallments = clientInstallments.filter(i => i.paid);
+    const totalPaidAmount = paidInstallments.reduce((s, i) => s + i.amount, 0);
+    const totalPendingAmount = clientInstallments.filter(i => !i.paid).reduce((s, i) => s + i.amount, 0);
 
     return (
       <>
@@ -512,9 +637,29 @@ export default function Clientes() {
           </DialogContent>
         </Dialog>
 
+        {/* Installment Dialog */}
+        <Dialog open={isInstallmentDialogOpen} onOpenChange={(open) => { setIsInstallmentDialogOpen(open); if (!open) resetInstallmentForm(); }}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>{editingInstallment ? 'Editar' : 'Agregar'} Cuota</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Número de Cuota *</Label><Input type="number" min="1" value={installmentForm.installment_number} onChange={e => setInstallmentForm({ ...installmentForm, installment_number: e.target.value })} className="bg-secondary/50" /></div>
+                <div><Label>Monto *</Label><Input type="number" step="0.01" value={installmentForm.amount} onChange={e => setInstallmentForm({ ...installmentForm, amount: e.target.value })} className="bg-secondary/50" /></div>
+              </div>
+              <div><Label>Fecha de Vencimiento</Label><Input type="date" value={installmentForm.due_date} onChange={e => setInstallmentForm({ ...installmentForm, due_date: e.target.value })} className="bg-secondary/50" /></div>
+              <div><Label>Notas</Label><Textarea value={installmentForm.notes} onChange={e => setInstallmentForm({ ...installmentForm, notes: e.target.value })} className="bg-secondary/50" /></div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={resetInstallmentForm}>Cancelar</Button>
+                <Button onClick={handleInstallmentSubmit}>{editingInstallment ? 'Guardar' : 'Agregar'}</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <Tabs defaultValue="info" className="space-y-4">
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="installments">Cuotas ({clientInstallments.length})</TabsTrigger>
             <TabsTrigger value="products">Productos ({clientProducts.length})</TabsTrigger>
             <TabsTrigger value="tasks">Tareas ({clientTasks.length})</TabsTrigger>
           </TabsList>
@@ -553,6 +698,80 @@ export default function Clientes() {
                     <Progress value={(selectedClient.paid_installments / selectedClient.total_installments) * 100} className="h-2" />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="installments" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex gap-4 text-sm">
+                <span className="text-muted-foreground">Pagado: <span className="font-medium text-success">${totalPaidAmount.toLocaleString()}</span></span>
+                <span className="text-muted-foreground">Pendiente: <span className="font-medium text-warning">${totalPendingAmount.toLocaleString()}</span></span>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={generateInstallments}>
+                  <Receipt className="h-4 w-4 mr-2" />Generar Cuotas
+                </Button>
+                <Button onClick={() => {
+                  const nextNumber = clientInstallments.length > 0 ? Math.max(...clientInstallments.map(i => i.installment_number)) + 1 : 1;
+                  setInstallmentForm({ ...installmentForm, installment_number: nextNumber.toString() });
+                  setIsInstallmentDialogOpen(true);
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />Agregar Cuota
+                </Button>
+              </div>
+            </div>
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">#</TableHead>
+                      <TableHead>Monto</TableHead>
+                      <TableHead>Vencimiento</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha Pago</TableHead>
+                      <TableHead>Notas</TableHead>
+                      <TableHead className="w-24"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientInstallments.map(inst => (
+                      <TableRow key={inst.id} className={cn(inst.paid && "bg-success/5")}>
+                        <TableCell className="font-medium">{inst.installment_number}</TableCell>
+                        <TableCell className="font-medium">${inst.amount.toLocaleString()}</TableCell>
+                        <TableCell>{inst.due_date || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={cn('text-xs', inst.paid ? 'bg-success/20 text-success' : 'bg-warning/20 text-warning')}>
+                            {inst.paid ? 'Pagada' : 'Pendiente'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{inst.paid_date || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-32 truncate">{inst.notes || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleInstallmentPaid(inst)} title={inst.paid ? 'Marcar como pendiente' : 'Marcar como pagada'}>
+                              <Checkbox checked={inst.paid} className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => editInstallment(inst)}>
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteInstallment(inst.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {clientInstallments.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No hay cuotas. Usa "Generar Cuotas" para crearlas automáticamente o "Agregar Cuota" para agregarlas manualmente.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
