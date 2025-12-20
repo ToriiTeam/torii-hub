@@ -382,6 +382,62 @@ export default function Clientes() {
           </Card>
         </div>
 
+        {/* Product Dialog - Outside tabs for proper portal rendering */}
+        <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Agregar Producto</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div><Label>Nombre *</Label><Input value={productForm.product_name} onChange={e => setProductForm({ ...productForm, product_name: e.target.value })} className="bg-secondary/50" /></div>
+              <div><Label>Descripción</Label><Textarea value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} className="bg-secondary/50" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Precio ($)</Label><Input type="number" value={productForm.price} onChange={e => setProductForm({ ...productForm, price: e.target.value })} className="bg-secondary/50" /></div>
+                <div><Label>Fecha Venta</Label><Input type="date" value={productForm.sold_date} onChange={e => setProductForm({ ...productForm, sold_date: e.target.value })} className="bg-secondary/50" /></div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={handleProductSubmit}>Agregar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Task Dialog - Outside tabs for proper portal rendering */}
+        <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader><DialogTitle>Agregar Tarea</DialogTitle></DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div><Label>Título *</Label><Input value={taskForm.title} onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} className="bg-secondary/50" /></div>
+              <div><Label>Descripción</Label><Textarea value={taskForm.description} onChange={e => setTaskForm({ ...taskForm, description: e.target.value })} className="bg-secondary/50" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Estado</Label>
+                  <Select value={taskForm.status} onValueChange={v => setTaskForm({ ...taskForm, status: v as TaskStatus })}>
+                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(taskStatusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Fecha Límite</Label><Input type="date" value={taskForm.due_date} onChange={e => setTaskForm({ ...taskForm, due_date: e.target.value })} className="bg-secondary/50" /></div>
+              </div>
+              <div>
+                <Label>Responsable</Label>
+                <Select value={taskForm.assigned_to} onValueChange={v => setTaskForm({ ...taskForm, assigned_to: v })}>
+                  <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin asignar</SelectItem>
+                    {teamUsers.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
+                <Button onClick={handleTaskSubmit}>Agregar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <Tabs defaultValue="info" className="space-y-4">
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="info">Información</TabsTrigger>
@@ -429,26 +485,7 @@ export default function Clientes() {
 
           <TabsContent value="products" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="h-4 w-4 mr-2" />Agregar Producto</Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-border">
-                  <DialogHeader><DialogTitle>Agregar Producto</DialogTitle></DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div><Label>Nombre *</Label><Input value={productForm.product_name} onChange={e => setProductForm({ ...productForm, product_name: e.target.value })} className="bg-secondary/50" /></div>
-                    <div><Label>Descripción</Label><Textarea value={productForm.description} onChange={e => setProductForm({ ...productForm, description: e.target.value })} className="bg-secondary/50" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><Label>Precio ($)</Label><Input type="number" value={productForm.price} onChange={e => setProductForm({ ...productForm, price: e.target.value })} className="bg-secondary/50" /></div>
-                      <div><Label>Fecha Venta</Label><Input type="date" value={productForm.sold_date} onChange={e => setProductForm({ ...productForm, sold_date: e.target.value })} className="bg-secondary/50" /></div>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleProductSubmit}>Agregar</Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button onClick={() => setIsProductDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />Agregar Producto</Button>
             </div>
             <Card className="bg-card border-border/50">
               <CardContent className="p-0">
@@ -487,44 +524,7 @@ export default function Clientes() {
 
           <TabsContent value="tasks" className="space-y-4">
             <div className="flex justify-end">
-              <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="h-4 w-4 mr-2" />Agregar Tarea</Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-border">
-                  <DialogHeader><DialogTitle>Agregar Tarea</DialogTitle></DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div><Label>Título *</Label><Input value={taskForm.title} onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} className="bg-secondary/50" /></div>
-                    <div><Label>Descripción</Label><Textarea value={taskForm.description} onChange={e => setTaskForm({ ...taskForm, description: e.target.value })} className="bg-secondary/50" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Estado</Label>
-                        <Select value={taskForm.status} onValueChange={v => setTaskForm({ ...taskForm, status: v as TaskStatus })}>
-                          <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(taskStatusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div><Label>Fecha Límite</Label><Input type="date" value={taskForm.due_date} onChange={e => setTaskForm({ ...taskForm, due_date: e.target.value })} className="bg-secondary/50" /></div>
-                    </div>
-                    <div>
-                      <Label>Responsable</Label>
-                      <Select value={taskForm.assigned_to} onValueChange={v => setTaskForm({ ...taskForm, assigned_to: v })}>
-                        <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin asignar" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Sin asignar</SelectItem>
-                          {teamUsers.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleTaskSubmit}>Agregar</Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button onClick={() => setIsTaskDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />Agregar Tarea</Button>
             </div>
             <div className="grid gap-3">
               {clientTasks.map(task => {
