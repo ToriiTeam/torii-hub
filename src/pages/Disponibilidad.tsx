@@ -174,8 +174,8 @@ export default function Disponibilidad() {
         <p className="text-muted-foreground">Estado del equipo y eventos del calendario</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* All Calendar Events */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar Events */}
         <Card className="bg-card border-border/50 lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -228,7 +228,9 @@ export default function Disponibilidad() {
                           "w-[160px] h-9",
                           !event.team_user_id && "border-warning text-warning"
                         )}>
-                          <SelectValue placeholder="Sin asignar" />
+                          <SelectValue>
+                            {event.team_user_id ? getUserName(event.team_user_id) : "Sin asignar"}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="unassigned">Sin asignar</SelectItem>
@@ -242,6 +244,88 @@ export default function Disponibilidad() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Tablón de Anuncios */}
+        <Card className="bg-card border-border/50">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Send className="h-4 w-4 text-primary" />
+              Tablón de Anuncios
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Textarea
+                placeholder="Escribe un mensaje para el equipo..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                className="min-h-[80px]"
+              />
+              <Button onClick={addAnnouncement} className="w-full" size="sm">
+                <Send className="h-4 w-4 mr-2" />
+                Publicar
+              </Button>
+            </div>
+
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {announcements.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No hay anuncios</p>
+              ) : (
+                announcements.map(a => (
+                  <div key={a.id} className={cn(
+                    "p-3 rounded-lg border",
+                    a.important ? "border-warning bg-warning/10" : "border-border/50 bg-secondary/30"
+                  )}>
+                    <p className="text-sm">{a.content}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {a.author_id ? getUserName(a.author_id) : 'Sistema'} • {new Date(a.created_at).toLocaleDateString('es-ES')}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Estado del Equipo */}
+        <Card className="bg-card border-border/50 lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              Estado del Equipo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {teamUsers.map(member => {
+                const availability = team.find(t => t.user_id === member.id);
+                const currentStatus = availability?.status || 'disponible';
+                
+                return (
+                  <div key={member.id} className="p-3 rounded-lg border border-border/50 bg-secondary/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Circle className={cn("h-3 w-3 fill-current", statusConfig[currentStatus].color)} />
+                      <span className="font-medium text-sm">{member.name}</span>
+                    </div>
+                    <Select 
+                      value={currentStatus} 
+                      onValueChange={(value) => updateStatus(member.id, value as AvailabilityStatus)}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(statusConfig).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
       </div>

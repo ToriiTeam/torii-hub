@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStore } from '@/hooks/useStore';
 import { initialTasks, initialSetters, initialClosers, initialFixedCosts, initialVariableCosts, initialIncomes, initialPayments } from '@/data/initialData';
 import { 
-  FileText, Download, Settings, 
+  FileText, Download, Send,
   BarChart3, DollarSign, Users, CheckSquare, Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 type ReportType = 'daily_metrics' | 'weekly_summary' | 'monthly_report' | 'financial' | 'custom';
 
@@ -19,8 +19,10 @@ const reportTypes: { value: ReportType; label: string; description: string; icon
   { value: 'weekly_summary', label: 'Resumen Semanal', description: 'Performance de la semana', icon: FileText },
   { value: 'monthly_report', label: 'Reporte Mensual', description: 'Análisis completo del mes', icon: FileText },
   { value: 'financial', label: 'Estado Financiero', description: 'Ingresos, gastos y balance', icon: DollarSign },
-  { value: 'custom', label: 'Personalizado', description: 'Configura qué incluir', icon: Settings },
+  { value: 'custom', label: 'Personalizado', description: 'Configura qué incluir', icon: FileText },
 ];
+
+const WEBHOOK_URL = 'https://n8n-n8n.vycvt5.easypanel.host/webhook/ef66538d-bf27-4ec2-863f-3ee73c732e5d';
 
 export default function Reportes() {
   const [tasks] = useStore('tareas', initialTasks);
@@ -37,6 +39,7 @@ export default function Reportes() {
   const [includeFinances, setIncludeFinances] = useState(true);
   const [includeTasks, setIncludeTasks] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const reportData = useMemo(() => {
     const data: Record<string, any> = {};
@@ -51,6 +54,13 @@ export default function Reportes() {
           ? Math.round((setters.reduce((sum, s) => sum + s.metrics.appointments, 0) / 
               setters.reduce((sum, s) => sum + s.metrics.calls, 0)) * 100 * 10) / 10
           : 0,
+        details: setters.map(s => ({
+          name: s.name,
+          calls: s.metrics.calls,
+          leads: s.metrics.leads,
+          appointments: s.metrics.appointments,
+          goalProgress: s.goal > 0 ? Math.round((s.metrics.appointments / s.goal) * 100) : 0
+        }))
       };
     }
 
@@ -65,6 +75,14 @@ export default function Reportes() {
           ? Math.round((closers.reduce((sum, c) => sum + c.metrics.closed, 0) / 
               closers.reduce((sum, c) => sum + c.metrics.meetings, 0)) * 100 * 10) / 10
           : 0,
+        details: closers.map(c => ({
+          name: c.name,
+          meetings: c.metrics.meetings,
+          proposals: c.metrics.proposals,
+          closed: c.metrics.closed,
+          value: c.metrics.totalValue,
+          goalProgress: c.goal > 0 ? Math.round((c.metrics.totalValue / c.goal) * 100) : 0
+        }))
       };
     }
 
@@ -109,6 +127,36 @@ export default function Reportes() {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+  };
+
+  const handleSendEmail = async () => {
+    setIsSending(true);
+    
+    const selectedReportType = reportTypes.find(r => r.value === selectedType);
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        mode: 'no-cors',
+        body: JSON.stringify({
+          type: selectedType,
+          typeName: selectedReportType?.label || selectedType,
+          timestamp: new Date().toISOString(),
+          period: { start: today, end: today },
+          data: reportData,
+          platform: 'Torii'
+        }),
+      });
+
+      toast.success('Reporte enviado correctamente');
+    } catch (error) {
+      console.error('Error sending report:', error);
+      toast.error('Error al enviar el reporte');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const formatCurrency = (value: number) => 
@@ -199,12 +247,12 @@ export default function Reportes() {
         </Card>
       </div>
 
-      {/* Preview & Download */}
+      {/* Preview & Actions */}
       <Card className="bg-card border-border/50">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="text-base">Vista Previa del Reporte</CardTitle>
-            <CardDescription>Revisa los datos antes de descargar</CardDescription>
+            <CardDescription>Revisa los datos antes de enviar</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
             <Eye className="h-4 w-4 mr-2" />
@@ -275,10 +323,14 @@ export default function Reportes() {
           </CardContent>
         )}
         <CardContent className="border-t border-border/50 pt-4">
-          <div className="flex justify-end">
-            <Button onClick={handleDownloadJSON} className="gap-2">
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={handleDownloadJSON} className="gap-2">
               <Download className="h-4 w-4" />
               Descargar JSON
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSending} className="gap-2">
+              <Send className="h-4 w-4" />
+              {isSending ? 'Enviando...' : 'Enviar Email'}
             </Button>
           </div>
         </CardContent>
