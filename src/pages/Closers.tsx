@@ -124,7 +124,7 @@ export default function Closers() {
     first_call_status: 'pendiente' as CallStatus,
     first_call_attended: false,
     second_call_date: '',
-    second_call_status: '' as CallStatus | '',
+    second_call_status: '' as CallStatus | '' | 'none',
     qualified: false,
     objections: '',
     notes: '',
@@ -238,7 +238,7 @@ export default function Closers() {
       first_call_status: callForm.first_call_status as CallStatus,
       first_call_attended: callForm.first_call_attended,
       second_call_date: callForm.second_call_date || null,
-      second_call_status: callForm.second_call_status || null,
+      second_call_status: ['none', ''].includes(callForm.second_call_status) ? null : callForm.second_call_status as CallStatus,
       qualified: callForm.qualified,
       objections: callForm.objections || null,
       notes: callForm.notes || null,
@@ -450,7 +450,7 @@ export default function Closers() {
                     <Select value={callForm.second_call_status} onValueChange={v => setCallForm({ ...callForm, second_call_status: v as CallStatus })}>
                       <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin segunda llamada" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin segunda llamada</SelectItem>
+                        <SelectItem value="none">Sin segunda llamada</SelectItem>
                         {Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
                       </SelectContent>
                     </Select>
