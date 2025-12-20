@@ -164,7 +164,7 @@ export default function Disponibilidad() {
                 <CalendarCheck className="h-3 w-3" />
                 Calendar Conectado
               </Badge>
-              <Button variant="outline" size="sm" onClick={refreshEvents} disabled={isLoading}>
+              <Button variant="outline" size="sm" onClick={() => refreshEvents()} disabled={isLoading}>
                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
               </Button>
               <Button variant="ghost" size="sm" onClick={disconnect} className="text-muted-foreground">

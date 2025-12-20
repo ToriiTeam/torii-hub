@@ -1,58 +1,25 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore } from './useStore';
 import { CalendarEvent, CalendarStatus, CalendarConnectionStatus } from '@/types/integrations';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock calendar events for demo
-const generateMockEvents = (): CalendarEvent[] => {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  
-  return [
-    {
-      id: 'cal-1',
-      summary: 'Daily Standup',
-      start: { dateTime: `${today}T09:00:00` },
-      end: { dateTime: `${today}T09:30:00` },
-    },
-    {
-      id: 'cal-2',
-      summary: 'Reunión con Cliente TechStart',
-      start: { dateTime: `${today}T11:00:00` },
-      end: { dateTime: `${today}T12:00:00` },
-      description: 'Revisión de proyecto Q1',
-    },
-    {
-      id: 'cal-3',
-      summary: 'Call de Seguimiento',
-      start: { dateTime: `${today}T14:00:00` },
-      end: { dateTime: `${today}T14:30:00` },
-    },
-    {
-      id: 'cal-4',
-      summary: 'Demo Propuesta MegaCorp',
-      start: { dateTime: `${today}T16:00:00` },
-      end: { dateTime: `${today}T17:00:00` },
-      description: 'Presentación de servicios',
-    },
-    {
-      id: 'cal-5',
-      summary: 'Revisión Semanal',
-      start: { dateTime: new Date(now.getTime() + 86400000).toISOString().split('.')[0] },
-      end: { dateTime: new Date(now.getTime() + 86400000 + 3600000).toISOString().split('.')[0] },
-    },
-  ];
-};
+interface GoogleCalendarTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
 
 export function useGoogleCalendar() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [calendarToken, setCalendarToken] = useStore<string | null>('google:calendar_token', null);
+  const [tokens, setTokens] = useStore<GoogleCalendarTokens | null>('google:calendar_tokens', null);
   const [calendarEvents, setCalendarEvents] = useStore<CalendarEvent[]>('google:calendar_events', []);
+  const [lastSync, setLastSync] = useStore<string | null>('google:calendar_last_sync', null);
 
   const connectionStatus: CalendarConnectionStatus = {
-    connected: !!calendarToken,
-    lastSync: calendarEvents.length > 0 ? new Date().toISOString() : undefined,
+    connected: !!tokens?.access_token,
+    lastSync: lastSync || undefined,
   };
 
   const getCurrentStatus = useCallback((events: CalendarEvent[], userId: string): CalendarStatus => {
@@ -111,66 +78,235 @@ export function useGoogleCalendar() {
     return { status: 'disponible' };
   }, []);
 
-  // Calculate statuses for all users (mocked for demo)
+  // Calculate statuses for all users
   const userStatuses = useMemo(() => {
-    if (!calendarToken || calendarEvents.length === 0) {
+    if (!tokens || calendarEvents.length === 0) {
       return {};
     }
 
-    // In real app, each user would have their own calendar
-    // For demo, we'll create slightly different statuses
     return {
       '1': getCurrentStatus(calendarEvents, '1'),
-      '2': getCurrentStatus(calendarEvents.slice(1), '2'), // Different events for variety
+      '2': getCurrentStatus(calendarEvents.slice(1), '2'),
       '3': getCurrentStatus(calendarEvents.slice(2), '3'),
     };
-  }, [calendarToken, calendarEvents, getCurrentStatus]);
+  }, [tokens, calendarEvents, getCurrentStatus]);
 
+  // Check if token needs refresh
+  const isTokenExpired = useCallback(() => {
+    if (!tokens) return true;
+    return Date.now() >= tokens.expires_at - 60000; // 1 minute buffer
+  }, [tokens]);
+
+  // Refresh access token
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!tokens?.refresh_token) return null;
+
+    try {
+      console.log('Refreshing Google Calendar access token...');
+      
+      const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
+        body: {
+          action: 'refresh-token',
+          refreshToken: tokens.refresh_token,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      const newTokens: GoogleCalendarTokens = {
+        access_token: data.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: Date.now() + (data.expires_in * 1000),
+      };
+
+      setTokens(newTokens);
+      console.log('Token refreshed successfully');
+      return data.access_token;
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      // Token refresh failed, need to re-authenticate
+      setTokens(null);
+      setCalendarEvents([]);
+      toast.error('Sesión expirada. Reconecta Google Calendar.');
+      return null;
+    }
+  }, [tokens, setTokens, setCalendarEvents]);
+
+  // Get valid access token (refresh if needed)
+  const getValidAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!tokens) return null;
+    
+    if (isTokenExpired()) {
+      return await refreshAccessToken();
+    }
+    
+    return tokens.access_token;
+  }, [tokens, isTokenExpired, refreshAccessToken]);
+
+  // Start OAuth flow
   const connect = useCallback(async () => {
     setIsConnecting(true);
     try {
-      // Simulate OAuth flow
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const redirectUri = `${window.location.origin}/disponibilidad`;
       
-      const mockToken = `mock_calendar_token_${Date.now()}`;
-      setCalendarToken(mockToken);
-      setCalendarEvents(generateMockEvents());
+      console.log('Starting Google Calendar OAuth flow...');
       
-      toast.success('Google Calendar conectado exitosamente');
-      return true;
+      const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
+        body: {
+          action: 'get-auth-url',
+          redirectUri,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      // Store redirect URI for callback
+      localStorage.setItem('google_calendar_redirect_uri', redirectUri);
+      
+      // Redirect to Google OAuth
+      window.location.href = data.authUrl;
+      
     } catch (error) {
       console.error('Error connecting to Calendar:', error);
       toast.error('Error al conectar con Google Calendar');
+      setIsConnecting(false);
+    }
+  }, []);
+
+  // Handle OAuth callback
+  const handleOAuthCallback = useCallback(async (code: string) => {
+    setIsConnecting(true);
+    try {
+      const redirectUri = localStorage.getItem('google_calendar_redirect_uri') || `${window.location.origin}/disponibilidad`;
+      
+      console.log('Exchanging OAuth code for tokens...');
+      
+      const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
+        body: {
+          action: 'exchange-code',
+          code,
+          redirectUri,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      const newTokens: GoogleCalendarTokens = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in * 1000),
+      };
+
+      setTokens(newTokens);
+      localStorage.removeItem('google_calendar_redirect_uri');
+      
+      toast.success('Google Calendar conectado exitosamente');
+      
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Fetch events immediately
+      await fetchEvents(data.access_token);
+      
+      return true;
+    } catch (error) {
+      console.error('Error completing OAuth:', error);
+      toast.error('Error al completar la conexión');
       return false;
     } finally {
       setIsConnecting(false);
     }
-  }, [setCalendarToken, setCalendarEvents]);
+  }, [setTokens]);
 
-  const disconnect = useCallback(() => {
-    setCalendarToken(null);
-    setCalendarEvents([]);
-    toast.success('Google Calendar desconectado');
-  }, [setCalendarToken, setCalendarEvents]);
-
-  const refreshEvents = useCallback(async () => {
-    if (!calendarToken) {
+  // Fetch events from Google Calendar
+  const fetchEvents = useCallback(async (accessToken?: string) => {
+    const token = accessToken || await getValidAccessToken();
+    if (!token) {
       toast.error('Conecta Google Calendar primero');
       return;
     }
     
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setCalendarEvents(generateMockEvents());
+      console.log('Fetching Google Calendar events...');
+      
+      const now = new Date();
+      const timeMin = now.toISOString();
+      const timeMax = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+        body: {
+          accessToken: token,
+          timeMin,
+          timeMax,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data.needsRefresh) {
+        // Token expired, try to refresh
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          return await fetchEvents(newToken);
+        }
+        return;
+      }
+      
+      if (data.error) throw new Error(data.error);
+
+      setCalendarEvents(data.events || []);
+      setLastSync(new Date().toISOString());
+      
+      console.log(`Fetched ${data.events?.length || 0} events`);
       toast.success('Eventos actualizados');
     } catch (error) {
-      console.error('Error refreshing events:', error);
-      toast.error('Error al actualizar eventos');
+      console.error('Error fetching events:', error);
+      toast.error('Error al obtener eventos');
     } finally {
       setIsLoading(false);
     }
-  }, [calendarToken, setCalendarEvents]);
+  }, [getValidAccessToken, refreshAccessToken, setCalendarEvents, setLastSync]);
+
+  const disconnect = useCallback(() => {
+    setTokens(null);
+    setCalendarEvents([]);
+    setLastSync(null);
+    localStorage.removeItem('google_calendar_redirect_uri');
+    toast.success('Google Calendar desconectado');
+  }, [setTokens, setCalendarEvents, setLastSync]);
+
+  // Check for OAuth callback on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    
+    if (error) {
+      toast.error('Error en la autenticación de Google');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    
+    if (code && !tokens) {
+      handleOAuthCallback(code);
+    }
+  }, []);
+
+  // Auto-refresh events periodically when connected
+  useEffect(() => {
+    if (!tokens) return;
+
+    // Refresh events every 5 minutes
+    const interval = setInterval(() => {
+      fetchEvents();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [tokens, fetchEvents]);
 
   return {
     connectionStatus,
@@ -180,7 +316,8 @@ export function useGoogleCalendar() {
     isLoading,
     connect,
     disconnect,
-    refreshEvents,
+    refreshEvents: fetchEvents,
     getCurrentStatus,
+    handleOAuthCallback,
   };
 }
