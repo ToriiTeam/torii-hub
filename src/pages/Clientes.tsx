@@ -307,6 +307,78 @@ export default function Clientes() {
     return s + (avgPerInstallment * remaining);
   }, 0);
 
+  // Client Dialog - Rendered always so it works from both views
+  const clientDialog = (
+    <Dialog open={isClientDialogOpen} onOpenChange={(open) => { setIsClientDialogOpen(open); if (!open) resetClientForm(); }}>
+      <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>{editingClient ? 'Editar' : 'Nuevo'} Cliente</DialogTitle></DialogHeader>
+        <div className="space-y-4 mt-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Cliente *</Label><Input value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Oferta</Label>
+              <Select value={clientForm.offer_type} onValueChange={v => setClientForm({ ...clientForm, offer_type: v as OfferType })}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DWY">DWY (Done With You)</SelectItem>
+                  <SelectItem value="DFY">DFY (Done For You)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div><Label>Inicio</Label><Input type="date" value={clientForm.start_date} onChange={e => setClientForm({ ...clientForm, start_date: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Fin</Label><Input type="date" value={clientForm.end_date} onChange={e => setClientForm({ ...clientForm, end_date: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Estado</Label>
+              <Select value={clientForm.status} onValueChange={v => setClientForm({ ...clientForm, status: v as ClientStatus })}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div><Label>Monto Total</Label><Input type="number" min="0" value={clientForm.total_amount} onChange={e => setClientForm({ ...clientForm, total_amount: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Total Cuotas</Label><Input type="number" min="1" value={clientForm.total_installments} onChange={e => setClientForm({ ...clientForm, total_installments: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Cuotas Pagadas</Label><Input type="number" min="0" value={clientForm.paid_installments} onChange={e => setClientForm({ ...clientForm, paid_installments: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Tipo Pago</Label>
+              <Select value={clientForm.payment_type} onValueChange={v => setClientForm({ ...clientForm, payment_type: v as PaymentType })}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Upfront">Upfront</SelectItem>
+                  <SelectItem value="Mensual">Mensual</SelectItem>
+                  <SelectItem value="Cuotas">Cuotas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div><Label>Próx. Venc.</Label><Input type="date" value={clientForm.next_due_date} onChange={e => setClientForm({ ...clientForm, next_due_date: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Plataforma</Label>
+              <Select value={clientForm.platform} onValueChange={v => setClientForm({ ...clientForm, platform: v as PaymentPlatform })}>
+                <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Stripe">Stripe</SelectItem>
+                  <SelectItem value="Binance">Binance</SelectItem>
+                  <SelectItem value="Transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Fee %</Label><Input type="number" step="0.1" value={clientForm.platform_fee} onChange={e => setClientForm({ ...clientForm, platform_fee: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>País</Label><Input value={clientForm.country} onChange={e => setClientForm({ ...clientForm, country: e.target.value })} className="bg-secondary/50" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Email</Label><Input type="email" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} className="bg-secondary/50" /></div>
+            <div><Label>Teléfono</Label><Input value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} className="bg-secondary/50" /></div>
+          </div>
+          <div><Label>Notas</Label><Textarea value={clientForm.notes} onChange={e => setClientForm({ ...clientForm, notes: e.target.value })} className="bg-secondary/50" /></div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={resetClientForm}>Cancelar</Button>
+            <Button onClick={handleClientSubmit} className="bg-primary">{editingClient ? 'Guardar' : 'Agregar'}</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
   }
@@ -319,6 +391,8 @@ export default function Clientes() {
     const completedTasks = clientTasks.filter(t => t.status === 'completada').length;
 
     return (
+      <>
+      {clientDialog}
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setSelectedClient(null)}>
@@ -564,88 +638,21 @@ export default function Clientes() {
           </TabsContent>
         </Tabs>
       </div>
+      </>
     );
   }
 
   // List View
   return (
+    <>
+    {clientDialog}
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-muted-foreground">{clients.length} clientes • ${totalContractValue.toLocaleString()} total</p>
         </div>
-        <Dialog open={isClientDialogOpen} onOpenChange={(open) => { setIsClientDialogOpen(open); if (!open) resetClientForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary"><Plus className="h-4 w-4 mr-2" />Nuevo Cliente</Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editingClient ? 'Editar' : 'Nuevo'} Cliente</DialogTitle></DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Cliente *</Label><Input value={clientForm.name} onChange={e => setClientForm({ ...clientForm, name: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Oferta</Label>
-                  <Select value={clientForm.offer_type} onValueChange={v => setClientForm({ ...clientForm, offer_type: v as OfferType })}>
-                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DWY">DWY (Done With You)</SelectItem>
-                      <SelectItem value="DFY">DFY (Done For You)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div><Label>Inicio</Label><Input type="date" value={clientForm.start_date} onChange={e => setClientForm({ ...clientForm, start_date: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Fin</Label><Input type="date" value={clientForm.end_date} onChange={e => setClientForm({ ...clientForm, end_date: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Estado</Label>
-                  <Select value={clientForm.status} onValueChange={v => setClientForm({ ...clientForm, status: v as ClientStatus })}>
-                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                    <SelectContent>{Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div><Label>Monto Total</Label><Input type="number" min="0" value={clientForm.total_amount} onChange={e => setClientForm({ ...clientForm, total_amount: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Total Cuotas</Label><Input type="number" min="1" value={clientForm.total_installments} onChange={e => setClientForm({ ...clientForm, total_installments: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Cuotas Pagadas</Label><Input type="number" min="0" value={clientForm.paid_installments} onChange={e => setClientForm({ ...clientForm, paid_installments: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Tipo Pago</Label>
-                  <Select value={clientForm.payment_type} onValueChange={v => setClientForm({ ...clientForm, payment_type: v as PaymentType })}>
-                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Upfront">Upfront</SelectItem>
-                      <SelectItem value="Mensual">Mensual</SelectItem>
-                      <SelectItem value="Cuotas">Cuotas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div><Label>Próx. Venc.</Label><Input type="date" value={clientForm.next_due_date} onChange={e => setClientForm({ ...clientForm, next_due_date: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Plataforma</Label>
-                  <Select value={clientForm.platform} onValueChange={v => setClientForm({ ...clientForm, platform: v as PaymentPlatform })}>
-                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Stripe">Stripe</SelectItem>
-                      <SelectItem value="Binance">Binance</SelectItem>
-                      <SelectItem value="Transfer">Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div><Label>Fee %</Label><Input type="number" step="0.1" value={clientForm.platform_fee} onChange={e => setClientForm({ ...clientForm, platform_fee: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>País</Label><Input value={clientForm.country} onChange={e => setClientForm({ ...clientForm, country: e.target.value })} className="bg-secondary/50" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Email</Label><Input type="email" value={clientForm.email} onChange={e => setClientForm({ ...clientForm, email: e.target.value })} className="bg-secondary/50" /></div>
-                <div><Label>Teléfono</Label><Input value={clientForm.phone} onChange={e => setClientForm({ ...clientForm, phone: e.target.value })} className="bg-secondary/50" /></div>
-              </div>
-              <div><Label>Notas</Label><Textarea value={clientForm.notes} onChange={e => setClientForm({ ...clientForm, notes: e.target.value })} className="bg-secondary/50" /></div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={resetClientForm}>Cancelar</Button>
-                <Button onClick={handleClientSubmit} className="bg-primary">{editingClient ? 'Guardar' : 'Agregar'}</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button className="bg-primary" onClick={() => setIsClientDialogOpen(true)}><Plus className="h-4 w-4 mr-2" />Nuevo Cliente</Button>
       </div>
 
       {/* Stats */}
@@ -757,5 +764,6 @@ export default function Clientes() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
