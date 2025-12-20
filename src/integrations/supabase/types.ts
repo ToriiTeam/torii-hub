@@ -49,6 +49,62 @@ export type Database = {
           },
         ]
       }
+      calendar_events: {
+        Row: {
+          attendees: Json | null
+          calendar_email: string | null
+          created_at: string
+          description: string | null
+          end_time: string
+          google_event_id: string
+          id: string
+          location: string | null
+          start_time: string
+          synced_at: string
+          team_user_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attendees?: Json | null
+          calendar_email?: string | null
+          created_at?: string
+          description?: string | null
+          end_time: string
+          google_event_id: string
+          id?: string
+          location?: string | null
+          start_time: string
+          synced_at?: string
+          team_user_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attendees?: Json | null
+          calendar_email?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          google_event_id?: string
+          id?: string
+          location?: string | null
+          start_time?: string
+          synced_at?: string
+          team_user_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_team_user_id_fkey"
+            columns: ["team_user_id"]
+            isOneToOne: false
+            referencedRelation: "team_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_recordings: {
         Row: {
           call_id: string | null
