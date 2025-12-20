@@ -157,12 +157,6 @@ export default function Disponibilidad() {
     return teamUser?.name || userNames[userId] || 'Usuario';
   };
 
-  // Get events for current user
-  const myEvents = calendarEvents.filter(e => e.team_user_id === user?.id);
-  
-  // Get unassigned events
-  const unassignedEvents = calendarEvents.filter(e => !e.team_user_id);
-
   // Check if event is happening now
   const isEventNow = (start: string, end: string) => {
     const now = new Date();
@@ -181,194 +175,73 @@ export default function Disponibilidad() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* My Events */}
-        <Card className="bg-card border-border/50">
+        {/* All Calendar Events */}
+        <Card className="bg-card border-border/50 lg:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="h-4 w-4 text-primary" />
-              Mis Llamadas
-              {myEvents.length > 0 && (
-                <Badge variant="secondary" className="ml-auto">{myEvents.length}</Badge>
+              Llamadas del Calendario
+              {calendarEvents.length > 0 && (
+                <Badge variant="secondary" className="ml-auto">{calendarEvents.length}</Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {myEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No tienes llamadas asignadas</p>
+          <CardContent>
+            {calendarEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay llamadas próximas</p>
             ) : (
-              myEvents.map(event => (
-                <div 
-                  key={event.id} 
-                  className={cn(
-                    "p-3 rounded-lg border",
-                    isEventNow(event.start_time, event.end_time) 
-                      ? "border-primary bg-primary/10" 
-                      : "border-border/50 bg-secondary/30"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
-                      isEventNow(event.start_time, event.end_time) ? "bg-primary text-primary-foreground" : "bg-primary/10"
-                    )}>
-                      <Video className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{event.title}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatEventDate(event.start_time)}</span>
-                        <span>•</span>
-                        <span>{formatEventTime(event.start_time)} - {formatEventTime(event.end_time)}</span>
-                      </div>
-                      {event.description && (
-                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{event.description}</p>
-                      )}
-                    </div>
-                    {isEventNow(event.start_time, event.end_time) && (
-                      <Badge className="bg-primary text-primary-foreground shrink-0">EN VIVO</Badge>
+              <div className="space-y-3">
+                {calendarEvents.map(event => (
+                  <div 
+                    key={event.id} 
+                    className={cn(
+                      "p-3 rounded-lg border",
+                      isEventNow(event.start_time, event.end_time) 
+                        ? "border-primary bg-primary/10" 
+                        : "border-border/50 bg-secondary/30"
                     )}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Unassigned Events */}
-        <Card className="bg-card border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="h-4 w-4 text-warning" />
-              Llamadas sin Asignar
-              {unassignedEvents.length > 0 && (
-                <Badge variant="outline" className="ml-auto border-warning text-warning">{unassignedEvents.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {unassignedEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">Todas las llamadas están asignadas</p>
-            ) : (
-              unassignedEvents.map(event => (
-                <div key={event.id} className="p-3 rounded-lg border border-border/50 bg-secondary/30">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
-                      <Video className="h-5 w-5 text-warning" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{event.title}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatEventDate(event.start_time)}</span>
-                        <span>•</span>
-                        <span>{formatEventTime(event.start_time)} - {formatEventTime(event.end_time)}</span>
-                      </div>
-                    </div>
-                    <Select onValueChange={(value) => assignEventToUser(event.id, value)}>
-                      <SelectTrigger className="w-[140px] h-8">
-                        <SelectValue placeholder="Asignar a..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teamUsers.map(u => (
-                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Team Status */}
-        <Card className="bg-card border-border/50">
-          <CardHeader>
-            <CardTitle className="text-base">Estado del Equipo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {teamUsers.map(teamUser => {
-              const member = team.find(m => m.user_id === teamUser.id);
-              const isCurrentUser = teamUser.id === user?.id;
-              const memberStatus = member?.status || 'disponible';
-              const displayStatus = statusConfig[memberStatus];
-              const userEventCount = calendarEvents.filter(e => e.team_user_id === teamUser.id).length;
-
-              return (
-                <div key={teamUser.id} className="p-4 rounded-lg bg-secondary/30 space-y-3">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-lg">
-                        {teamUser.name?.charAt(0)}
-                      </div>
+                  >
+                    <div className="flex items-center gap-3">
                       <div className={cn(
-                        "absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card",
-                        displayStatus.color
-                      )} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{teamUser.name}</p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className={cn("flex items-center gap-1", displayStatus.color.replace('bg-', 'text-'))}>
-                          {displayStatus.label}
-                        </span>
-                        {userEventCount > 0 && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className="text-muted-foreground">{userEventCount} llamadas asignadas</span>
-                          </>
-                        )}
+                        "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+                        isEventNow(event.start_time, event.end_time) ? "bg-primary text-primary-foreground" : "bg-primary/10"
+                      )}>
+                        <Video className="h-5 w-5" />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{event.title}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatEventDate(event.start_time)}</span>
+                          <span>•</span>
+                          <span>{formatEventTime(event.start_time)} - {formatEventTime(event.end_time)}</span>
+                        </div>
+                      </div>
+                      {isEventNow(event.start_time, event.end_time) && (
+                        <Badge className="bg-primary text-primary-foreground shrink-0">EN VIVO</Badge>
+                      )}
+                      <Select 
+                        value={event.team_user_id || "unassigned"} 
+                        onValueChange={(value) => assignEventToUser(event.id, value === "unassigned" ? null : value)}
+                      >
+                        <SelectTrigger className={cn(
+                          "w-[160px] h-9",
+                          !event.team_user_id && "border-warning text-warning"
+                        )}>
+                          <SelectValue placeholder="Sin asignar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Sin asignar</SelectItem>
+                          {teamUsers.map(u => (
+                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-
-                  {/* Manual status controls for current user */}
-                  {isCurrentUser && (
-                    <div className="pl-16 flex gap-1 flex-wrap">
-                      {(['disponible', 'ocupado', 'ausente'] as AvailabilityStatus[]).map(status => (
-                        <Button 
-                          key={status} 
-                          variant="ghost" 
-                          size="sm" 
-                          className={cn(
-                            "h-7 px-2", 
-                            memberStatus === status && statusConfig[status].color + '/20'
-                          )} 
-                          onClick={() => updateStatus(teamUser.id, status)}
-                        >
-                          <Circle className={cn(
-                            "h-2 w-2 mr-1", 
-                            statusConfig[status].color.replace('bg-', 'fill-')
-                          )} />
-                          <span className="text-xs">{statusConfig[status].label}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Announcements */}
-        <Card className="bg-card border-border/50">
-          <CardHeader><CardTitle className="text-base">Tablón de Anuncios</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Escribe un mensaje..." className="bg-secondary/50 min-h-[60px]" />
-              <Button onClick={addAnnouncement} className="bg-primary"><Send className="h-4 w-4" /></Button>
-            </div>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {announcements.map(a => (
-                <div key={a.id} className={cn("p-3 rounded-lg border", a.important ? "border-primary/50 bg-primary/5" : "border-border/50")}>
-                  {a.important && <Badge className="bg-primary/20 text-primary border-0 text-xs mb-2">Importante</Badge>}
-                  <p className="text-sm">{a.content}</p>
-                  <p className="text-xs text-muted-foreground mt-2">— {getUserName(a.author_id || '')} • {new Date(a.created_at).toLocaleDateString('es-ES')}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
