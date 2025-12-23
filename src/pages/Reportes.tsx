@@ -136,10 +136,9 @@ export default function Reportes() {
     const today = new Date().toISOString().split('T')[0];
     
     try {
-      await fetch(WEBHOOK_URL, {
+      const response = await fetch(WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        mode: 'no-cors',
         body: JSON.stringify({
           type: selectedType,
           typeName: selectedReportType?.label || selectedType,
@@ -149,6 +148,10 @@ export default function Reportes() {
           platform: 'Torii'
         }),
       });
+
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${await response.text()}`);
+      }
 
       toast.success('Reporte enviado correctamente');
     } catch (error) {
