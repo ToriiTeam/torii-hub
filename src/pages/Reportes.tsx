@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useStore } from '@/hooks/useStore';
+import { supabase } from '@/integrations/supabase/client';
 import { initialTasks, initialSetters, initialClosers, initialFixedCosts, initialVariableCosts, initialIncomes, initialPayments } from '@/data/initialData';
 import { 
   FileText, Download, Send,
@@ -22,7 +23,7 @@ const reportTypes: { value: ReportType; label: string; description: string; icon
   { value: 'custom', label: 'Personalizado', description: 'Configura qué incluir', icon: FileText },
 ];
 
-const WEBHOOK_URL = 'https://n8n-n8n.vycvt5.easypanel.host/webhook/ef66538d-bf27-4ec2-863f-3ee73c732e5d';
+
 
 export default function Reportes() {
   const [tasks] = useStore('tareas', initialTasks);
@@ -136,22 +137,18 @@ export default function Reportes() {
     const today = new Date().toISOString().split('T')[0];
     
     try {
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-report-webhook', {
+        body: {
           type: selectedType,
           typeName: selectedReportType?.label || selectedType,
           timestamp: new Date().toISOString(),
           period: { start: today, end: today },
           data: reportData,
           platform: 'Torii'
-        }),
+        },
       });
 
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${await response.text()}`);
-      }
+      if (error) throw error;
 
       toast.success('Reporte enviado correctamente');
     } catch (error) {
