@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { userNames } from '@/data/initialData';
 import { toast } from 'sonner';
-import { Circle, Send, Calendar, Video, User, Clock } from 'lucide-react';
+import { Circle, Send, Calendar, Video, User, Clock, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type AvailabilityStatus = 'disponible' | 'ocupado' | 'ausente' | 'vacaciones';
@@ -62,7 +64,10 @@ export default function Disponibilidad() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isImportant, setIsImportant] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentTeamUserId, setCurrentTeamUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -74,13 +79,20 @@ export default function Disponibilidad() {
     
     const [availabilityRes, usersRes, announcementsRes, eventsRes] = await Promise.all([
       supabase.from('team_availability').select('*'),
-      supabase.from('team_users').select('id, name'),
+      supabase.from('team_users').select('id, name, email'),
       supabase.from('announcements').select('*').order('created_at', { ascending: false }),
       supabase.from('calendar_events').select('*').gte('end_time', now).order('start_time', { ascending: true })
     ]);
     
     if (availabilityRes.data) setTeam(availabilityRes.data as TeamMember[]);
-    if (usersRes.data) setTeamUsers(usersRes.data as TeamUser[]);
+    if (usersRes.data) {
+      setTeamUsers(usersRes.data as (TeamUser & { email?: string })[]);
+      // Find the current user's team_user_id by matching email
+      if (user?.email) {
+        const matchedUser = usersRes.data.find((u: any) => u.email === user.email);
+        if (matchedUser) setCurrentTeamUserId(matchedUser.id);
+      }
+    }
     if (announcementsRes.data) setAnnouncements(announcementsRes.data as Announcement[]);
     if (eventsRes.data) setCalendarEvents(eventsRes.data as CalendarEvent[]);
     setLoading(false);
@@ -122,17 +134,22 @@ export default function Disponibilidad() {
   };
 
   const addAnnouncement = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim()) {
+      toast.error('El mensaje es requerido');
+      return;
+    }
     
     const { error } = await supabase.from('announcements').insert({
-      title: 'Mensaje',
+      title: announcementTitle.trim() || 'Mensaje',
       content: newMessage,
-      author_id: user?.id || null,
-      important: false
+      author_id: currentTeamUserId,
+      important: isImportant
     });
     
     if (error) { toast.error('Error al publicar'); return; }
     setNewMessage('');
+    setAnnouncementTitle('');
+    setIsImportant(false);
     toast.success('Mensaje publicado');
     fetchData();
   };
@@ -256,17 +273,33 @@ export default function Disponibilidad() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <Input
+                placeholder="Título del anuncio (opcional)"
+                value={announcementTitle}
+                onChange={(e) => setAnnouncementTitle(e.target.value)}
+                className="bg-secondary/50"
+              />
               <Textarea
                 placeholder="Escribe un mensaje para el equipo..."
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 className="min-h-[80px]"
               />
-              <Button onClick={addAnnouncement} className="w-full" size="sm">
-                <Send className="h-4 w-4 mr-2" />
-                Publicar
-              </Button>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox 
+                    checked={isImportant} 
+                    onCheckedChange={(c) => setIsImportant(!!c)} 
+                  />
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  Importante
+                </label>
+                <Button onClick={addAnnouncement} size="sm">
+                  <Send className="h-4 w-4 mr-2" />
+                  Publicar
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-3 max-h-[300px] overflow-y-auto">
