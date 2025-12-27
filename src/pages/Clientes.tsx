@@ -422,10 +422,19 @@ export default function Clientes() {
 
   const activeClients = clients.filter(c => c.status === 'activo');
   const totalContractValue = activeClients.reduce((s, c) => s + (c.total_amount || 0), 0);
+  
+  // Calculate pending based on actual installments (unpaid amounts)
   const totalPending = activeClients.reduce((s, c) => {
-    const remaining = c.total_installments - c.paid_installments;
-    const avgPerInstallment = c.total_installments > 0 ? (c.total_amount || 0) / c.total_installments : 0;
-    return s + (avgPerInstallment * remaining);
+    const clientInstallments = installments.filter(i => i.client_id === c.id);
+    if (clientInstallments.length > 0) {
+      // Sum unpaid installments
+      return s + clientInstallments.filter(i => !i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+    } else {
+      // Fall back to estimate if no installments exist
+      const remaining = c.total_installments - c.paid_installments;
+      const avgPerInstallment = c.total_installments > 0 ? (c.total_amount || 0) / c.total_installments : 0;
+      return s + (avgPerInstallment * remaining);
+    }
   }, 0);
 
   // Client Dialog - Rendered always so it works from both views
