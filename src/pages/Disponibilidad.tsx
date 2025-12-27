@@ -139,6 +139,11 @@ export default function Disponibilidad() {
       return;
     }
     
+    if (!currentTeamUserId) {
+      toast.error('Tu usuario no está registrado en el equipo. Contacta al administrador.');
+      return;
+    }
+    
     const { error } = await supabase.from('announcements').insert({
       title: announcementTitle.trim() || 'Mensaje',
       content: newMessage,
@@ -146,7 +151,11 @@ export default function Disponibilidad() {
       important: isImportant
     });
     
-    if (error) { toast.error('Error al publicar'); return; }
+    if (error) { 
+      console.error('Error publicando anuncio:', error);
+      toast.error('Error al publicar'); 
+      return; 
+    }
     setNewMessage('');
     setAnnouncementTitle('');
     setIsImportant(false);
