@@ -795,6 +795,54 @@ export type Database = {
           },
         ]
       }
+      task_time_logs: {
+        Row: {
+          created_at: string
+          duration_seconds: number
+          ended_at: string
+          id: string
+          notes: string | null
+          started_at: string | null
+          task_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds: number
+          ended_at?: string
+          id?: string
+          notes?: string | null
+          started_at?: string | null
+          task_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number
+          ended_at?: string
+          id?: string
+          notes?: string | null
+          started_at?: string | null
+          task_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_time_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_time_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "team_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           created_at: string
