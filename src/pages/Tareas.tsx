@@ -13,7 +13,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Search, Edit2, Trash2, User, Users, Target, CheckCircle2, Circle, Clock, ArrowLeft, Calendar } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, User, Users, Target, CheckCircle2, Circle, Clock, ArrowLeft, Calendar, Timer } from 'lucide-react';
+import { TaskTimer } from '@/components/TaskTimer';
 import { cn } from '@/lib/utils';
 import { format, startOfWeek, addDays, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -723,6 +724,7 @@ export default function Tareas() {
                         <p className={cn('font-medium', task.status === 'completada' && 'line-through text-muted-foreground')}>{task.title}</p>
                         {task.description && <p className="text-xs text-muted-foreground truncate">{task.description}</p>}
                       </div>
+                      <TaskTimer taskId={task.id} taskTitle={task.title} compact />
                       {assignees.length > 0 && (
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3 text-muted-foreground" />
@@ -825,6 +827,7 @@ export default function Tareas() {
                           <p className={cn('font-medium', task.status === 'completada' && 'line-through text-muted-foreground')}>{task.title}</p>
                           {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
                         </div>
+                        <TaskTimer taskId={task.id} taskTitle={task.title} compact />
                         {assignees.length > 1 && (
                           <Badge variant="outline" className="text-xs gap-1">
                             <Users className="h-3 w-3" />+{assignees.length - 1}
