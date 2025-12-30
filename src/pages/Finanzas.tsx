@@ -74,6 +74,16 @@ interface Client {
   platform_fee: number;
 }
 
+interface ClientInstallment {
+  id: string;
+  client_id: string;
+  installment_number: number;
+  amount: number;
+  due_date: string | null;
+  paid: boolean;
+  paid_date: string | null;
+}
+
 interface MonthlyAccounting {
   id: string;
   year: number;
@@ -90,6 +100,7 @@ export default function Finanzas() {
   const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientInstallments, setClientInstallments] = useState<ClientInstallment[]>([]);
   const [monthlyAccounting, setMonthlyAccounting] = useState<MonthlyAccounting[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -109,12 +120,13 @@ export default function Finanzas() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [fixedRes, variableRes, incomeRes, clientsRes, accountingRes] = await Promise.all([
+      const [fixedRes, variableRes, incomeRes, clientsRes, accountingRes, installmentsRes] = await Promise.all([
         supabase.from('fixed_costs').select('*').order('name'),
         supabase.from('variable_costs').select('*').order('date', { ascending: false }),
         supabase.from('incomes').select('*').order('date', { ascending: false }),
         supabase.from('clients').select('*').order('name'),
-        supabase.from('monthly_accounting').select('*').order('year', { ascending: false }).order('month', { ascending: false })
+        supabase.from('monthly_accounting').select('*').order('year', { ascending: false }).order('month', { ascending: false }),
+        supabase.from('client_installments').select('*').order('installment_number')
       ]);
 
       if (fixedRes.data) setFixedCosts(fixedRes.data);
@@ -122,6 +134,7 @@ export default function Finanzas() {
       if (incomeRes.data) setIncomes(incomeRes.data);
       if (clientsRes.data) setClients(clientsRes.data);
       if (accountingRes.data) setMonthlyAccounting(accountingRes.data);
+      if (installmentsRes.data) setClientInstallments(installmentsRes.data);
     } catch (error) {
       console.error('Error loading finance data:', error);
     } finally {
@@ -136,12 +149,14 @@ export default function Finanzas() {
   const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
   const balance = totalIncome - totalExpenses;
 
-  // Client payments calculations
-  const totalClientRevenue = clients.reduce((sum, c) => sum + (Number(c.paid_installments) * Number(c.installment_amount)), 0);
-  const totalPendingClientRevenue = clients.reduce((sum, c) => {
-    const pending = (c.total_installments - c.paid_installments) * Number(c.installment_amount);
-    return sum + pending;
-  }, 0);
+  // Client payments calculations - using actual installment amounts
+  const totalClientRevenue = clientInstallments
+    .filter(inst => inst.paid)
+    .reduce((sum, inst) => sum + Number(inst.amount), 0);
+  
+  const totalPendingClientRevenue = clientInstallments
+    .filter(inst => !inst.paid)
+    .reduce((sum, inst) => sum + Number(inst.amount), 0);
 
   // Expense distribution for pie chart
   const expenseCategories = [...fixedCosts, ...variableCosts].reduce((acc, cost) => {
@@ -256,29 +271,9 @@ export default function Finanzas() {
     }
   };
 
-  // Mark client payment as received
-  const markClientPayment = async (client: Client) => {
-    if (client.paid_installments >= client.total_installments) return;
-    try {
-      const { error } = await supabase.from('clients').update({
-        paid_installments: client.paid_installments + 1
-      }).eq('id', client.id);
-      if (error) throw error;
-
-      // Also register as income
-      await supabase.from('incomes').insert([{
-        source: `Pago ${client.name} - Cuota ${client.paid_installments + 1}/${client.total_installments}`,
-        amount: client.installment_amount,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        type: 'unico',
-        client_id: client.id
-      }]);
-
-      toast.success('Pago registrado');
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+  // Helper function to get client installments for calculations
+  const getClientInstallmentsData = (clientId: string) => {
+    return clientInstallments.filter(i => i.client_id === clientId);
   };
 
   // Export to Excel
@@ -325,21 +320,26 @@ export default function Finanzas() {
     const wsIncome = XLSX.utils.aoa_to_sheet(incomeData);
     XLSX.utils.book_append_sheet(wb, wsIncome, 'Ingresos');
 
-    // Clientes sheet
+    // Clientes sheet - using real installment data
     const clientData = [
-      ['Cliente', 'Estado', 'Tipo Pago', 'Cuotas Totales', 'Cuotas Pagadas', 'Monto Cuota', 'Plataforma', 'Fee %', 'Total Pagado', 'Pendiente'],
-      ...clients.map(c => [
-        c.name, 
-        c.status, 
-        c.payment_type, 
-        c.total_installments, 
-        c.paid_installments, 
-        c.installment_amount,
-        c.platform,
-        c.platform_fee,
-        c.paid_installments * Number(c.installment_amount),
-        (c.total_installments - c.paid_installments) * Number(c.installment_amount)
-      ])
+      ['Cliente', 'Estado', 'Tipo Pago', 'Cuotas Totales', 'Cuotas Pagadas', 'Plataforma', 'Fee %', 'Total Pagado', 'Pendiente'],
+      ...clients.map(c => {
+        const insts = getClientInstallmentsData(c.id);
+        const paid = insts.filter(i => i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+        const pending = insts.filter(i => !i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+        const paidCount = insts.filter(i => i.paid).length;
+        return [
+          c.name, 
+          c.status, 
+          c.payment_type, 
+          insts.length, 
+          paidCount, 
+          c.platform,
+          c.platform_fee,
+          paid,
+          pending
+        ];
+      })
     ];
     const wsClients = XLSX.utils.aoa_to_sheet(clientData);
     XLSX.utils.book_append_sheet(wb, wsClients, 'Clientes');
@@ -471,9 +471,9 @@ export default function Finanzas() {
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="contabilidad">Contabilidad Mensual</TabsTrigger>
+          <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
           <TabsTrigger value="fijos">Costos Fijos</TabsTrigger>
           <TabsTrigger value="variables">Costos Variables</TabsTrigger>
-          <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
         </TabsList>
 
         {/* Resumen Tab */}
@@ -556,9 +556,12 @@ export default function Finanzas() {
                 </TableHeader>
                 <TableBody>
                   {clients.map(client => {
-                    const paid = client.paid_installments * Number(client.installment_amount);
-                    const pending = (client.total_installments - client.paid_installments) * Number(client.installment_amount);
-                    const progress = client.total_installments > 0 ? (client.paid_installments / client.total_installments) * 100 : 0;
+                    const clientInsts = clientInstallments.filter(i => i.client_id === client.id);
+                    const paid = clientInsts.filter(i => i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+                    const pending = clientInsts.filter(i => !i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
+                    const totalInsts = clientInsts.length;
+                    const paidInsts = clientInsts.filter(i => i.paid).length;
+                    const progress = totalInsts > 0 ? (paidInsts / totalInsts) * 100 : 0;
                     
                     return (
                       <TableRow key={client.id} className="border-border/50">
@@ -578,21 +581,25 @@ export default function Finanzas() {
                             <div className="w-20 h-2 bg-secondary rounded-full overflow-hidden">
                               <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
                             </div>
-                            <span className="text-xs text-muted-foreground">{client.paid_installments}/{client.total_installments}</span>
+                            <span className="text-xs text-muted-foreground">{paidInsts}/{totalInsts}</span>
                           </div>
                         </TableCell>
-                        <TableCell>${Number(client.installment_amount).toLocaleString()}</TableCell>
+                        <TableCell>
+                          {clientInsts.length > 0 ? (
+                            <span className="text-xs text-muted-foreground">
+                              {clientInsts.map(i => `$${Number(i.amount).toLocaleString()}`).join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Sin cuotas</span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{client.platform} ({client.platform_fee}%)</span>
                         </TableCell>
                         <TableCell className="text-right font-medium text-success">${paid.toLocaleString()}</TableCell>
                         <TableCell className="text-right font-medium text-warning">${pending.toLocaleString()}</TableCell>
                         <TableCell>
-                          {client.paid_installments < client.total_installments && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-success" onClick={() => markClientPayment(client)} title="Registrar pago">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          )}
+                          {/* Payment is now managed via Clientes page installments */}
                         </TableCell>
                       </TableRow>
                     );
@@ -880,87 +887,163 @@ export default function Finanzas() {
           </Card>
         </TabsContent>
 
-        {/* Ingresos Tab */}
-        <TabsContent value="ingresos" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-foreground">${totalIncome.toLocaleString()}</span></p>
-            <Dialog open={dialogType === 'income'} onOpenChange={(open) => setDialogType(open ? 'income' : null)}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90"><Plus className="h-4 w-4 mr-2" />Agregar Ingreso</Button>
-              </DialogTrigger>
-              <DialogContent className="bg-card border-border">
-                <DialogHeader><DialogTitle>Nuevo Ingreso</DialogTitle></DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div><Label>Fuente *</Label><Input value={incomeForm.source} onChange={e => setIncomeForm({ ...incomeForm, source: e.target.value })} className="bg-secondary/50" placeholder="Ej: Contrato Cliente X" /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Monto *</Label><Input type="number" value={incomeForm.amount} onChange={e => setIncomeForm({ ...incomeForm, amount: e.target.value })} className="bg-secondary/50" /></div>
-                    <div><Label>Fecha</Label><Input type="date" value={incomeForm.date} onChange={e => setIncomeForm({ ...incomeForm, date: e.target.value })} className="bg-secondary/50" /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><Label>Tipo</Label>
-                      <Select value={incomeForm.type} onValueChange={v => setIncomeForm({ ...incomeForm, type: v })}>
-                        <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unico">Pago Único</SelectItem>
-                          <SelectItem value="recurrente">Recurrente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div><Label>Cliente (opcional)</Label>
-                      <Select value={incomeForm.client_id || 'none'} onValueChange={v => setIncomeForm({ ...incomeForm, client_id: v === 'none' ? '' : v })}>
-                        <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sin cliente</SelectItem>
-                          {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
-                    <Button onClick={handleAddIncome} className="bg-primary">Agregar</Button>
-                  </div>
+        {/* Movimientos Tab - Ingresos y Egresos */}
+        <TabsContent value="movimientos" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Columna Ingresos */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-success flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" /> Ingresos
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-success">${totalIncome.toLocaleString()}</span></p>
                 </div>
-              </DialogContent>
-            </Dialog>
+                <Dialog open={dialogType === 'income'} onOpenChange={(open) => setDialogType(open ? 'income' : null)}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-success hover:bg-success/90"><Plus className="h-4 w-4 mr-2" />Agregar</Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-border">
+                    <DialogHeader><DialogTitle>Nuevo Ingreso</DialogTitle></DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div><Label>Fuente *</Label><Input value={incomeForm.source} onChange={e => setIncomeForm({ ...incomeForm, source: e.target.value })} className="bg-secondary/50" placeholder="Ej: Contrato Cliente X" /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label>Monto *</Label><Input type="number" value={incomeForm.amount} onChange={e => setIncomeForm({ ...incomeForm, amount: e.target.value })} className="bg-secondary/50" /></div>
+                        <div><Label>Fecha</Label><Input type="date" value={incomeForm.date} onChange={e => setIncomeForm({ ...incomeForm, date: e.target.value })} className="bg-secondary/50" /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label>Tipo</Label>
+                          <Select value={incomeForm.type} onValueChange={v => setIncomeForm({ ...incomeForm, type: v })}>
+                            <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unico">Pago Único</SelectItem>
+                              <SelectItem value="recurrente">Recurrente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div><Label>Cliente (opcional)</Label>
+                          <Select value={incomeForm.client_id || 'none'} onValueChange={v => setIncomeForm({ ...incomeForm, client_id: v === 'none' ? '' : v })}>
+                            <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sin cliente</SelectItem>
+                              {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
+                        <Button onClick={handleAddIncome} className="bg-success">Agregar</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/50">
+                        <TableHead>Fuente</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                        <TableHead className="w-[40px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomes.map(income => (
+                        <TableRow key={income.id} className="border-border/50">
+                          <TableCell className="font-medium">
+                            <span>{income.source}</span>
+                            {income.type === 'recurrente' && (
+                              <Badge variant="outline" className="ml-2 text-xs bg-info/20 text-info border-info/30">Rec</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{income.date}</TableCell>
+                          <TableCell className="text-right font-medium text-success">+${Number(income.amount).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteItem('incomes', income.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {incomes.length === 0 && (
+                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay ingresos</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Columna Egresos */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
+                    <TrendingDown className="h-5 w-5" /> Egresos
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-destructive">${totalExpenses.toLocaleString()}</span></p>
+                </div>
+                <Dialog open={dialogType === 'variable'} onOpenChange={(open) => setDialogType(open ? 'variable' : null)}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Plus className="h-4 w-4 mr-2" />Agregar</Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-border">
+                    <DialogHeader><DialogTitle>Nuevo Egreso</DialogTitle></DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div><Label>Nombre *</Label><Input value={variableForm.name} onChange={e => setVariableForm({ ...variableForm, name: e.target.value })} className="bg-secondary/50" /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><Label>Monto *</Label><Input type="number" value={variableForm.amount} onChange={e => setVariableForm({ ...variableForm, amount: e.target.value })} className="bg-secondary/50" /></div>
+                        <div><Label>Fecha</Label><Input type="date" value={variableForm.date} onChange={e => setVariableForm({ ...variableForm, date: e.target.value })} className="bg-secondary/50" /></div>
+                      </div>
+                      <div><Label>Categoría</Label><Input value={variableForm.category} onChange={e => setVariableForm({ ...variableForm, category: e.target.value })} className="bg-secondary/50" /></div>
+                      <div><Label>Descripción</Label><Input value={variableForm.description} onChange={e => setVariableForm({ ...variableForm, description: e.target.value })} className="bg-secondary/50" /></div>
+                      <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
+                        <Button onClick={handleAddVariable} className="bg-destructive">Agregar</Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardContent className="p-0 max-h-[500px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/50">
+                        <TableHead>Concepto</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead className="text-right">Monto</TableHead>
+                        <TableHead className="w-[40px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {variableCosts.map(cost => (
+                        <TableRow key={cost.id} className="border-border/50">
+                          <TableCell className="font-medium">
+                            <span>{cost.name}</span>
+                            {cost.category && <Badge variant="outline" className="ml-2 text-xs">{cost.category}</Badge>}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{cost.date}</TableCell>
+                          <TableCell className="text-right font-medium text-destructive">-${Number(cost.amount).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteItem('variable_costs', cost.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {variableCosts.length === 0 && (
+                        <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay egresos</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border/50">
-                    <TableHead>Fuente</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {incomes.map(income => (
-                    <TableRow key={income.id} className="border-border/50">
-                      <TableCell className="font-medium">{income.source}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn('text-xs', income.type === 'recurrente' && 'bg-info/20 text-info border-info/30')}>
-                          {income.type === 'recurrente' ? 'Recurrente' : 'Único'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{income.date}</TableCell>
-                      <TableCell className="text-right font-medium text-success">+${Number(income.amount).toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem('incomes', income.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {incomes.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay ingresos registrados</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
