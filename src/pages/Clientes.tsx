@@ -381,39 +381,20 @@ export default function Clientes() {
     fetchData();
   };
 
-  const generateInstallments = async () => {
-    if (!selectedClient) return;
-    
-    const count = selectedClient.total_installments;
-    const baseAmount = selectedClient.total_amount ? selectedClient.total_amount / count : 0;
-    const startDate = selectedClient.start_date ? new Date(selectedClient.start_date) : new Date();
-    
-    const existingNumbers = installments.filter(i => i.client_id === selectedClient.id).map(i => i.installment_number);
-    const newInstallments = [];
-    
-    for (let i = 1; i <= count; i++) {
-      if (!existingNumbers.includes(i)) {
-        const dueDate = new Date(startDate);
-        dueDate.setMonth(dueDate.getMonth() + (i - 1));
-        newInstallments.push({
-          client_id: selectedClient.id,
-          installment_number: i,
-          amount: baseAmount,
-          due_date: dueDate.toISOString().split('T')[0],
-          paid: i <= selectedClient.paid_installments
-        });
-      }
-    }
-    
-    if (newInstallments.length === 0) {
-      toast.info('Ya existen todas las cuotas');
-      return;
-    }
-    
-    const { error } = await supabase.from('client_installments').insert(newInstallments);
-    if (error) { toast.error('Error al generar cuotas'); return; }
-    toast.success(`${newInstallments.length} cuotas generadas`);
-    fetchData();
+  // No longer auto-generates installments with equal amounts
+  // Installments are now added manually with variable amounts via the dialog
+  const openNewInstallment = () => {
+    const clientInsts = getClientInstallments(selectedClient?.id || '');
+    const nextNumber = clientInsts.length > 0 
+      ? Math.max(...clientInsts.map(i => i.installment_number)) + 1 
+      : 1;
+    setInstallmentForm({
+      installment_number: nextNumber.toString(),
+      amount: '',
+      due_date: '',
+      notes: ''
+    });
+    setIsInstallmentDialogOpen(true);
   };
 
   const getClientProducts = (clientId: string) => products.filter(p => p.client_id === clientId);
@@ -717,18 +698,9 @@ export default function Clientes() {
                 <span className="text-muted-foreground">Pagado: <span className="font-medium text-success">${totalPaidAmount.toLocaleString()}</span></span>
                 <span className="text-muted-foreground">Pendiente: <span className="font-medium text-warning">${totalPendingAmount.toLocaleString()}</span></span>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={generateInstallments}>
-                  <Receipt className="h-4 w-4 mr-2" />Generar Cuotas
-                </Button>
-                <Button onClick={() => {
-                  const nextNumber = clientInstallments.length > 0 ? Math.max(...clientInstallments.map(i => i.installment_number)) + 1 : 1;
-                  setInstallmentForm({ ...installmentForm, installment_number: nextNumber.toString() });
-                  setIsInstallmentDialogOpen(true);
-                }}>
-                  <Plus className="h-4 w-4 mr-2" />Agregar Cuota
-                </Button>
-              </div>
+              <Button onClick={openNewInstallment}>
+                <Plus className="h-4 w-4 mr-2" />Agregar Cuota
+              </Button>
             </div>
             <Card className="bg-card border-border/50">
               <CardContent className="p-0">
