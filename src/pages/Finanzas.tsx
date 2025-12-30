@@ -95,6 +95,22 @@ interface MonthlyAccounting {
   notes: string | null;
 }
 
+interface Setter {
+  id: string;
+  name: string;
+}
+
+interface SetterPayment {
+  id: string;
+  setter_id: string;
+  amount: number;
+  payment_date: string;
+  period_start: string | null;
+  period_end: string | null;
+  meetings_count: number;
+  notes: string | null;
+}
+
 export default function Finanzas() {
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
@@ -102,16 +118,19 @@ export default function Finanzas() {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientInstallments, setClientInstallments] = useState<ClientInstallment[]>([]);
   const [monthlyAccounting, setMonthlyAccounting] = useState<MonthlyAccounting[]>([]);
+  const [setters, setSetters] = useState<Setter[]>([]);
+  const [setterPayments, setSetterPayments] = useState<SetterPayment[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [activeTab, setActiveTab] = useState('resumen');
-  const [dialogType, setDialogType] = useState<'fixed' | 'variable' | 'income' | null>(null);
+  const [dialogType, setDialogType] = useState<'fixed' | 'variable' | 'income' | 'setter_payment' | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   // Form states
   const [fixedForm, setFixedForm] = useState({ name: '', amount: '', frequency: 'mensual', category: '', payment_date: '1' });
   const [variableForm, setVariableForm] = useState({ name: '', amount: '', date: '', category: '', description: '' });
   const [incomeForm, setIncomeForm] = useState({ source: '', amount: '', date: '', type: 'unico', client_id: '' });
+  const [setterPaymentForm, setSetterPaymentForm] = useState({ setter_id: '', amount: '', payment_date: '', period_start: '', period_end: '', meetings_count: '', notes: '' });
 
   useEffect(() => {
     loadData();
@@ -120,13 +139,15 @@ export default function Finanzas() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [fixedRes, variableRes, incomeRes, clientsRes, accountingRes, installmentsRes] = await Promise.all([
+      const [fixedRes, variableRes, incomeRes, clientsRes, accountingRes, installmentsRes, settersRes, setterPaymentsRes] = await Promise.all([
         supabase.from('fixed_costs').select('*').order('name'),
         supabase.from('variable_costs').select('*').order('date', { ascending: false }),
         supabase.from('incomes').select('*').order('date', { ascending: false }),
         supabase.from('clients').select('*').order('name'),
         supabase.from('monthly_accounting').select('*').order('year', { ascending: false }).order('month', { ascending: false }),
-        supabase.from('client_installments').select('*').order('installment_number')
+        supabase.from('client_installments').select('*').order('installment_number'),
+        supabase.from('setters').select('id, name').order('name'),
+        supabase.from('setter_payments').select('*').order('payment_date', { ascending: false })
       ]);
 
       if (fixedRes.data) setFixedCosts(fixedRes.data);
@@ -135,6 +156,8 @@ export default function Finanzas() {
       if (clientsRes.data) setClients(clientsRes.data);
       if (accountingRes.data) setMonthlyAccounting(accountingRes.data);
       if (installmentsRes.data) setClientInstallments(installmentsRes.data);
+      if (settersRes.data) setSetters(settersRes.data);
+      if (setterPaymentsRes.data) setSetterPayments(setterPaymentsRes.data);
     } catch (error) {
       console.error('Error loading finance data:', error);
     } finally {
@@ -260,7 +283,7 @@ export default function Finanzas() {
     }
   };
 
-  const deleteItem = async (table: 'fixed_costs' | 'variable_costs' | 'incomes', id: string) => {
+  const deleteItem = async (table: 'fixed_costs' | 'variable_costs' | 'incomes' | 'setter_payments', id: string) => {
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
@@ -271,10 +294,49 @@ export default function Finanzas() {
     }
   };
 
+  // Setter payment handler
+  const handleAddSetterPayment = async () => {
+    if (!setterPaymentForm.setter_id || !setterPaymentForm.amount) {
+      toast.error('Setter y monto son requeridos');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('setter_payments').insert([{
+        setter_id: setterPaymentForm.setter_id,
+        amount: parseFloat(setterPaymentForm.amount),
+        payment_date: setterPaymentForm.payment_date || format(new Date(), 'yyyy-MM-dd'),
+        period_start: setterPaymentForm.period_start || null,
+        period_end: setterPaymentForm.period_end || null,
+        meetings_count: parseInt(setterPaymentForm.meetings_count) || 0,
+        notes: setterPaymentForm.notes || null,
+      }]);
+      if (error) throw error;
+      
+      // Also register as expense (variable cost)
+      await supabase.from('variable_costs').insert([{
+        name: `Pago Setter - ${setters.find(s => s.id === setterPaymentForm.setter_id)?.name || 'Setter'}`,
+        amount: parseFloat(setterPaymentForm.amount),
+        date: setterPaymentForm.payment_date || format(new Date(), 'yyyy-MM-dd'),
+        category: 'Pagos Setters',
+        description: setterPaymentForm.notes || `Pago por ${setterPaymentForm.meetings_count || 0} reuniones`
+      }]);
+      
+      toast.success('Pago de setter registrado');
+      setSetterPaymentForm({ setter_id: '', amount: '', payment_date: '', period_start: '', period_end: '', meetings_count: '', notes: '' });
+      setDialogType(null);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
   // Helper function to get client installments for calculations
   const getClientInstallmentsData = (clientId: string) => {
     return clientInstallments.filter(i => i.client_id === clientId);
   };
+  
+  // Total setter payments
+  const totalSetterPayments = setterPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   // Export to Excel
   const exportToExcel = () => {
@@ -472,6 +534,7 @@ export default function Finanzas() {
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="contabilidad">Contabilidad Mensual</TabsTrigger>
           <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
+          <TabsTrigger value="setters">Pagos Setters</TabsTrigger>
           <TabsTrigger value="fijos">Costos Fijos</TabsTrigger>
           <TabsTrigger value="variables">Costos Variables</TabsTrigger>
         </TabsList>
@@ -1044,6 +1107,96 @@ export default function Finanzas() {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        {/* Pagos Setters Tab */}
+        <TabsContent value="setters" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Total pagado a setters: <span className="font-bold text-foreground">${totalSetterPayments.toLocaleString()}</span>
+              </p>
+            </div>
+            <Dialog open={dialogType === 'setter_payment'} onOpenChange={(open) => setDialogType(open ? 'setter_payment' : null)}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90"><Plus className="h-4 w-4 mr-2" />Registrar Pago</Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader><DialogTitle>Nuevo Pago a Setter</DialogTitle></DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <Label>Setter *</Label>
+                    <Select value={setterPaymentForm.setter_id} onValueChange={v => setSetterPaymentForm({ ...setterPaymentForm, setter_id: v })}>
+                      <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar setter" /></SelectTrigger>
+                      <SelectContent>
+                        {setters.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Monto *</Label><Input type="number" value={setterPaymentForm.amount} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, amount: e.target.value })} className="bg-secondary/50" /></div>
+                    <div><Label>Fecha de Pago</Label><Input type="date" value={setterPaymentForm.payment_date} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, payment_date: e.target.value })} className="bg-secondary/50" /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Período Desde</Label><Input type="date" value={setterPaymentForm.period_start} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, period_start: e.target.value })} className="bg-secondary/50" /></div>
+                    <div><Label>Período Hasta</Label><Input type="date" value={setterPaymentForm.period_end} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, period_end: e.target.value })} className="bg-secondary/50" /></div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><Label>Cant. Reuniones</Label><Input type="number" value={setterPaymentForm.meetings_count} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, meetings_count: e.target.value })} className="bg-secondary/50" placeholder="0" /></div>
+                  </div>
+                  <div><Label>Notas</Label><Input value={setterPaymentForm.notes} onChange={e => setSetterPaymentForm({ ...setterPaymentForm, notes: e.target.value })} className="bg-secondary/50" placeholder="Observaciones..." /></div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
+                    <Button onClick={handleAddSetterPayment} className="bg-primary">Registrar Pago</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Card className="bg-card border-border/50">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/50">
+                    <TableHead>Setter</TableHead>
+                    <TableHead>Fecha Pago</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Reuniones</TableHead>
+                    <TableHead>Notas</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {setterPayments.map(payment => {
+                    const setter = setters.find(s => s.id === payment.setter_id);
+                    return (
+                      <TableRow key={payment.id} className="border-border/50">
+                        <TableCell className="font-medium">{setter?.name || 'N/A'}</TableCell>
+                        <TableCell className="text-muted-foreground">{payment.payment_date}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {payment.period_start && payment.period_end 
+                            ? `${payment.period_start} - ${payment.period_end}` 
+                            : '-'}
+                        </TableCell>
+                        <TableCell>{payment.meetings_count || 0}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm truncate max-w-[150px]">{payment.notes || '-'}</TableCell>
+                        <TableCell className="text-right font-medium text-destructive">-${Number(payment.amount).toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteItem('setter_payments', payment.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {setterPayments.length === 0 && (
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay pagos registrados</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

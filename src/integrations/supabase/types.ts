@@ -726,6 +726,50 @@ export type Database = {
           },
         ]
       }
+      setter_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          meetings_count: number | null
+          notes: string | null
+          payment_date: string
+          period_end: string | null
+          period_start: string | null
+          setter_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          meetings_count?: number | null
+          notes?: string | null
+          payment_date?: string
+          period_end?: string | null
+          period_start?: string | null
+          setter_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          meetings_count?: number | null
+          notes?: string | null
+          payment_date?: string
+          period_end?: string | null
+          period_start?: string | null
+          setter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setter_payments_setter_id_fkey"
+            columns: ["setter_id"]
+            isOneToOne: false
+            referencedRelation: "setters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       setters: {
         Row: {
           avatar: string | null
