@@ -53,6 +53,15 @@ interface VariableCost {
   description: string;
 }
 
+interface Expense {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: string | null;
+  description: string | null;
+}
+
 interface Income {
   id: string;
   source: string;
@@ -115,6 +124,7 @@ interface SetterPayment {
 export default function Finanzas() {
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
   const [variableCosts, setVariableCosts] = useState<VariableCost[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [clientInstallments, setClientInstallments] = useState<ClientInstallment[]>([]);
@@ -124,12 +134,13 @@ export default function Finanzas() {
   const [loading, setLoading] = useState(true);
   
   const [activeTab, setActiveTab] = useState('resumen');
-  const [dialogType, setDialogType] = useState<'fixed' | 'variable' | 'income' | 'setter_payment' | null>(null);
+  const [dialogType, setDialogType] = useState<'fixed' | 'variable' | 'income' | 'setter_payment' | 'expense' | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   // Form states
   const [fixedForm, setFixedForm] = useState({ name: '', amount: '', frequency: 'mensual', category: '', payment_date: '1' });
   const [variableForm, setVariableForm] = useState({ name: '', amount: '', date: '', category: '', description: '' });
+  const [expenseForm, setExpenseForm] = useState({ name: '', amount: '', date: '', category: '', description: '' });
   const [incomeForm, setIncomeForm] = useState({ source: '', amount: '', date: '', type: 'unico', client_id: '' });
   const [setterPaymentForm, setSetterPaymentForm] = useState({ setter_id: '', amount: '', payment_date: '', period_start: '', period_end: '', meetings_count: '', notes: '' });
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -142,9 +153,10 @@ export default function Finanzas() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [fixedRes, variableRes, incomeRes, clientsRes, accountingRes, installmentsRes, settersRes, setterPaymentsRes] = await Promise.all([
+      const [fixedRes, variableRes, expensesRes, incomeRes, clientsRes, accountingRes, installmentsRes, settersRes, setterPaymentsRes] = await Promise.all([
         supabase.from('fixed_costs').select('*').order('name'),
         supabase.from('variable_costs').select('*').order('date', { ascending: false }),
+        supabase.from('expenses').select('*').order('date', { ascending: false }),
         supabase.from('incomes').select('*').order('date', { ascending: false }),
         supabase.from('clients').select('*').order('name'),
         supabase.from('monthly_accounting').select('*').order('year', { ascending: false }).order('month', { ascending: false }),
@@ -155,6 +167,7 @@ export default function Finanzas() {
 
       if (fixedRes.data) setFixedCosts(fixedRes.data);
       if (variableRes.data) setVariableCosts(variableRes.data);
+      if (expensesRes.data) setExpenses(expensesRes.data);
       if (incomeRes.data) setIncomes(incomeRes.data);
       if (clientsRes.data) setClients(clientsRes.data);
       if (accountingRes.data) setMonthlyAccounting(accountingRes.data);
@@ -171,9 +184,9 @@ export default function Finanzas() {
   // Calculations
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + Number(c.amount), 0);
   const totalVariableCosts = variableCosts.reduce((sum, c) => sum + Number(c.amount), 0);
-  const totalExpenses = totalFixedCosts + totalVariableCosts;
+  const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-  const balance = totalIncome - totalExpenses;
+  const balance = totalIncome - totalExpensesAmount;
 
   // Client payments calculations - using actual installment amounts
   const totalClientRevenue = clientInstallments
@@ -326,11 +339,35 @@ export default function Finanzas() {
     }
   };
 
-  const deleteItem = async (table: 'fixed_costs' | 'variable_costs' | 'incomes' | 'setter_payments', id: string) => {
+  const deleteItem = async (table: 'fixed_costs' | 'variable_costs' | 'incomes' | 'setter_payments' | 'expenses', id: string) => {
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
       toast.success('Eliminado correctamente');
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  // Add expense handler
+  const handleAddExpense = async () => {
+    if (!expenseForm.name || !expenseForm.amount) {
+      toast.error('Complete los campos requeridos');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('expenses').insert([{
+        name: expenseForm.name,
+        amount: parseFloat(expenseForm.amount),
+        date: expenseForm.date || format(new Date(), 'yyyy-MM-dd'),
+        category: expenseForm.category || null,
+        description: expenseForm.description || null,
+      }]);
+      if (error) throw error;
+      toast.success('Egreso agregado');
+      setExpenseForm({ name: '', amount: '', date: '', category: '', description: '' });
+      setDialogType(null);
       loadData();
     } catch (error: any) {
       toast.error(error.message);
@@ -383,7 +420,7 @@ export default function Finanzas() {
       ['Total Ingresos', `$${totalIncome.toLocaleString()}`, ''],
       ['Total Gastos Fijos', `$${totalFixedCosts.toLocaleString()}`, ''],
       ['Total Gastos Variables', `$${totalVariableCosts.toLocaleString()}`, ''],
-      ['Total Gastos', `$${totalExpenses.toLocaleString()}`, ''],
+      ['Total Egresos', `$${totalExpensesAmount.toLocaleString()}`, ''],
       ['Balance', `$${balance.toLocaleString()}`, balance >= 0 ? 'Positivo' : 'Negativo'],
       ['', '', ''],
       ['Ingresos de Clientes', `$${totalClientRevenue.toLocaleString()}`, ''],
@@ -525,7 +562,7 @@ export default function Finanzas() {
               <TrendingDown className="h-8 w-8 text-destructive" />
               <Badge className="bg-destructive/20 text-destructive border-0">Gastos</Badge>
             </div>
-            <p className="text-2xl font-bold">${totalExpenses.toLocaleString()}</p>
+            <p className="text-2xl font-bold">${totalExpensesAmount.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Total gastado</p>
           </CardContent>
         </Card>
@@ -1097,25 +1134,25 @@ export default function Finanzas() {
                   <h3 className="text-lg font-semibold text-destructive flex items-center gap-2">
                     <TrendingDown className="h-5 w-5" /> Egresos
                   </h3>
-                  <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-destructive">${totalExpenses.toLocaleString()}</span></p>
+                  <p className="text-sm text-muted-foreground">Total: <span className="font-bold text-destructive">${totalExpensesAmount.toLocaleString()}</span></p>
                 </div>
-                <Dialog open={dialogType === 'variable'} onOpenChange={(open) => setDialogType(open ? 'variable' : null)}>
+                <Dialog open={dialogType === 'expense'} onOpenChange={(open) => setDialogType(open ? 'expense' : null)}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Plus className="h-4 w-4 mr-2" />Agregar</Button>
                   </DialogTrigger>
                   <DialogContent className="bg-card border-border">
                     <DialogHeader><DialogTitle>Nuevo Egreso</DialogTitle></DialogHeader>
                     <div className="space-y-4 mt-4">
-                      <div><Label>Nombre *</Label><Input value={variableForm.name} onChange={e => setVariableForm({ ...variableForm, name: e.target.value })} className="bg-secondary/50" /></div>
+                      <div><Label>Nombre *</Label><Input value={expenseForm.name} onChange={e => setExpenseForm({ ...expenseForm, name: e.target.value })} className="bg-secondary/50" /></div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div><Label>Monto *</Label><Input type="number" value={variableForm.amount} onChange={e => setVariableForm({ ...variableForm, amount: e.target.value })} className="bg-secondary/50" /></div>
-                        <div><Label>Fecha</Label><Input type="date" value={variableForm.date} onChange={e => setVariableForm({ ...variableForm, date: e.target.value })} className="bg-secondary/50" /></div>
+                        <div><Label>Monto *</Label><Input type="number" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="bg-secondary/50" /></div>
+                        <div><Label>Fecha</Label><Input type="date" value={expenseForm.date} onChange={e => setExpenseForm({ ...expenseForm, date: e.target.value })} className="bg-secondary/50" /></div>
                       </div>
-                      <div><Label>Categoría</Label><Input value={variableForm.category} onChange={e => setVariableForm({ ...variableForm, category: e.target.value })} className="bg-secondary/50" /></div>
-                      <div><Label>Descripción</Label><Input value={variableForm.description} onChange={e => setVariableForm({ ...variableForm, description: e.target.value })} className="bg-secondary/50" /></div>
+                      <div><Label>Categoría</Label><Input value={expenseForm.category} onChange={e => setExpenseForm({ ...expenseForm, category: e.target.value })} className="bg-secondary/50" /></div>
+                      <div><Label>Descripción</Label><Input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} className="bg-secondary/50" /></div>
                       <div className="flex justify-end gap-2 pt-4">
                         <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
-                        <Button onClick={handleAddVariable} className="bg-destructive">Agregar</Button>
+                        <Button onClick={handleAddExpense} className="bg-destructive">Agregar</Button>
                       </div>
                     </div>
                   </DialogContent>
@@ -1133,22 +1170,22 @@ export default function Finanzas() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {variableCosts.map(cost => (
-                        <TableRow key={cost.id} className="border-border/50">
+                      {expenses.map(expense => (
+                        <TableRow key={expense.id} className="border-border/50">
                           <TableCell className="font-medium">
-                            <span>{cost.name}</span>
-                            {cost.category && <Badge variant="outline" className="ml-2 text-xs">{cost.category}</Badge>}
+                            <span>{expense.name}</span>
+                            {expense.category && <Badge variant="outline" className="ml-2 text-xs">{expense.category}</Badge>}
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{cost.date}</TableCell>
-                          <TableCell className="text-right font-medium text-destructive">-${Number(cost.amount).toLocaleString()}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{expense.date}</TableCell>
+                          <TableCell className="text-right font-medium text-destructive">-${Number(expense.amount).toLocaleString()}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteItem('variable_costs', cost.id)}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteItem('expenses', expense.id)}>
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
-                      {variableCosts.length === 0 && (
+                      {expenses.length === 0 && (
                         <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay egresos</TableCell></TableRow>
                       )}
                     </TableBody>
