@@ -24,7 +24,8 @@ import {
   Users,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Upload
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
 import { cn } from '@/lib/utils';
@@ -131,6 +132,8 @@ export default function Finanzas() {
   const [variableForm, setVariableForm] = useState({ name: '', amount: '', date: '', category: '', description: '' });
   const [incomeForm, setIncomeForm] = useState({ source: '', amount: '', date: '', type: 'unico', client_id: '' });
   const [setterPaymentForm, setSetterPaymentForm] = useState({ setter_id: '', amount: '', payment_date: '', period_start: '', period_end: '', meetings_count: '', notes: '' });
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -266,20 +269,60 @@ export default function Finanzas() {
       return;
     }
     try {
-      const { error } = await supabase.from('incomes').insert([{
+      setUploadingReceipt(true);
+      
+      // Insert income first
+      const { data: incomeData, error } = await supabase.from('incomes').insert([{
         source: incomeForm.source,
         amount: parseFloat(incomeForm.amount),
         date: incomeForm.date || format(new Date(), 'yyyy-MM-dd'),
         type: incomeForm.type,
         client_id: incomeForm.client_id || null,
-      }]);
+      }]).select().single();
+      
       if (error) throw error;
-      toast.success('Ingreso registrado');
+
+      // If there's a receipt file, upload it and create document record
+      if (receiptFile && incomeData) {
+        const fileExt = receiptFile.name.split('.').pop();
+        const fileName = `comprobante-${incomeData.id}-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('receipts')
+          .upload(fileName, receiptFile);
+        
+        if (uploadError) {
+          console.error('Error uploading receipt:', uploadError);
+          toast.error('Ingreso registrado pero hubo error al subir comprobante');
+        } else {
+          // Get public URL
+          const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(fileName);
+          
+          // Create document record
+          await supabase.from('documents').insert([{
+            name: `Comprobante - ${incomeForm.source}`,
+            description: `Comprobante de ingreso: $${incomeForm.amount} - ${incomeForm.date || format(new Date(), 'yyyy-MM-dd')}`,
+            category: 'comprobantes',
+            file_url: urlData.publicUrl,
+            file_type: receiptFile.type,
+            client_id: incomeForm.client_id || null,
+            tags: ['ingreso', 'comprobante']
+          }]);
+          
+          toast.success('Ingreso y comprobante registrados');
+        }
+      } else {
+        toast.success('Ingreso registrado');
+      }
+      
       setIncomeForm({ source: '', amount: '', date: '', type: 'unico', client_id: '' });
+      setReceiptFile(null);
       setDialogType(null);
       loadData();
     } catch (error: any) {
       toast.error(error.message);
+    } finally {
+      setUploadingReceipt(false);
     }
   };
 
@@ -994,9 +1037,25 @@ export default function Finanzas() {
                           </Select>
                         </div>
                       </div>
+                      <div>
+                        <Label>Comprobante (opcional)</Label>
+                        <Input 
+                          type="file" 
+                          accept="image/*,.pdf"
+                          onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                          className="bg-secondary/50 cursor-pointer"
+                        />
+                        {receiptFile && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Archivo: {receiptFile.name}
+                          </p>
+                        )}
+                      </div>
                       <div className="flex justify-end gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setDialogType(null)}>Cancelar</Button>
-                        <Button onClick={handleAddIncome} className="bg-success">Agregar</Button>
+                        <Button variant="outline" onClick={() => { setDialogType(null); setReceiptFile(null); }}>Cancelar</Button>
+                        <Button onClick={handleAddIncome} className="bg-success" disabled={uploadingReceipt}>
+                          {uploadingReceipt ? 'Guardando...' : 'Agregar'}
+                        </Button>
                       </div>
                     </div>
                   </DialogContent>
