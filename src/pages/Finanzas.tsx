@@ -355,15 +355,6 @@ export default function Finanzas() {
       }]);
       if (error) throw error;
       
-      // Also register as expense (variable cost)
-      await supabase.from('variable_costs').insert([{
-        name: `Pago Setter - ${setters.find(s => s.id === setterPaymentForm.setter_id)?.name || 'Setter'}`,
-        amount: parseFloat(setterPaymentForm.amount),
-        date: setterPaymentForm.payment_date || format(new Date(), 'yyyy-MM-dd'),
-        category: 'Pagos Setters',
-        description: setterPaymentForm.notes || `Pago por ${setterPaymentForm.meetings_count || 0} reuniones`
-      }]);
-      
       toast.success('Pago de setter registrado');
       setSetterPaymentForm({ setter_id: '', amount: '', payment_date: '', period_start: '', period_end: '', meetings_count: '', notes: '' });
       setDialogType(null);
