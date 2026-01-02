@@ -193,12 +193,16 @@ export default function Finanzas() {
   const balance = totalIncome - totalGastado;
 
   // Client payments calculations - using actual installment amounts
+  // Solo considera clientes activos para coincidir con la página de Clientes
+  const activeClientIds = clients.filter(c => c.status === 'activo').map(c => c.id);
+  
   const totalClientRevenue = clientInstallments
     .filter(inst => inst.paid)
     .reduce((sum, inst) => sum + Number(inst.amount), 0);
   
+  // Pendiente de clientes: solo cuotas no pagadas de clientes activos
   const totalPendingClientRevenue = clientInstallments
-    .filter(inst => !inst.paid)
+    .filter(inst => !inst.paid && activeClientIds.includes(inst.client_id))
     .reduce((sum, inst) => sum + Number(inst.amount), 0);
 
   // Expense distribution for pie chart
@@ -564,7 +568,7 @@ export default function Finanzas() {
               <TrendingDown className="h-8 w-8 text-destructive" />
               <Badge className="bg-destructive/20 text-destructive border-0">Gastos</Badge>
             </div>
-            <p className="text-2xl font-bold">${totalExpensesAmount.toLocaleString()}</p>
+            <p className="text-2xl font-bold">${totalGastado.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Total gastado</p>
           </CardContent>
         </Card>
