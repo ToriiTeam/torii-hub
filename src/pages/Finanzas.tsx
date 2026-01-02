@@ -185,8 +185,12 @@ export default function Finanzas() {
   const totalFixedCosts = fixedCosts.reduce((sum, c) => sum + Number(c.amount), 0);
   const totalVariableCosts = variableCosts.reduce((sum, c) => sum + Number(c.amount), 0);
   const totalExpensesAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalSetterPayments = setterPayments.reduce((sum, p) => sum + Number(p.amount), 0);
   const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-  const balance = totalIncome - totalExpensesAmount;
+  
+  // Total gastado = todos los egresos (expenses + costos variables + costos fijos + pagos setters)
+  const totalGastado = totalExpensesAmount + totalVariableCosts + totalFixedCosts + totalSetterPayments;
+  const balance = totalIncome - totalGastado;
 
   // Client payments calculations - using actual installment amounts
   const totalClientRevenue = clientInstallments
@@ -406,8 +410,6 @@ export default function Finanzas() {
     return clientInstallments.filter(i => i.client_id === clientId);
   };
   
-  // Total setter payments
-  const totalSetterPayments = setterPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
   // Export to Excel
   const exportToExcel = () => {
