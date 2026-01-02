@@ -79,6 +79,7 @@ interface Client {
   total_installments: number;
   paid_installments: number;
   installment_amount: number;
+  total_amount: number | null;
   next_due_date: string | null;
   platform: string;
   platform_fee: number;
@@ -193,17 +194,26 @@ export default function Finanzas() {
   const balance = totalIncome - totalGastado;
 
   // Client payments calculations - using actual installment amounts
-  // Solo considera clientes activos para coincidir con la página de Clientes
-  const activeClientIds = clients.filter(c => c.status === 'activo').map(c => c.id);
-  
   const totalClientRevenue = clientInstallments
     .filter(inst => inst.paid)
     .reduce((sum, inst) => sum + Number(inst.amount), 0);
   
-  // Pendiente de clientes: solo cuotas no pagadas de clientes activos
-  const totalPendingClientRevenue = clientInstallments
-    .filter(inst => !inst.paid && activeClientIds.includes(inst.client_id))
-    .reduce((sum, inst) => sum + Number(inst.amount), 0);
+  // Pendiente de clientes: misma lógica que en Clientes.tsx
+  // Si el cliente tiene cuotas registradas, suma las no pagadas
+  // Si no tiene cuotas, usa total_amount como fallback (considerando pagos parciales)
+  const activeClients = clients.filter(c => c.status === 'activo');
+  const totalPendingClientRevenue = activeClients.reduce((sum, client) => {
+    const clientInsts = clientInstallments.filter(i => i.client_id === client.id);
+    if (clientInsts.length > 0) {
+      // Sumar cuotas no pagadas
+      return sum + clientInsts.filter(i => !i.paid).reduce((s, i) => s + Number(i.amount), 0);
+    } else {
+      // Fallback: estimar pendiente si no hay cuotas registradas
+      const remaining = client.total_installments - client.paid_installments;
+      const avgPerInstallment = client.total_installments > 0 ? (client.total_amount || 0) / client.total_installments : 0;
+      return sum + (avgPerInstallment * remaining);
+    }
+  }, 0);
 
   // Expense distribution for pie chart
   const expenseCategories = [...fixedCosts, ...variableCosts].reduce((acc, cost) => {
