@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Handshake, DollarSign, TrendingUp, Edit2, Trash2, Star, Award, Phone, PhoneCall, Upload, Play, FileAudio, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Handshake, DollarSign, TrendingUp, Edit2, Trash2, Star, Award, Phone, PhoneCall, Upload, FileAudio, CheckCircle, XCircle, Clock, Target, Percent } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -49,6 +49,10 @@ interface CloserCall {
   paid: boolean;
   price?: number;
   rescheduled_date?: string;
+  last_followup_date?: string;
+  next_followup_date?: string;
+  followup_notes?: string;
+  followup_count: number;
 }
 
 interface CallRecording {
@@ -125,11 +129,15 @@ export default function Closers() {
     first_call_attended: false,
     second_call_date: '',
     second_call_status: '' as CallStatus | '' | 'none',
+    rescheduled_date: '',
     qualified: false,
     objections: '',
     notes: '',
     paid: false,
-    price: ''
+    price: '',
+    last_followup_date: '',
+    next_followup_date: '',
+    followup_notes: ''
   });
 
   useEffect(() => {
@@ -145,10 +153,29 @@ export default function Closers() {
     ]);
     
     if (closersRes.data) setClosers(closersRes.data as Closer[]);
-    if (callsRes.data) setCalls(callsRes.data as CloserCall[]);
+    if (callsRes.data) setCalls(callsRes.data.map(c => ({ ...c, followup_count: c.followup_count || 0 })) as CloserCall[]);
     if (recordingsRes.data) setRecordings(recordingsRes.data as CallRecording[]);
     setLoading(false);
   };
+
+  // Métricas de Closing
+  const totalCalls = calls.length;
+  const totalAttended = calls.filter(c => c.first_call_attended).length;
+  const totalQualified = calls.filter(c => c.qualified).length;
+  const totalClosed = calls.filter(c => c.paid).length;
+  const totalValue = calls.filter(c => c.paid).reduce((sum, c) => sum + (c.price || 0), 0);
+  
+  // Show Up Rate: % de llamadas atendidas
+  const showUpRate = totalCalls > 0 ? Math.round((totalAttended / totalCalls) * 100) : 0;
+  
+  // Close Rate: % de cierres sobre llamadas atendidas
+  const closeRate = totalAttended > 0 ? Math.round((totalClosed / totalAttended) * 100) : 0;
+  
+  // AOV (Average Order Value): Valor promedio de cierre
+  const aov = totalClosed > 0 ? Math.round(totalValue / totalClosed) : 0;
+  
+  // Qualification Rate: % de calificados sobre atendidos
+  const qualificationRate = totalAttended > 0 ? Math.round((totalQualified / totalAttended) * 100) : 0;
 
   const getCloserMetrics = (closerId: string) => {
     const closerCalls = calls.filter(c => c.closer_id === closerId);
@@ -157,13 +184,11 @@ export default function Closers() {
     const qualified = closerCalls.filter(c => c.qualified).length;
     const closed = closerCalls.filter(c => c.paid).length;
     const totalValue = closerCalls.filter(c => c.paid).reduce((sum, c) => sum + (c.price || 0), 0);
-    return { firstCalls, secondCalls, qualified, closed, totalValue };
+    const showUp = closerCalls.length > 0 ? Math.round((firstCalls / closerCalls.length) * 100) : 0;
+    const closeRt = firstCalls > 0 ? Math.round((closed / firstCalls) * 100) : 0;
+    return { firstCalls, secondCalls, qualified, closed, totalValue, showUp, closeRate: closeRt };
   };
 
-  const totalCalls = calls.length;
-  const totalQualified = calls.filter(c => c.qualified).length;
-  const totalClosed = calls.filter(c => c.paid).length;
-  const totalValue = calls.filter(c => c.paid).reduce((sum, c) => sum + (c.price || 0), 0);
   const avgCommitment = closers.length ? (closers.reduce((sum, c) => sum + c.commitment, 0) / closers.length).toFixed(1) : '0';
 
   const handleCloserSubmit = async () => {
@@ -239,11 +264,16 @@ export default function Closers() {
       first_call_attended: callForm.first_call_attended,
       second_call_date: callForm.second_call_date || null,
       second_call_status: ['none', ''].includes(callForm.second_call_status) ? null : callForm.second_call_status as CallStatus,
+      rescheduled_date: callForm.rescheduled_date || null,
       qualified: callForm.qualified,
       objections: callForm.objections || null,
       notes: callForm.notes || null,
       paid: callForm.paid,
-      price: callForm.price ? parseFloat(callForm.price) : null
+      price: callForm.price ? parseFloat(callForm.price) : null,
+      last_followup_date: callForm.last_followup_date || null,
+      next_followup_date: callForm.next_followup_date || null,
+      followup_notes: callForm.followup_notes || null,
+      followup_count: editingCall ? (editingCall.followup_count || 0) + (callForm.last_followup_date && callForm.last_followup_date !== editingCall.last_followup_date ? 1 : 0) : 0
     };
 
     if (editingCall) {
@@ -279,11 +309,15 @@ export default function Closers() {
       first_call_attended: false,
       second_call_date: '',
       second_call_status: '',
+      rescheduled_date: '',
       qualified: false,
       objections: '',
       notes: '',
       paid: false,
-      price: ''
+      price: '',
+      last_followup_date: '',
+      next_followup_date: '',
+      followup_notes: ''
     });
     setEditingCall(null);
     setIsCallDialogOpen(false);
@@ -301,11 +335,15 @@ export default function Closers() {
       first_call_attended: call.first_call_attended,
       second_call_date: call.second_call_date ? call.second_call_date.slice(0, 16) : '',
       second_call_status: call.second_call_status || '',
+      rescheduled_date: call.rescheduled_date ? call.rescheduled_date.slice(0, 16) : '',
       qualified: call.qualified || false,
       objections: call.objections || '',
       notes: call.notes || '',
       paid: call.paid,
-      price: call.price?.toString() || ''
+      price: call.price?.toString() || '',
+      last_followup_date: call.last_followup_date ? call.last_followup_date.slice(0, 16) : '',
+      next_followup_date: call.next_followup_date ? call.next_followup_date.slice(0, 16) : '',
+      followup_notes: call.followup_notes || ''
     });
     setIsCallDialogOpen(true);
   };
@@ -327,7 +365,7 @@ export default function Closers() {
     const fileExt = file.name.split('.').pop();
     const fileName = `${uploadingCallId}_${Date.now()}.${fileExt}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('call-recordings')
       .upload(fileName, file);
 
@@ -395,57 +433,77 @@ export default function Closers() {
                 <PhoneCall className="h-4 w-4 mr-2" />Registrar Llamada
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingCall ? 'Editar' : 'Registrar'} Llamada</DialogTitle></DialogHeader>
               <div className="space-y-4 mt-4">
-                <div>
-                  <Label>Closer *</Label>
-                  <Select value={callForm.closer_id} onValueChange={v => setCallForm({ ...callForm, closer_id: v })}>
-                    <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar closer" /></SelectTrigger>
-                    <SelectContent>
-                      {closers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Closer *</Label>
+                    <Select value={callForm.closer_id} onValueChange={v => setCallForm({ ...callForm, closer_id: v })}>
+                      <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar closer" /></SelectTrigger>
+                      <SelectContent>
+                        {closers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <Label>Nombre del Lead *</Label>
                     <Input value={callForm.lead_name} onChange={e => setCallForm({ ...callForm, lead_name: e.target.value })} className="bg-secondary/50" />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Email</Label>
                     <Input type="email" value={callForm.lead_email} onChange={e => setCallForm({ ...callForm, lead_email: e.target.value })} className="bg-secondary/50" />
                   </div>
-                </div>
-                <div>
-                  <Label>Teléfono</Label>
-                  <Input value={callForm.lead_phone} onChange={e => setCallForm({ ...callForm, lead_phone: e.target.value })} className="bg-secondary/50" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Primera Llamada</Label>
-                    <Input type="datetime-local" value={callForm.first_call_date} onChange={e => setCallForm({ ...callForm, first_call_date: e.target.value })} className="bg-secondary/50" />
-                  </div>
-                  <div>
-                    <Label>Estado 1ra Llamada</Label>
-                    <Select value={callForm.first_call_status} onValueChange={v => setCallForm({ ...callForm, first_call_status: v as CallStatus })}>
-                      <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label>Teléfono</Label>
+                    <Input value={callForm.lead_phone} onChange={e => setCallForm({ ...callForm, lead_phone: e.target.value })} className="bg-secondary/50" />
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={callForm.first_call_attended} onCheckedChange={(c) => setCallForm({ ...callForm, first_call_attended: !!c })} />
-                  <Label className="cursor-pointer">Primera llamada atendida</Label>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Segunda Llamada</Label>
-                    <Input type="datetime-local" value={callForm.second_call_date} onChange={e => setCallForm({ ...callForm, second_call_date: e.target.value })} className="bg-secondary/50" />
+                
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Primera Llamada</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Fecha Agendada</Label>
+                      <Input type="datetime-local" value={callForm.first_call_date} onChange={e => setCallForm({ ...callForm, first_call_date: e.target.value })} className="bg-secondary/50" />
+                    </div>
+                    <div>
+                      <Label>Estado</Label>
+                      <Select value={callForm.first_call_status} onValueChange={v => setCallForm({ ...callForm, first_call_status: v as CallStatus })}>
+                        <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(statusLabels).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-4 mt-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={callForm.first_call_attended} onCheckedChange={(c) => setCallForm({ ...callForm, first_call_attended: !!c })} />
+                      <Label className="cursor-pointer">Atendida</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={callForm.qualified} onCheckedChange={(c) => setCallForm({ ...callForm, qualified: !!c })} />
+                      <Label className="cursor-pointer">Calificado</Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Segunda Llamada / Reagendamiento</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Fecha Reagendada</Label>
+                      <Input type="datetime-local" value={callForm.rescheduled_date} onChange={e => setCallForm({ ...callForm, rescheduled_date: e.target.value })} className="bg-secondary/50" />
+                    </div>
+                    <div>
+                      <Label>Segunda Llamada</Label>
+                      <Input type="datetime-local" value={callForm.second_call_date} onChange={e => setCallForm({ ...callForm, second_call_date: e.target.value })} className="bg-secondary/50" />
+                    </div>
+                  </div>
+                  <div className="mt-3">
                     <Label>Estado 2da Llamada</Label>
                     <Select value={callForm.second_call_status} onValueChange={v => setCallForm({ ...callForm, second_call_status: v as CallStatus })}>
                       <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Sin segunda llamada" /></SelectTrigger>
@@ -456,22 +514,39 @@ export default function Closers() {
                     </Select>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox checked={callForm.qualified} onCheckedChange={(c) => setCallForm({ ...callForm, qualified: !!c })} />
-                    <Label className="cursor-pointer">Calificado</Label>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Seguimientos</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Último Seguimiento</Label>
+                      <Input type="datetime-local" value={callForm.last_followup_date} onChange={e => setCallForm({ ...callForm, last_followup_date: e.target.value })} className="bg-secondary/50" />
+                    </div>
+                    <div>
+                      <Label>Próximo Seguimiento</Label>
+                      <Input type="datetime-local" value={callForm.next_followup_date} onChange={e => setCallForm({ ...callForm, next_followup_date: e.target.value })} className="bg-secondary/50" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="mt-3">
+                    <Label>Notas de Seguimiento</Label>
+                    <Textarea value={callForm.followup_notes} onChange={e => setCallForm({ ...callForm, followup_notes: e.target.value })} className="bg-secondary/50" placeholder="Notas del seguimiento..." />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-medium mb-3">Cierre</h4>
+                  <div className="flex items-center gap-2 mb-3">
                     <Checkbox checked={callForm.paid} onCheckedChange={(c) => setCallForm({ ...callForm, paid: !!c })} />
                     <Label className="cursor-pointer">Pagado / Cerrado</Label>
                   </div>
+                  {callForm.paid && (
+                    <div>
+                      <Label>Precio ($)</Label>
+                      <Input type="number" value={callForm.price} onChange={e => setCallForm({ ...callForm, price: e.target.value })} className="bg-secondary/50" placeholder="Valor del cierre" />
+                    </div>
+                  )}
                 </div>
-                {callForm.paid && (
-                  <div>
-                    <Label>Precio ($)</Label>
-                    <Input type="number" value={callForm.price} onChange={e => setCallForm({ ...callForm, price: e.target.value })} className="bg-secondary/50" placeholder="Valor del cierre" />
-                  </div>
-                )}
+
                 <div>
                   <Label>Objeciones</Label>
                   <Textarea value={callForm.objections} onChange={e => setCallForm({ ...callForm, objections: e.target.value })} className="bg-secondary/50" placeholder="Objeciones del lead..." />
@@ -531,41 +606,62 @@ export default function Closers() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      {/* Summary Cards - Métricas de Closing */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
         <Card className="bg-card border-border/50">
           <CardContent className="p-4 text-center">
-            <Phone className="h-8 w-8 mx-auto mb-2 text-info" />
-            <p className="text-2xl font-bold">{totalCalls}</p>
+            <Phone className="h-6 w-6 mx-auto mb-1 text-info" />
+            <p className="text-xl font-bold">{totalCalls}</p>
             <p className="text-xs text-muted-foreground">Llamadas</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
           <CardContent className="p-4 text-center">
-            <Handshake className="h-8 w-8 mx-auto mb-2 text-warning" />
-            <p className="text-2xl font-bold">{totalQualified}</p>
+            <Target className="h-6 w-6 mx-auto mb-1 text-warning" />
+            <p className="text-xl font-bold">{showUpRate}%</p>
+            <p className="text-xs text-muted-foreground">Show Up Rate</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-4 text-center">
+            <Handshake className="h-6 w-6 mx-auto mb-1 text-info" />
+            <p className="text-xl font-bold">{totalQualified}</p>
             <p className="text-xs text-muted-foreground">Calificados</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
           <CardContent className="p-4 text-center">
-            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-success" />
-            <p className="text-2xl font-bold">{totalClosed}</p>
+            <Percent className="h-6 w-6 mx-auto mb-1 text-primary" />
+            <p className="text-xl font-bold">{qualificationRate}%</p>
+            <p className="text-xs text-muted-foreground">Qual. Rate</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-4 text-center">
+            <TrendingUp className="h-6 w-6 mx-auto mb-1 text-success" />
+            <p className="text-xl font-bold">{totalClosed}</p>
             <p className="text-xs text-muted-foreground">Cierres</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
           <CardContent className="p-4 text-center">
-            <DollarSign className="h-8 w-8 mx-auto mb-2 text-primary" />
-            <p className="text-2xl font-bold">${totalValue.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Valor Total</p>
+            <Percent className="h-6 w-6 mx-auto mb-1 text-success" />
+            <p className="text-xl font-bold">{closeRate}%</p>
+            <p className="text-xs text-muted-foreground">Close Rate</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
           <CardContent className="p-4 text-center">
-            <Award className="h-8 w-8 mx-auto mb-2 text-warning" />
-            <p className="text-2xl font-bold">{avgCommitment}</p>
-            <p className="text-xs text-muted-foreground">Compromiso Prom.</p>
+            <DollarSign className="h-6 w-6 mx-auto mb-1 text-primary" />
+            <p className="text-xl font-bold">${aov.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">AOV</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-4 text-center">
+            <DollarSign className="h-6 w-6 mx-auto mb-1 text-success" />
+            <p className="text-xl font-bold">${totalValue.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Total Ventas</p>
           </CardContent>
         </Card>
       </div>
@@ -619,8 +715,10 @@ export default function Closers() {
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span>{m.firstCalls} llamadas</span>
+                          <span>{m.showUp}% show up</span>
                           <span>{m.qualified} calificados</span>
                           <span>{m.closed} cierres</span>
+                          <span>{m.closeRate}% close rate</span>
                           <span>${m.totalValue.toLocaleString()}</span>
                           <div className="flex items-center gap-1">
                             <span className="text-xs">Compromiso:</span>
@@ -671,9 +769,15 @@ export default function Closers() {
                   <TableRow>
                     <TableHead>Closer</TableHead>
                     <TableHead>Lead</TableHead>
-                    <TableHead>Contacto</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>F. Agendada</TableHead>
                     <TableHead>1ra Llamada</TableHead>
+                    <TableHead>Calificó</TableHead>
+                    <TableHead>Reagendó</TableHead>
                     <TableHead>2da Llamada</TableHead>
+                    <TableHead>Últ. Seguim.</TableHead>
+                    <TableHead>Próx. Seguim.</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead className="w-24"></TableHead>
@@ -687,33 +791,53 @@ export default function Closers() {
                         <TableCell className="font-medium">{closer?.name || '-'}</TableCell>
                         <TableCell>
                           <div>{call.lead_name}</div>
-                          {call.qualified && <Badge className="bg-success/20 text-success border-0 text-xs mt-1">Calificado</Badge>}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {call.lead_email && <div>{call.lead_email}</div>}
-                          {call.lead_phone && <div>{call.lead_phone}</div>}
+                        <TableCell className="text-sm text-muted-foreground">{call.lead_email || '-'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{call.lead_phone || '-'}</TableCell>
+                        <TableCell>
+                          {call.first_call_date ? format(new Date(call.first_call_date), "dd/MM HH:mm") : '-'}
                         </TableCell>
                         <TableCell>
-                          {call.first_call_date ? (
-                            <div className="flex items-center gap-1">
-                              {statusIcons[call.first_call_status]}
-                              <span className="text-sm">{format(new Date(call.first_call_date), "dd/MM HH:mm")}</span>
-                            </div>
+                          <div className="flex items-center gap-1">
+                            {statusIcons[call.first_call_status]}
+                            <span className="text-xs">{call.first_call_attended ? 'Sí' : 'No'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {call.qualified ? (
+                            <Badge className="bg-success/20 text-success border-0 text-xs">Sí</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">No</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {call.rescheduled_date ? (
+                            <span className="text-xs">{format(new Date(call.rescheduled_date), "dd/MM HH:mm")}</span>
                           ) : '-'}
                         </TableCell>
                         <TableCell>
                           {call.second_call_date && call.second_call_status ? (
                             <div className="flex items-center gap-1">
                               {statusIcons[call.second_call_status]}
-                              <span className="text-sm">{format(new Date(call.second_call_date), "dd/MM HH:mm")}</span>
+                              <span className="text-xs">{format(new Date(call.second_call_date), "dd/MM")}</span>
                             </div>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {call.last_followup_date ? (
+                            <span className="text-xs">{format(new Date(call.last_followup_date), "dd/MM")}</span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {call.next_followup_date ? (
+                            <span className="text-xs text-warning">{format(new Date(call.next_followup_date), "dd/MM")}</span>
                           ) : '-'}
                         </TableCell>
                         <TableCell>
                           {call.paid ? (
                             <Badge className="bg-success/20 text-success border-0">Cerrado</Badge>
                           ) : (
-                            <Badge variant="outline">{statusLabels[call.first_call_status]}</Badge>
+                            <Badge variant="outline" className="text-xs">{statusLabels[call.first_call_status]}</Badge>
                           )}
                         </TableCell>
                         <TableCell className="font-medium">
@@ -737,7 +861,7 @@ export default function Closers() {
                   })}
                   {filteredCalls.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                         No hay llamadas registradas
                       </TableCell>
                     </TableRow>
@@ -772,14 +896,13 @@ export default function Closers() {
                         {call && <p className="text-xs text-muted-foreground">Lead: {call.lead_name}</p>}
                         <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(rec.uploaded_at), "dd MMM yyyy", { locale: es })}
-                          {rec.file_size && ` • ${(rec.file_size / 1024 / 1024).toFixed(1)} MB`}
                         </p>
                       </div>
                       <div className="flex gap-1">
                         {rec.file_url && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                             <a href={rec.file_url} target="_blank" rel="noopener noreferrer">
-                              <Play className="h-4 w-4" />
+                              <FileAudio className="h-4 w-4" />
                             </a>
                           </Button>
                         )}
@@ -795,7 +918,7 @@ export default function Closers() {
             {filteredRecordings.length === 0 && (
               <Card className="bg-card border-border/50 col-span-full">
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  No hay grabaciones. Sube una desde la pestaña de llamadas.
+                  No hay grabaciones
                 </CardContent>
               </Card>
             )}
