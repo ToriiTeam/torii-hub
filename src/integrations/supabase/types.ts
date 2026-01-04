@@ -368,10 +368,14 @@ export type Database = {
           first_call_attended: boolean | null
           first_call_date: string | null
           first_call_status: Database["public"]["Enums"]["call_status"] | null
+          followup_count: number | null
+          followup_notes: string | null
           id: string
+          last_followup_date: string | null
           lead_email: string | null
           lead_name: string
           lead_phone: string | null
+          next_followup_date: string | null
           notes: string | null
           objections: string | null
           paid: boolean | null
@@ -388,10 +392,14 @@ export type Database = {
           first_call_attended?: boolean | null
           first_call_date?: string | null
           first_call_status?: Database["public"]["Enums"]["call_status"] | null
+          followup_count?: number | null
+          followup_notes?: string | null
           id?: string
+          last_followup_date?: string | null
           lead_email?: string | null
           lead_name: string
           lead_phone?: string | null
+          next_followup_date?: string | null
           notes?: string | null
           objections?: string | null
           paid?: boolean | null
@@ -408,10 +416,14 @@ export type Database = {
           first_call_attended?: boolean | null
           first_call_date?: string | null
           first_call_status?: Database["public"]["Enums"]["call_status"] | null
+          followup_count?: number | null
+          followup_notes?: string | null
           id?: string
+          last_followup_date?: string | null
           lead_email?: string | null
           lead_name?: string
           lead_phone?: string | null
+          next_followup_date?: string | null
           notes?: string | null
           objections?: string | null
           paid?: boolean | null
@@ -715,34 +727,40 @@ export type Database = {
       setter_meetings: {
         Row: {
           attended: boolean | null
+          closed: boolean | null
           created_at: string
           id: string
           lead_email: string | null
           lead_name: string
           lead_phone: string | null
           notes: string | null
+          qualified: boolean | null
           scheduled_date: string
           setter_id: string
         }
         Insert: {
           attended?: boolean | null
+          closed?: boolean | null
           created_at?: string
           id?: string
           lead_email?: string | null
           lead_name: string
           lead_phone?: string | null
           notes?: string | null
+          qualified?: boolean | null
           scheduled_date: string
           setter_id: string
         }
         Update: {
           attended?: boolean | null
+          closed?: boolean | null
           created_at?: string
           id?: string
           lead_email?: string | null
           lead_name?: string
           lead_phone?: string | null
           notes?: string | null
+          qualified?: boolean | null
           scheduled_date?: string
           setter_id?: string
         }
@@ -802,36 +820,57 @@ export type Database = {
       }
       setters: {
         Row: {
+          availability_hours: string | null
           avatar: string | null
           commitment: number | null
+          country: string | null
           created_at: string
+          dedicated_hours: number | null
           goal: number | null
           id: string
           name: string
           notes: string | null
+          performance: Database["public"]["Enums"]["setter_performance"] | null
+          platform: string | null
+          setter_status: Database["public"]["Enums"]["setter_status"] | null
           stage: Database["public"]["Enums"]["setter_stage"] | null
+          start_date: string | null
           updated_at: string
         }
         Insert: {
+          availability_hours?: string | null
           avatar?: string | null
           commitment?: number | null
+          country?: string | null
           created_at?: string
+          dedicated_hours?: number | null
           goal?: number | null
           id?: string
           name: string
           notes?: string | null
+          performance?: Database["public"]["Enums"]["setter_performance"] | null
+          platform?: string | null
+          setter_status?: Database["public"]["Enums"]["setter_status"] | null
           stage?: Database["public"]["Enums"]["setter_stage"] | null
+          start_date?: string | null
           updated_at?: string
         }
         Update: {
+          availability_hours?: string | null
           avatar?: string | null
           commitment?: number | null
+          country?: string | null
           created_at?: string
+          dedicated_hours?: number | null
           goal?: number | null
           id?: string
           name?: string
           notes?: string | null
+          performance?: Database["public"]["Enums"]["setter_performance"] | null
+          platform?: string | null
+          setter_status?: Database["public"]["Enums"]["setter_status"] | null
           stage?: Database["public"]["Enums"]["setter_stage"] | null
+          start_date?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1282,7 +1321,20 @@ export type Database = {
       offer_type: "DWY" | "DFY"
       payment_platform: "Stripe" | "Binance" | "Transfer"
       payment_type: "Upfront" | "Mensual" | "Cuotas"
+      setter_performance:
+        | "alto"
+        | "medio"
+        | "bajo"
+        | "alto_restriccion"
+        | "medio_restriccion"
+        | "bajo_restriccion"
       setter_stage: "nuevo" | "entrenamiento" | "activo" | "senior" | "lider"
+      setter_status:
+        | "activo"
+        | "inactivo"
+        | "introduciendose"
+        | "pendiente_reunion"
+        | "calentamiento"
       task_priority: "alta" | "media" | "baja"
       task_status: "pendiente" | "en_progreso" | "completada"
     }
@@ -1441,7 +1493,22 @@ export const Constants = {
       offer_type: ["DWY", "DFY"],
       payment_platform: ["Stripe", "Binance", "Transfer"],
       payment_type: ["Upfront", "Mensual", "Cuotas"],
+      setter_performance: [
+        "alto",
+        "medio",
+        "bajo",
+        "alto_restriccion",
+        "medio_restriccion",
+        "bajo_restriccion",
+      ],
       setter_stage: ["nuevo", "entrenamiento", "activo", "senior", "lider"],
+      setter_status: [
+        "activo",
+        "inactivo",
+        "introduciendose",
+        "pendiente_reunion",
+        "calentamiento",
+      ],
       task_priority: ["alta", "media", "baja"],
       task_status: ["pendiente", "en_progreso", "completada"],
     },
