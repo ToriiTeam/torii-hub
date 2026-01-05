@@ -14,8 +14,19 @@ import { toast } from 'sonner';
 import { Plus, Users, Calendar, TrendingUp, Edit2, Trash2, Award, CalendarCheck, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+const formatSafeDate = (dateString: string | null | undefined, formatStr: string, options?: { locale?: typeof es }) => {
+  if (!dateString) return '-';
+  try {
+    const date = parseISO(dateString);
+    if (!isValid(date)) return '-';
+    return format(date, formatStr, options);
+  } catch {
+    return '-';
+  }
+};
 
 type SetterStatus = 'activo' | 'inactivo' | 'introduciendose' | 'pendiente_reunion' | 'calentamiento';
 type SetterPerformance = 'alto' | 'medio' | 'bajo' | 'alto_restriccion' | 'medio_restriccion' | 'bajo_restriccion';
@@ -562,7 +573,7 @@ export default function Setters() {
                             {performanceLabels[setter.performance] || 'Sin rendimiento'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{setter.start_date ? format(new Date(setter.start_date), "dd/MM/yy") : '-'}</TableCell>
+                        <TableCell>{formatSafeDate(setter.start_date, "dd/MM/yy")}</TableCell>
                         <TableCell className="text-warning">${metrics.pendingPayments.toLocaleString()}</TableCell>
                         <TableCell className="text-success">${metrics.totalPaid.toLocaleString()}</TableCell>
                         <TableCell>{metrics.scheduled}</TableCell>
@@ -638,7 +649,7 @@ export default function Setters() {
                         <TableCell>{meeting.lead_name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{meeting.lead_email || '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{meeting.lead_phone || '-'}</TableCell>
-                        <TableCell>{format(new Date(meeting.scheduled_date), "dd MMM yyyy HH:mm", { locale: es })}</TableCell>
+                        <TableCell>{formatSafeDate(meeting.scheduled_date, "dd MMM yyyy HH:mm", { locale: es })}</TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{meeting.notes || '-'}</TableCell>
                         <TableCell>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMeeting(meeting.id)}>
