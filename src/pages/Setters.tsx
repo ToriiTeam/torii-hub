@@ -553,13 +553,13 @@ export default function Setters() {
                         <TableCell>{setter.platform || '-'}</TableCell>
                         <TableCell>{setter.country || '-'}</TableCell>
                         <TableCell>
-                          <Badge className={cn('text-xs border-0', statusColors[setter.setter_status])}>
-                            {statusLabels[setter.setter_status]}
+                          <Badge className={cn('text-xs border-0', statusColors[setter.setter_status] || 'bg-muted text-muted-foreground')}>
+                            {statusLabels[setter.setter_status] || 'Sin estado'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge className={cn('text-xs', performanceColors[setter.performance])}>
-                            {performanceLabels[setter.performance]}
+                          <Badge className={cn('text-xs', performanceColors[setter.performance] || 'bg-muted text-muted-foreground')}>
+                            {performanceLabels[setter.performance] || 'Sin rendimiento'}
                           </Badge>
                         </TableCell>
                         <TableCell>{setter.start_date ? format(new Date(setter.start_date), "dd/MM/yy") : '-'}</TableCell>
