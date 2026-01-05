@@ -32,9 +32,15 @@ interface Closer {
   notes?: string;
 }
 
+interface Setter {
+  id: string;
+  name: string;
+}
+
 interface CloserCall {
   id: string;
   closer_id: string;
+  setter_id?: string;
   lead_name: string;
   lead_email?: string;
   lead_phone?: string;
@@ -100,6 +106,7 @@ const statusIcons: Record<CallStatus, React.ReactNode> = {
 
 export default function Closers() {
   const [closers, setClosers] = useState<Closer[]>([]);
+  const [setters, setSetters] = useState<Setter[]>([]);
   const [calls, setCalls] = useState<CloserCall[]>([]);
   const [recordings, setRecordings] = useState<CallRecording[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,6 +128,7 @@ export default function Closers() {
 
   const [callForm, setCallForm] = useState({
     closer_id: '',
+    setter_id: '',
     lead_name: '',
     lead_email: '',
     lead_phone: '',
@@ -146,13 +154,15 @@ export default function Closers() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [closersRes, callsRes, recordingsRes] = await Promise.all([
+    const [closersRes, settersRes, callsRes, recordingsRes] = await Promise.all([
       supabase.from('closers').select('*').order('name'),
+      supabase.from('setters').select('id, name').order('name'),
       supabase.from('closer_calls').select('*').order('first_call_date', { ascending: false }),
       supabase.from('call_recordings').select('*').order('uploaded_at', { ascending: false })
     ]);
     
     if (closersRes.data) setClosers(closersRes.data as Closer[]);
+    if (settersRes.data) setSetters(settersRes.data as Setter[]);
     if (callsRes.data) setCalls(callsRes.data.map(c => ({ ...c, followup_count: c.followup_count || 0 })) as CloserCall[]);
     if (recordingsRes.data) setRecordings(recordingsRes.data as CallRecording[]);
     setLoading(false);
@@ -256,6 +266,7 @@ export default function Closers() {
 
     const data = {
       closer_id: callForm.closer_id,
+      setter_id: callForm.setter_id || null,
       lead_name: callForm.lead_name,
       lead_email: callForm.lead_email || null,
       lead_phone: callForm.lead_phone || null,
@@ -301,6 +312,7 @@ export default function Closers() {
   const resetCallForm = () => {
     setCallForm({
       closer_id: selectedCloserId || '',
+      setter_id: '',
       lead_name: '',
       lead_email: '',
       lead_phone: '',
@@ -327,6 +339,7 @@ export default function Closers() {
     setEditingCall(call);
     setCallForm({
       closer_id: call.closer_id,
+      setter_id: call.setter_id || '',
       lead_name: call.lead_name,
       lead_email: call.lead_email || '',
       lead_phone: call.lead_phone || '',
@@ -436,7 +449,16 @@ export default function Closers() {
             <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{editingCall ? 'Editar' : 'Registrar'} Llamada</DialogTitle></DialogHeader>
               <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Setter (quien agendó)</Label>
+                    <Select value={callForm.setter_id} onValueChange={v => setCallForm({ ...callForm, setter_id: v })}>
+                      <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccionar setter" /></SelectTrigger>
+                      <SelectContent>
+                        {setters.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <Label>Closer *</Label>
                     <Select value={callForm.closer_id} onValueChange={v => setCallForm({ ...callForm, closer_id: v })}>
@@ -767,6 +789,7 @@ export default function Closers() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Setter</TableHead>
                     <TableHead>Closer</TableHead>
                     <TableHead>Lead</TableHead>
                     <TableHead>Email</TableHead>
@@ -786,8 +809,10 @@ export default function Closers() {
                 <TableBody>
                   {filteredCalls.map(call => {
                     const closer = closers.find(c => c.id === call.closer_id);
+                    const setter = setters.find(s => s.id === call.setter_id);
                     return (
                       <TableRow key={call.id}>
+                        <TableCell className="font-medium text-info">{setter?.name || '-'}</TableCell>
                         <TableCell className="font-medium">{closer?.name || '-'}</TableCell>
                         <TableCell>
                           <div>{call.lead_name}</div>
@@ -861,7 +886,7 @@ export default function Closers() {
                   })}
                   {filteredCalls.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                         No hay llamadas registradas
                       </TableCell>
                     </TableRow>

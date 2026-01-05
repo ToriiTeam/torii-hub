@@ -384,6 +384,7 @@ export type Database = {
           rescheduled_date: string | null
           second_call_date: string | null
           second_call_status: Database["public"]["Enums"]["call_status"] | null
+          setter_id: string | null
           updated_at: string
         }
         Insert: {
@@ -408,6 +409,7 @@ export type Database = {
           rescheduled_date?: string | null
           second_call_date?: string | null
           second_call_status?: Database["public"]["Enums"]["call_status"] | null
+          setter_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -432,6 +434,7 @@ export type Database = {
           rescheduled_date?: string | null
           second_call_date?: string | null
           second_call_status?: Database["public"]["Enums"]["call_status"] | null
+          setter_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -440,6 +443,13 @@ export type Database = {
             columns: ["closer_id"]
             isOneToOne: false
             referencedRelation: "closers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "closer_calls_setter_id_fkey"
+            columns: ["setter_id"]
+            isOneToOne: false
+            referencedRelation: "setters"
             referencedColumns: ["id"]
           },
         ]
