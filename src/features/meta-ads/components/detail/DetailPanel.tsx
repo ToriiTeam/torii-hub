@@ -2,23 +2,51 @@ import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../ui/sheet'
 import { useSelection } from '../../context/SelectionContext'
 import { useAccount } from '../../context/AccountContext'
+import { useDateRange } from '../../context/DateRangeContext'
 import { useTimeseries } from '../../hooks/useTimeseries'
+import { useMetaApi } from '../../hooks/useMetaApi'
 import { getMetricConfig, METRIC_OPTIONS } from '../../config/metrics'
 import { auditSingleEntity } from '../../lib/auditEngine'
 import { useSensitiveData } from '../../context/SensitiveDataContext'
-import type { InsightRow } from '../../types/meta'
+import type { InsightRow, TabLevel } from '../../types/meta'
 import { SummaryKPIs } from './SummaryKPIs'
 import { TimeseriesChart } from './TimeseriesChart'
 import { MetricSelector, NONE_METRIC } from './MetricSelector'
+import { EntitySelector, NONE_ENTITY, type EntityOption } from './EntitySelector'
 import { AuditPanel } from '../common/AuditPanel'
 import { StatusBadge } from '../common/StatusBadge'
 
-export function DetailPanel() {
-  const { selectedRow, selectedLevel, clearSelection } = useSelection()
-  const { selectedAccount } = useAccount()
-  const { isHidden } = useSensitiveData()
+const ENDPOINT_SEGMENT: Record<TabLevel, string> = {
+  campaign: 'campaigns',
+  adset: 'adsets',
+  ad: 'ads',
+}
+
+function idOf(row: InsightRow, level: TabLevel): string {
+  return (level === 'campaign' ? row.campaign_id : level === 'adset' ? row.adset_id : row.ad_id) ?? ''
+}
+
+function nameOf(row: InsightRow, level: TabLevel): string {
+  return (level === 'campaign' ? row.campaign_name : level === 'adset' ? row.adset_name : row.ad_name) ?? ''
+}
+
+interface DetailPanelBodyProps {
+  row: InsightRow
+  level: TabLevel
+  accountId: string | null
+}
+
+// Split out from DetailPanel and mounted with key={entityType:entityId} by
+// the parent below. All of this component's local state (selected metric,
+// comparison metric, comparison entity) is specific to one entity — keying
+// on the entity resets that state for free on every new selection, instead
+// of needing a useEffect to manually reset stale comparison state whenever
+// the user opens a different row.
+function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
+  const { buildParams } = useDateRange()
   const [metric, setMetric] = useState('spend')
   const [compareMetric, setCompareMetric] = useState(NONE_METRIC)
+  const [compareEntityId, setCompareEntityId] = useState(NONE_ENTITY)
 
   // The metric being compared can't also be the primary metric — if the user
   // switches the primary selector to whatever was selected for comparison,
@@ -28,29 +56,90 @@ export function DetailPanel() {
     if (compareMetric === metric) setCompareMetric(NONE_METRIC)
   }, [metric, compareMetric])
 
-  const entityType = selectedLevel ?? 'campaign'
+  const entityId = idOf(row, level)
+  const entityName = nameOf(row, level) || 'Entidad'
 
-  const entityId = selectedRow
-    ? (entityType === 'campaign' ? (selectedRow as InsightRow & { campaign_id?: string }).campaign_id
-      : entityType === 'adset' ? (selectedRow as InsightRow & { adset_id?: string }).adset_id
-      : (selectedRow as InsightRow & { ad_id?: string }).ad_id)
-    : null
+  const timeseriesResult = useTimeseries(accountId, level, entityId)
 
-  const timeseriesResult = useTimeseries(
-    selectedAccount?.account_id ?? null,
-    entityType,
-    entityId ?? null,
-  )
-
-  const isOpen = !!selectedRow
-  const entityName = selectedRow
-    ? (entityType === 'campaign' ? (selectedRow as InsightRow & { campaign_name?: string }).campaign_name
-      : entityType === 'adset' ? (selectedRow as InsightRow & { adset_name?: string }).adset_name
-      : (selectedRow as InsightRow & { ad_name?: string }).ad_name) ?? 'Entidad'
+  // Sibling entities (other campaigns/adsets/ads in the same account/period)
+  // to populate the "Comparar con entidad" dropdown.
+  const siblingEndpoint = accountId
+    ? `/accounts/${accountId}/${ENDPOINT_SEGMENT[level]}?${buildParams()}`
     : ''
+  const { data: siblingRows } = useMetaApi<InsightRow[]>(siblingEndpoint, !!accountId)
 
-  const recommendations = selectedRow ? auditSingleEntity(selectedRow, entityType) : []
+  const entityOptions: EntityOption[] = (siblingRows ?? [])
+    .filter((r) => idOf(r, level) !== entityId)
+    .map((r) => ({ id: idOf(r, level), name: nameOf(r, level) }))
+
+  const comparingEntity = compareEntityId !== NONE_ENTITY
+  const compareTimeseriesResult = useTimeseries(
+    accountId,
+    level,
+    comparingEntity ? compareEntityId : null,
+  )
+  const compareEntityName = entityOptions.find((o) => o.id === compareEntityId)?.name
+
+  const recommendations = auditSingleEntity(row, level)
   const metricConfig = getMetricConfig(metric)
+
+  return (
+    <>
+      <section className="detail-section">
+        <h3 className="detail-section-title">KPIs del período</h3>
+        <SummaryKPIs row={row} />
+      </section>
+
+      <section className="detail-section">
+        <div className="detail-section-header">
+          <h3 className="detail-section-title">Tendencia</h3>
+          <div className="detail-section-selectors">
+            <MetricSelector value={metric} onChange={setMetric} label="" />
+            <MetricSelector
+              value={compareMetric}
+              onChange={setCompareMetric}
+              label="Comparar métrica"
+              includeNone
+              options={METRIC_OPTIONS.filter((m) => m.key !== metric)}
+            />
+            <EntitySelector
+              value={compareEntityId}
+              onChange={setCompareEntityId}
+              label="Comparar entidad"
+              options={entityOptions}
+            />
+          </div>
+        </div>
+        <div className="detail-metric-label">{metricConfig?.label ?? metric}</div>
+        <TimeseriesChart
+          data={timeseriesResult.data ?? []}
+          metric={metric}
+          compareMetric={compareMetric === NONE_METRIC ? undefined : compareMetric}
+          compareEntityData={comparingEntity ? (compareTimeseriesResult.data ?? []) : undefined}
+          entityName={entityName}
+          compareEntityName={compareEntityName}
+          loading={timeseriesResult.loading || (comparingEntity && compareTimeseriesResult.loading)}
+        />
+      </section>
+
+      {recommendations.length > 0 && (
+        <section className="detail-section">
+          <AuditPanel recommendations={recommendations} />
+        </section>
+      )}
+    </>
+  )
+}
+
+export function DetailPanel() {
+  const { selectedRow, selectedLevel, clearSelection } = useSelection()
+  const { selectedAccount } = useAccount()
+  const { isHidden } = useSensitiveData()
+
+  const entityType = selectedLevel ?? 'campaign'
+  const isOpen = !!selectedRow
+  const entityName = selectedRow ? (nameOf(selectedRow, entityType) || 'Entidad') : ''
+  const entityId = selectedRow ? idOf(selectedRow, entityType) : null
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) clearSelection() }}>
@@ -75,38 +164,13 @@ export function DetailPanel() {
         </SheetHeader>
 
         <div className="detail-sheet-body">
-          <section className="detail-section">
-            <h3 className="detail-section-title">KPIs del período</h3>
-            <SummaryKPIs row={selectedRow} />
-          </section>
-
-          <section className="detail-section">
-            <div className="detail-section-header">
-              <h3 className="detail-section-title">Tendencia</h3>
-              <div className="detail-section-selectors">
-                <MetricSelector value={metric} onChange={setMetric} label="" />
-                <MetricSelector
-                  value={compareMetric}
-                  onChange={setCompareMetric}
-                  label="Comparar con"
-                  includeNone
-                  options={METRIC_OPTIONS.filter((m) => m.key !== metric)}
-                />
-              </div>
-            </div>
-            <div className="detail-metric-label">{metricConfig?.label ?? metric}</div>
-            <TimeseriesChart
-              data={timeseriesResult.data ?? []}
-              metric={metric}
-              compareMetric={compareMetric === NONE_METRIC ? undefined : compareMetric}
-              loading={timeseriesResult.loading}
+          {selectedRow && (
+            <DetailPanelBody
+              key={`${entityType}:${entityId}`}
+              row={selectedRow}
+              level={entityType}
+              accountId={selectedAccount?.account_id ?? null}
             />
-          </section>
-
-          {recommendations.length > 0 && (
-            <section className="detail-section">
-              <AuditPanel recommendations={recommendations} />
-            </section>
           )}
         </div>
       </SheetContent>
