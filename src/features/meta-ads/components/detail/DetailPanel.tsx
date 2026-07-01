@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../ui/sheet'
 import { useSelection } from '../../context/SelectionContext'
 import { useAccount } from '../../context/AccountContext'
 import { useTimeseries } from '../../hooks/useTimeseries'
-import { getMetricConfig } from '../../config/metrics'
+import { getMetricConfig, METRIC_OPTIONS } from '../../config/metrics'
 import { auditSingleEntity } from '../../lib/auditEngine'
 import { useSensitiveData } from '../../context/SensitiveDataContext'
 import type { InsightRow } from '../../types/meta'
 import { SummaryKPIs } from './SummaryKPIs'
 import { TimeseriesChart } from './TimeseriesChart'
-import { MetricSelector } from './MetricSelector'
+import { MetricSelector, NONE_METRIC } from './MetricSelector'
 import { AuditPanel } from '../common/AuditPanel'
 import { StatusBadge } from '../common/StatusBadge'
 
@@ -18,6 +18,15 @@ export function DetailPanel() {
   const { selectedAccount } = useAccount()
   const { isHidden } = useSensitiveData()
   const [metric, setMetric] = useState('spend')
+  const [compareMetric, setCompareMetric] = useState(NONE_METRIC)
+
+  // The metric being compared can't also be the primary metric — if the user
+  // switches the primary selector to whatever was selected for comparison,
+  // drop the now-invalid comparison instead of leaving a stale value that no
+  // longer appears in its (filtered) option list.
+  useEffect(() => {
+    if (compareMetric === metric) setCompareMetric(NONE_METRIC)
+  }, [metric, compareMetric])
 
   const entityType = selectedLevel ?? 'campaign'
 
@@ -74,12 +83,22 @@ export function DetailPanel() {
           <section className="detail-section">
             <div className="detail-section-header">
               <h3 className="detail-section-title">Tendencia</h3>
-              <MetricSelector value={metric} onChange={setMetric} label="" />
+              <div className="detail-section-selectors">
+                <MetricSelector value={metric} onChange={setMetric} label="" />
+                <MetricSelector
+                  value={compareMetric}
+                  onChange={setCompareMetric}
+                  label="Comparar con"
+                  includeNone
+                  options={METRIC_OPTIONS.filter((m) => m.key !== metric)}
+                />
+              </div>
             </div>
             <div className="detail-metric-label">{metricConfig?.label ?? metric}</div>
             <TimeseriesChart
               data={timeseriesResult.data ?? []}
               metric={metric}
+              compareMetric={compareMetric === NONE_METRIC ? undefined : compareMetric}
               loading={timeseriesResult.loading}
             />
           </section>

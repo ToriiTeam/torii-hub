@@ -23,11 +23,20 @@ interface SheetContentProps extends React.ComponentPropsWithoutRef<typeof SheetP
   side?: "top" | "bottom" | "left" | "right"
 }
 
+// Radix portals to document.body by default, which escapes the
+// .meta-ads-root subtree that defines all of this feature's CSS custom
+// properties (colors, etc). Since custom properties only inherit through
+// real DOM ancestry, portaled content would render with every var(--x)
+// unresolved. Render into .meta-ads-root itself instead.
+function getMetaAdsRootContainer(): HTMLElement | undefined {
+  return document.querySelector<HTMLElement>('.meta-ads-root') ?? undefined
+}
+
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
 >(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
+  <SheetPortal container={getMetaAdsRootContainer()}>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}

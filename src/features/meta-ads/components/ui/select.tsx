@@ -28,11 +28,18 @@ const SelectTrigger = React.forwardRef<
 ))
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
 
+// Radix portals to document.body by default, which escapes .meta-ads-root —
+// the only place this feature's CSS custom properties (colors, etc) are
+// defined. See the identical fix/comment in ui/sheet.tsx.
+function getMetaAdsRootContainer(): HTMLElement | undefined {
+  return document.querySelector<HTMLElement>('.meta-ads-root') ?? undefined
+}
+
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  <SelectPrimitive.Portal container={getMetaAdsRootContainer()}>
     <SelectPrimitive.Content
       ref={ref}
       className={cn("select-content", className)}

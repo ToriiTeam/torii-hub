@@ -1,10 +1,11 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import type { TimeseriesInsightRow } from '../../types/meta'
-import { getMetricConfig } from '../../config/metrics'
+import { getMetricConfig, type MetricFormat } from '../../config/metrics'
 
 interface TimeseriesChartProps {
   data: TimeseriesInsightRow[]
   metric: string
+  compareMetric?: string
   loading?: boolean
 }
 
@@ -31,34 +32,51 @@ function formatXAxis(dateStr: string) {
   return dateStr
 }
 
+// Terse formatting for axis ticks.
+function formatTick(value: number, format?: MetricFormat): string {
+  if (format === 'currency') return `$${value}`
+  if (format === 'percent')  return `${value}%`
+  if (format === 'roas')     return `${value}x`
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`
+  return `${value}`
+}
+
+// Precise formatting for tooltip/legend values.
+function formatValue(value: number, format?: MetricFormat): string {
+  if (format === 'currency') return `$${value.toFixed(2)}`
+  if (format === 'percent')  return `${value.toFixed(2)}%`
+  if (format === 'roas')     return `${value.toFixed(2)}x`
+  if (format === 'compact') {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+    if (value >= 1000)      return `${(value / 1000).toFixed(1)}K`
+    return value.toFixed(0)
+  }
+  return value.toFixed(2)
+}
+
 interface CustomTooltipPayload {
-  name: string
+  dataKey: string
   value: number
-  payload: TimeseriesInsightRow
 }
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: CustomTooltipPayload[]; label?: string }) {
   if (!active || !payload?.length) return null
-  const config = getMetricConfig(payload[0].name)
-  let formatted = payload[0].value.toFixed(2)
-  if (config?.format === 'currency') formatted = `$${payload[0].value.toFixed(2)}`
-  else if (config?.format === 'percent') formatted = `${payload[0].value.toFixed(2)}%`
-  else if (config?.format === 'compact') {
-    const v = payload[0].value
-    if (v >= 1000) formatted = `${(v / 1000).toFixed(1)}K`
-    else formatted = v.toFixed(0)
-  }
   return (
     <div className="chart-tooltip">
       <div className="chart-tooltip-date">{label}</div>
-      <div className="chart-tooltip-value">
-        {config?.label ?? payload[0].name}: <strong>{formatted}</strong>
-      </div>
+      {payload.map((p) => {
+        const config = getMetricConfig(p.dataKey)
+        return (
+          <div key={p.dataKey} className="chart-tooltip-value">
+            {config?.label ?? p.dataKey}: <strong>{formatValue(p.value, config?.format)}</strong>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-export function TimeseriesChart({ data, metric, loading }: TimeseriesChartProps) {
+export function TimeseriesChart({ data, metric, compareMetric, loading }: TimeseriesChartProps) {
   if (loading) {
     return <div className="chart-skeleton" />
   }
@@ -71,13 +89,19 @@ export function TimeseriesChart({ data, metric, loading }: TimeseriesChartProps)
     )
   }
 
-  const chartData = data.map(row => ({
-    date: formatXAxis(row.date_start),
-    [metric]: extractMetricValue(row, metric),
-  }))
+  const chartData = data.map(row => {
+    const point: Record<string, unknown> = {
+      date: formatXAxis(row.date_start),
+      [metric]: extractMetricValue(row, metric),
+    }
+    if (compareMetric) point[compareMetric] = extractMetricValue(row, compareMetric)
+    return point
+  })
 
   const config = getMetricConfig(metric)
-  const color = 'var(--accent-blue)'
+  const color = config.color
+  const compareConfig = compareMetric ? getMetricConfig(compareMetric) : null
+  const compareColor = compareConfig?.color ?? 'var(--accent-purple)'
 
   return (
     <div className="chart-wrapper">
@@ -96,25 +120,50 @@ export function TimeseriesChart({ data, metric, loading }: TimeseriesChartProps)
             axisLine={false} tickLine={false} interval="preserveStartEnd"
           />
           <YAxis
+            yAxisId="left"
             tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
             axisLine={false} tickLine={false} width={42}
-            tickFormatter={v => {
-              if (config?.format === 'currency') return `$${v}`
-              if (config?.format === 'percent') return `${v}%`
-              if (v >= 1000) return `${(v / 1000).toFixed(0)}K`
-              return v
-            }}
+            tickFormatter={(v) => formatTick(v, config.format)}
           />
+          {compareMetric && (
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+              axisLine={false} tickLine={false} width={42}
+              tickFormatter={(v) => formatTick(v, compareConfig?.format)}
+            />
+          )}
           <Tooltip content={<CustomTooltip />} />
+          {compareMetric && (
+            <Legend
+              formatter={(value) => getMetricConfig(value as string)?.label ?? value}
+              wrapperStyle={{ fontSize: 11 }}
+            />
+          )}
           <Area
+            yAxisId="left"
             type="monotone"
             dataKey={metric}
+            name={metric}
             stroke={color}
             strokeWidth={2}
             fill={`url(#grad-${metric})`}
             dot={false}
             activeDot={{ r: 4, fill: color }}
           />
+          {compareMetric && (
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey={compareMetric}
+              name={compareMetric}
+              stroke={compareColor}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: compareColor }}
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </div>

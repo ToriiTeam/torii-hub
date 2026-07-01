@@ -565,7 +565,10 @@
 }
 .detail-section-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+}
+.detail-section-selectors {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
 }
 .detail-metric-label {
   font-size: 11px; color: var(--text-tertiary); margin-bottom: 4px;
