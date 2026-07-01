@@ -18,13 +18,13 @@ import {
   Handshake,
   FileText,
   Users,
-  MessageSquare,
   Menu,
   LogOut,
   Bell,
   ChevronLeft,
   User,
   AlertCircle,
+  BarChart2,
 } from 'lucide-react';
 
 interface Task {
@@ -37,14 +37,13 @@ interface Task {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Productividad', href: '/tareas', icon: CheckSquare },
-  { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
-  { name: 'Setters', href: '/setters', icon: PhoneCall },
-  { name: 'Closers', href: '/closers', icon: Handshake },
-  { name: 'Documentación', href: '/documentos', icon: FileText },
   { name: 'Clientes', href: '/clientes', icon: Users },
-  { name: 'Disponibilidad', href: '/disponibilidad', icon: MessageSquare },
+  { name: 'Setting', href: '/setters', icon: PhoneCall },
+  { name: 'Closing', href: '/closers', icon: Handshake },
+  { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
   { name: 'Reportes', href: '/reportes', icon: FileText },
+  { name: 'Tareas', href: '/tareas', icon: CheckSquare },
+  { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
 ];
 
 interface LayoutProps {
