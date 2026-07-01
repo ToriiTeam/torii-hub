@@ -504,7 +504,10 @@
 }
 
 /* ── DETAIL SHEET ────────────────────────────── */
-.meta-ads-root .sheet-overlay {
+/* Not scoped under .meta-ads-root: Radix Dialog.Portal renders Sheet content
+   into document.body, outside the .meta-ads-root DOM subtree, so a
+   .meta-ads-root ancestor selector would never match. */
+.sheet-overlay {
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: 1000;
@@ -512,81 +515,84 @@
 }
 @keyframes meta-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-.meta-ads-root .sheet-content {
+.sheet-content {
   position: fixed; top: 0; bottom: 0;
   background: var(--bg-secondary);
   z-index: 1001;
   display: flex; flex-direction: column;
   overflow: hidden;
 }
-.meta-ads-root .sheet-content-right {
+.sheet-content-right {
   right: 0; width: 440px;
   border-left: 1px solid var(--border);
   animation: meta-slide-in 0.2s ease;
 }
 @keyframes meta-slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
-.meta-ads-root .detail-sheet { width: 440px !important; }
-.meta-ads-root .detail-sheet-header {
+.detail-sheet { width: 440px !important; }
+.detail-sheet-header {
   padding: 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.meta-ads-root .detail-sheet-title-row {
+.detail-sheet-title-row {
   display: flex; align-items: center; justify-content: space-between;
 }
-.meta-ads-root .detail-sheet-title {
+.detail-sheet-title {
   font-size: 16px; font-weight: 700; color: var(--text-primary);
   margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.meta-ads-root .detail-sheet-close {
+.detail-sheet-close {
   background: none; border: none; cursor: pointer;
   color: var(--text-secondary); padding: 4px;
   border-radius: 4px; transition: color 0.15s;
 }
-.meta-ads-root .detail-sheet-close:hover { color: var(--text-primary); }
-.meta-ads-root .detail-sheet-meta {
+.detail-sheet-close:hover { color: var(--text-primary); }
+.detail-sheet-meta {
   display: flex; align-items: center; gap: 8px; margin-top: 6px;
 }
-.meta-ads-root .detail-sheet-level {
+.detail-sheet-level {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-tertiary);
 }
-.meta-ads-root .detail-sheet-body {
+.detail-sheet-body {
   flex: 1; overflow-y: auto; padding: 20px;
   display: flex; flex-direction: column; gap: 24px;
 }
-.meta-ads-root .detail-section {}
-.meta-ads-root .detail-section-title {
+.detail-section {}
+.detail-section-title {
   font-size: 12px; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-secondary); margin: 0 0 10px;
 }
-.meta-ads-root .detail-section-header {
+.detail-section-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 10px;
 }
-.meta-ads-root .detail-metric-label {
+.detail-metric-label {
   font-size: 11px; color: var(--text-tertiary); margin-bottom: 4px;
 }
 
 /* ── SUMMARY KPIs ────────────────────────────── */
-.meta-ads-root .summary-kpis {
+/* Also rendered inside the portaled Sheet — unscoped for the same reason. */
+.summary-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 10px;
 }
-.meta-ads-root .summary-kpi-item {
+.summary-kpi-item {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 10px 12px;
 }
-.meta-ads-root .summary-kpi-label {
+.summary-kpi-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-secondary); margin-bottom: 4px;
 }
-.meta-ads-root .summary-kpi-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.summary-kpi-value { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 
 /* ── METRIC SELECTOR ─────────────────────────── */
-.meta-ads-root .metric-selector { display: flex; align-items: center; gap: 6px; }
-.meta-ads-root .metric-selector-label { font-size: 12px; color: var(--text-secondary); }
+/* Used both inside .meta-ads-root (MetricsBar) and inside the portaled Sheet
+   (DetailPanel) — unscoped so it works in both places. */
+.metric-selector { display: flex; align-items: center; gap: 6px; }
+.metric-selector-label { font-size: 12px; color: var(--text-secondary); }
 
 /* ── EMPTY STATE ─────────────────────────────── */
 .meta-ads-root .empty-state {

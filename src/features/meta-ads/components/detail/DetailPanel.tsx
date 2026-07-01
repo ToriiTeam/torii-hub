@@ -45,7 +45,7 @@ export function DetailPanel() {
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (!open) clearSelection() }}>
-      <SheetContent side="right" className="detail-sheet">
+      <SheetContent side="right" className="detail-sheet" aria-describedby={undefined}>
         <SheetHeader className="detail-sheet-header">
           <div className="detail-sheet-title-row">
             <SheetTitle className={`detail-sheet-title ${isHidden ? 'sensitive-hidden' : ''}`}>
