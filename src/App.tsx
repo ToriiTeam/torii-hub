@@ -14,6 +14,7 @@ import Closers from "@/pages/Closers";
 import Clientes from "@/pages/Clientes";
 import ClienteDetalle from "@/pages/ClienteDetalle";
 import Reportes from "@/pages/Reportes";
+import VslTracking from "@/pages/VslTracking";
 import MetaAds from "@/pages/MetaAds";
 import NotFound from "./pages/NotFound";
 
@@ -46,6 +47,7 @@ function AppContent() {
             <Route path="/closers" element={<Closers />} />
             <Route path="/finanzas" element={<Finanzas />} />
             <Route path="/reportes" element={<Reportes />} />
+            <Route path="/vsl-tracking" element={<VslTracking />} />
             <Route path="/tareas" element={<Tareas />} />
             <Route path="/meta-ads" element={<MetaAds />} />
             <Route path="*" element={<NotFound />} />

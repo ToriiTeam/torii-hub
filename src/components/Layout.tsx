@@ -25,6 +25,7 @@ import {
   User,
   AlertCircle,
   BarChart2,
+  Video,
 } from 'lucide-react';
 
 interface Task {
@@ -42,6 +43,7 @@ const navigation = [
   { name: 'Closing', href: '/closers', icon: Handshake },
   { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
   { name: 'Reportes', href: '/reportes', icon: FileText },
+  { name: 'VSL', href: '/vsl-tracking', icon: Video },
   { name: 'Tareas', href: '/tareas', icon: CheckSquare },
   { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
 ];
