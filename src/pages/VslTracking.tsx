@@ -234,29 +234,6 @@ function buildTrend(events: VslEvent[], granularity: 'day' | 'week'): TrendPoint
   return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-interface LandingSummary {
-  landingId: string;
-  sessions: number;
-  completions: number;
-  ctaClicks: number;
-}
-
-function buildLandingSummary(events: VslEvent[]): LandingSummary[] {
-  const bySessions = buildSessionSummaries(events);
-  const byLanding = new Map<string, LandingSummary>();
-  for (const s of bySessions.values()) {
-    let row = byLanding.get(s.landingId);
-    if (!row) {
-      row = { landingId: s.landingId, sessions: 0, completions: 0, ctaClicks: 0 };
-      byLanding.set(s.landingId, row);
-    }
-    row.sessions++;
-    if (s.milestones.has('VSL_Progress_100')) row.completions++;
-    row.ctaClicks += s.ctaClicks.length;
-  }
-  return Array.from(byLanding.values()).sort((a, b) => b.sessions - a.sessions);
-}
-
 interface UtmBreakdownRow {
   key: string; // display label for the group ('Sin UTM' when the value is null)
   fullValue: string | null; // untruncated value, for the tooltip — null when there's nothing to show
@@ -455,9 +432,14 @@ export default function VslTracking() {
     [sessionSummaries],
   );
   const trend = useMemo(() => buildTrend(filteredEvents, trendGranularity), [filteredEvents, trendGranularity]);
-  const landingSummary = useMemo(
-    () => (landingId === ALL_LANDINGS ? buildLandingSummary(filteredEvents) : []),
-    [filteredEvents, landingId],
+
+  // Only meaningful in the "all landings" view — when a specific landing is
+  // selected, sessionSummaries already only contains that one landing.
+  const landingBreakdown = useMemo(
+    () => (landingId === ALL_LANDINGS
+      ? buildUtmBreakdown(sessionSummaries, s => s.landingId).sort((a, b) => b.sessions - a.sessions)
+      : []),
+    [sessionSummaries, landingId],
   );
 
   const sourceBreakdown = useMemo(
@@ -622,23 +604,15 @@ export default function VslTracking() {
             </Card>
           </div>
 
-          {/* Per-landing summary — only meaningful once more than one landing exists */}
-          {landingId === ALL_LANDINGS && landingSummary.length > 1 && (
+          {/* Per-landing summary — only shown in the "all landings" view, once more than one landing has data */}
+          {landingId === ALL_LANDINGS && landingBreakdown.length > 1 && (
             <Card className="bg-card border-border/50">
               <CardHeader>
                 <CardTitle className="text-base font-medium">Resumen por landing</CardTitle>
+                <CardDescription>Ordenado por sesiones</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {landingSummary.map(row => (
-                  <div key={row.landingId} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 text-sm">
-                    <span className="font-medium">{row.landingId}</span>
-                    <div className="flex gap-6 text-muted-foreground">
-                      <span>{row.sessions} sesiones</span>
-                      <span>{row.completions} completaron</span>
-                      <span>{row.ctaClicks} clicks CTA</span>
-                    </div>
-                  </div>
-                ))}
+              <CardContent>
+                <UtmBreakdownTable rows={landingBreakdown} labelHeader="Landing" />
               </CardContent>
             </Card>
           )}
