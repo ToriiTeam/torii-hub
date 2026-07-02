@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
-import { PlayCircle, MousePointerClick, TrendingDown, Users } from 'lucide-react';
+import { PlayCircle, MousePointerClick, TrendingDown, Users, CheckCircle2 } from 'lucide-react';
 import { startOfWeek, format } from 'date-fns';
 
 type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
@@ -13,9 +13,9 @@ type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
 const ALL_LANDINGS = 'all';
 const ALL_CAMPAIGNS = 'all';
 
-// Funnel stages, in order. Each is a distinct event_name that Torii's VSL
-// tracking script fires at most once per session_id.
-const MILESTONES = [
+// Video progress milestones, in order. Each is a distinct event_name that
+// Torii's VSL tracking script fires at most once per session_id.
+const VIDEO_MILESTONES = [
   { key: 'play', label: 'Play', eventName: 'VSL_Play' },
   { key: 'p25', label: '25%', eventName: 'VSL_Progress_25' },
   { key: 'p50', label: '50%', eventName: 'VSL_Progress_50' },
@@ -23,7 +23,20 @@ const MILESTONES = [
   { key: 'p100', label: '100%', eventName: 'VSL_Progress_100' },
 ] as const;
 
-const CTA_BUCKETS = [
+// The full funnel extends video progress with the two conversion steps:
+// clicking a CTA, then actually completing the booking form (fired from the
+// thank-you page — the real conversion signal, more reliable than the click).
+const FUNNEL_STAGES: { key: string; label: string; matches: (s: SessionSummary) => boolean }[] = [
+  ...VIDEO_MILESTONES.map(m => ({
+    key: m.key,
+    label: m.label,
+    matches: (s: SessionSummary) => s.milestones.has(m.eventName),
+  })),
+  { key: 'cta', label: 'CTA Click', matches: (s: SessionSummary) => s.ctaClicks.length > 0 },
+  { key: 'submit', label: 'Form Submit', matches: (s: SessionSummary) => s.hasFormSubmit },
+];
+
+const PERCENT_BUCKETS = [
   { key: 'lt25', label: '< 25%', test: (p: number) => p < 25 },
   { key: '25-50', label: '25% – 50%', test: (p: number) => p >= 25 && p < 50 },
   { key: '50-75', label: '50% – 75%', test: (p: number) => p >= 50 && p < 75 },
@@ -44,11 +57,17 @@ function pct(value: number | null): number {
   return value ?? 0;
 }
 
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 interface SessionSummary {
   landingId: string;
   utmCampaign: string | null;
   milestones: Set<string>;
   ctaClicks: number[]; // percent-at-click for every VSL_CTA_Click this session fired
+  hasFormSubmit: boolean;
+  formSubmitPercent: number | null; // percent watched at the moment of the (first) submit
   lastAbandonPercent: number | null;
 }
 
@@ -56,7 +75,7 @@ interface SessionSummary {
 // event types, so this is the one pass every other view is derived from.
 function buildSessionSummaries(events: VslEvent[]): Map<string, SessionSummary> {
   const map = new Map<string, SessionSummary>();
-  const milestoneNames = new Set<string>(MILESTONES.map(m => m.eventName));
+  const milestoneNames = new Set<string>(VIDEO_MILESTONES.map(m => m.eventName));
   const lastAbandonAt = new Map<string, string>();
 
   for (const e of events) {
@@ -68,6 +87,8 @@ function buildSessionSummaries(events: VslEvent[]): Map<string, SessionSummary> 
         utmCampaign: e.utm_campaign,
         milestones: new Set(),
         ctaClicks: [],
+        hasFormSubmit: false,
+        formSubmitPercent: null,
         lastAbandonPercent: null,
       };
       map.set(e.session_id, s);
@@ -75,6 +96,13 @@ function buildSessionSummaries(events: VslEvent[]): Map<string, SessionSummary> 
 
     if (milestoneNames.has(e.event_name)) s.milestones.add(e.event_name);
     if (e.event_name === 'VSL_CTA_Click') s.ctaClicks.push(pct(e.percent));
+
+    if (e.event_name === 'VSL_Form_Submit') {
+      // Should only fire once per session from the thank-you page, but keep
+      // the first one if it somehow fires more than once.
+      if (!s.hasFormSubmit) s.formSubmitPercent = pct(e.percent);
+      s.hasFormSubmit = true;
+    }
 
     // VSL_Abandon fires on every tab switch, not just the final one — keep
     // only the most recent one per session as the "real" abandon point.
@@ -98,43 +126,45 @@ interface FunnelStage {
 }
 
 function buildFunnel(sessions: SessionSummary[]): FunnelStage[] {
-  const counts = MILESTONES.map(m => ({
-    key: m.key,
-    label: m.label,
-    count: sessions.filter(s => s.milestones.has(m.eventName)).length,
+  const counts = FUNNEL_STAGES.map(stage => ({
+    key: stage.key,
+    label: stage.label,
+    count: sessions.filter(stage.matches).length,
   }));
   return counts.map((stage, i) => ({
     ...stage,
     dropOffPct: i === 0 || counts[i - 1].count === 0
       ? null
-      : Math.round((1 - stage.count / counts[i - 1].count) * 1000) / 10,
+      : round1((1 - stage.count / counts[i - 1].count) * 100),
   }));
 }
 
-interface CtaBucketResult {
+interface PercentBucketResult {
   key: string;
   label: string;
-  clickCount: number;
-  pctOfClicks: number;
-  conversionRate: number; // sessions that clicked in this bucket / total sessions
+  count: number;
+  pctOfTotal: number; // this bucket's share of all values (clicks, or submits)
+  conversionRate: number; // sessions with a value in this bucket / total sessions
 }
 
-function buildCtaBreakdown(sessions: SessionSummary[]): CtaBucketResult[] {
+// Shared by "CTA clicks by % watched" and "Form submits by % watched" —
+// `getValues` picks which per-session numbers (percents) to bucket.
+function buildPercentBreakdown(
+  sessions: SessionSummary[],
+  getValues: (s: SessionSummary) => number[],
+): PercentBucketResult[] {
   const totalSessions = sessions.length;
-  const totalClicks = sessions.reduce((sum, s) => sum + s.ctaClicks.length, 0);
+  const allValues = sessions.flatMap(getValues);
 
-  return CTA_BUCKETS.map(bucket => {
-    const clicksInBucket = sessions.reduce(
-      (sum, s) => sum + s.ctaClicks.filter(bucket.test).length,
-      0,
-    );
-    const sessionsInBucket = sessions.filter(s => s.ctaClicks.some(bucket.test)).length;
+  return PERCENT_BUCKETS.map(bucket => {
+    const valuesInBucket = allValues.filter(bucket.test);
+    const sessionsInBucket = sessions.filter(s => getValues(s).some(bucket.test)).length;
     return {
       key: bucket.key,
       label: bucket.label,
-      clickCount: clicksInBucket,
-      pctOfClicks: totalClicks ? Math.round((clicksInBucket / totalClicks) * 1000) / 10 : 0,
-      conversionRate: totalSessions ? Math.round((sessionsInBucket / totalSessions) * 1000) / 10 : 0,
+      count: valuesInBucket.length,
+      pctOfTotal: allValues.length ? round1((valuesInBucket.length / allValues.length) * 100) : 0,
+      conversionRate: totalSessions ? round1((sessionsInBucket / totalSessions) * 100) : 0,
     };
   });
 }
@@ -258,7 +288,14 @@ export default function VslTracking() {
   );
 
   const funnel = useMemo(() => buildFunnel(sessionSummaries), [sessionSummaries]);
-  const ctaBreakdown = useMemo(() => buildCtaBreakdown(sessionSummaries), [sessionSummaries]);
+  const ctaBreakdown = useMemo(
+    () => buildPercentBreakdown(sessionSummaries, s => s.ctaClicks),
+    [sessionSummaries],
+  );
+  const submitBreakdown = useMemo(
+    () => buildPercentBreakdown(sessionSummaries, s => (s.formSubmitPercent !== null ? [s.formSubmitPercent] : [])),
+    [sessionSummaries],
+  );
   const trend = useMemo(() => buildTrend(filteredEvents, trendGranularity), [filteredEvents, trendGranularity]);
   const landingSummary = useMemo(
     () => (landingId === ALL_LANDINGS ? buildLandingSummary(filteredEvents) : []),
@@ -270,7 +307,17 @@ export default function VslTracking() {
   // period — i.e. everyone who loaded the landing, whether or not they hit play.
   const totalSessions = sessionSummaries.length;
   const maxFunnelCount = funnel[0]?.count ?? 0;
-  const playRate = totalSessions ? Math.round((maxFunnelCount / totalSessions) * 1000) / 10 : 0;
+  const playRate = totalSessions ? round1((maxFunnelCount / totalSessions) * 100) : 0;
+
+  const ctaStage = funnel.find(f => f.key === 'cta');
+  const submitStage = funnel.find(f => f.key === 'submit');
+  const formSubmitCount = submitStage?.count ?? 0;
+  // VSL_Form_Submit is the real conversion signal (fired from the thank-you
+  // page after booking), more reliable than the CTA click.
+  const realConversionRate = totalSessions ? round1((formSubmitCount / totalSessions) * 100) : 0;
+  const formCompletionRate = ctaStage && ctaStage.count > 0
+    ? round1((formSubmitCount / ctaStage.count) * 100)
+    : null;
 
   const avgAbandonPercent = useMemo(() => {
     const withAbandon = sessionSummaries
@@ -333,23 +380,42 @@ export default function VslTracking() {
         </div>
       ) : (
         <>
-          {/* Visitantes únicos */}
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-6 flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-6 w-6 text-primary" />
+          {/* Top stats: real conversion is the headline number, visitors is context */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-card border-success/30">
+              <CardContent className="p-6 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-success/15 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="h-6 w-6 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold text-success">{realConversionRate}%</p>
+                    <p className="text-sm text-muted-foreground">conversión real (Form Submit / visitantes)</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold">{totalSessions.toLocaleString()}</p>
-                  <p className="text-sm text-muted-foreground">visitantes únicos en el período</p>
+                <Badge className="bg-success/15 text-success border-0 text-sm px-3 py-1.5">
+                  {formSubmitCount} bookings
+                </Badge>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-6 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold">{totalSessions.toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">visitantes únicos en el período</p>
+                  </div>
                 </div>
-              </div>
-              <Badge className="bg-primary/15 text-primary border-0 text-sm px-3 py-1.5">
-                {playRate}% dio play
-              </Badge>
-            </CardContent>
-          </Card>
+                <Badge className="bg-primary/15 text-primary border-0 text-sm px-3 py-1.5">
+                  {playRate}% dio play
+                </Badge>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Per-landing summary — only meaningful once more than one landing exists */}
           {landingId === ALL_LANDINGS && landingSummary.length > 1 && (
@@ -372,50 +438,58 @@ export default function VslTracking() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Funnel */}
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-base font-medium flex items-center gap-2">
-                  <PlayCircle className="h-5 w-5 text-primary" />
-                  Funnel de visualización
-                </CardTitle>
-                <CardDescription>Sesiones únicas que llegaron a cada milestone</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {funnel.map(stage => (
-                  <div key={stage.key}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="font-medium">{stage.label}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">{stage.count}</span>
-                        {stage.dropOffPct !== null && (
+          {/* Funnel */}
+          <Card className="bg-card border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <PlayCircle className="h-5 w-5 text-primary" />
+                Funnel de visualización a conversión
+              </CardTitle>
+              <CardDescription>Sesiones únicas que llegaron a cada etapa, desde Play hasta el booking completado</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {funnel.map(stage => (
+                <div key={stage.key}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{stage.count}</span>
+                      {stage.key === 'submit' ? (
+                        formCompletionRate !== null && (
+                          <Badge className="bg-success/15 text-success border-0 text-xs">
+                            {formCompletionRate}% completó el form
+                          </Badge>
+                        )
+                      ) : (
+                        stage.dropOffPct !== null && (
                           <Badge variant="outline" className="text-xs gap-1 text-destructive border-destructive/30">
                             <TrendingDown className="h-3 w-3" />
                             -{stage.dropOffPct}%
                           </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: maxFunnelCount ? `${(stage.count / maxFunnelCount) * 100}%` : '0%' }}
-                      />
+                        )
+                      )}
                     </div>
                   </div>
-                ))}
-                {totalSessions === 0 && (
-                  <p className="text-center text-muted-foreground text-sm py-6">Sin datos para este filtro</p>
-                )}
-                {avgAbandonPercent !== null && (
-                  <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
-                    Punto de abandono promedio (último cambio de pestaña por sesión): <span className="font-medium text-foreground">{avgAbandonPercent}%</span> del video
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={stage.key === 'submit' ? 'h-full bg-success rounded-full transition-all' : 'h-full bg-primary rounded-full transition-all'}
+                      style={{ width: maxFunnelCount ? `${(stage.count / maxFunnelCount) * 100}%` : '0%' }}
+                    />
+                  </div>
+                </div>
+              ))}
+              {totalSessions === 0 && (
+                <p className="text-center text-muted-foreground text-sm py-6">Sin datos para este filtro</p>
+              )}
+              {avgAbandonPercent !== null && (
+                <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+                  Punto de abandono promedio (último cambio de pestaña por sesión): <span className="font-medium text-foreground">{avgAbandonPercent}%</span> del video
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* CTA conversion by percent watched */}
             <Card className="bg-card border-border/50">
               <CardHeader>
@@ -430,15 +504,42 @@ export default function VslTracking() {
                   <div key={bucket.key} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                     <div>
                       <p className="text-sm font-medium">{bucket.label}</p>
-                      <p className="text-xs text-muted-foreground">{bucket.clickCount} clicks · {bucket.pctOfClicks}% del total de clicks</p>
+                      <p className="text-xs text-muted-foreground">{bucket.count} clicks · {bucket.pctOfTotal}% del total de clicks</p>
                     </div>
                     <Badge className="bg-primary/15 text-primary border-0">
                       {bucket.conversionRate}% de sesiones
                     </Badge>
                   </div>
                 ))}
-                {ctaBreakdown.every(b => b.clickCount === 0) && (
+                {ctaBreakdown.every(b => b.count === 0) && (
                   <p className="text-center text-muted-foreground text-sm py-6">Sin clicks de CTA en este filtro</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Form submits by percent watched — the real conversion, by watch depth */}
+            <Card className="bg-card border-success/30">
+              <CardHeader>
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  Submits por % visto
+                </CardTitle>
+                <CardDescription>¿Cuánto video necesita ver alguien para convertir de verdad?</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {submitBreakdown.map(bucket => (
+                  <div key={bucket.key} className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+                    <div>
+                      <p className="text-sm font-medium">{bucket.label}</p>
+                      <p className="text-xs text-muted-foreground">{bucket.count} submits · {bucket.pctOfTotal}% del total de submits</p>
+                    </div>
+                    <Badge className="bg-success/15 text-success border-0">
+                      {bucket.conversionRate}% de sesiones
+                    </Badge>
+                  </div>
+                ))}
+                {submitBreakdown.every(b => b.count === 0) && (
+                  <p className="text-center text-muted-foreground text-sm py-6">Sin form submits en este filtro</p>
                 )}
               </CardContent>
             </Card>
