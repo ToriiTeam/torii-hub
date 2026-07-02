@@ -478,12 +478,23 @@ export default function VslTracking() {
     ? round1((formSubmitCount / ctaStage.count) * 100)
     : null;
 
+  // Average % of the VIDEO watched at the moment of the last tab-switch —
+  // a video engagement metric, not a share of the audience (that's the
+  // separate "tasa de abandono" below).
   const avgAbandonPercent = useMemo(() => {
     const withAbandon = sessionSummaries
       .map(s => s.lastAbandonPercent)
       .filter((p): p is number => p !== null);
     if (!withAbandon.length) return null;
     return Math.round(withAbandon.reduce((sum, p) => sum + p, 0) / withAbandon.length);
+  }, [sessionSummaries]);
+
+  // Share of the audience (sessions that hit Play) who never completed the
+  // booking form.
+  const abandonRate = useMemo(() => {
+    const playSessions = sessionSummaries.filter(s => s.milestones.has('VSL_Play'));
+    if (!playSessions.length) return 0;
+    return round1((playSessions.filter(s => !s.hasFormSubmit).length / playSessions.length) * 100);
   }, [sessionSummaries]);
 
   const viewedOver50Count = useMemo(
@@ -545,7 +556,7 @@ export default function VslTracking() {
       ) : (
         <>
           {/* Top KPI row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
             <Card className="bg-card border-border/50">
               <CardContent className="p-4">
                 <Users className="h-6 w-6 text-primary" />
@@ -602,7 +613,17 @@ export default function VslTracking() {
               <CardContent className="p-4">
                 <TrendingDown className="h-6 w-6 text-destructive" />
                 <p className="text-2xl font-bold mt-3">{avgAbandonPercent !== null ? `${avgAbandonPercent}%` : '—'}</p>
-                <p className="text-xs text-muted-foreground">Abandono promedio</p>
+                <p className="text-xs text-muted-foreground">Punto de abandono promedio</p>
+                <p className="text-xs text-muted-foreground/70">% del video visto al abandonar</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <TrendingDown className="h-6 w-6 text-destructive" />
+                <p className="text-2xl font-bold mt-3">{abandonRate}%</p>
+                <p className="text-xs text-muted-foreground">Tasa de abandono</p>
+                <p className="text-xs text-muted-foreground/70">visitantes que no completaron el booking</p>
               </CardContent>
             </Card>
           </div>
