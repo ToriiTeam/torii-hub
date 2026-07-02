@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../ui/sheet'
 import { useSelection } from '../../context/SelectionContext'
 import { useAccount } from '../../context/AccountContext'
@@ -48,14 +48,6 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
   const [compareMetric, setCompareMetric] = useState(NONE_METRIC)
   const [compareEntityId, setCompareEntityId] = useState(NONE_ENTITY)
 
-  // The metric being compared can't also be the primary metric — if the user
-  // switches the primary selector to whatever was selected for comparison,
-  // drop the now-invalid comparison instead of leaving a stale value that no
-  // longer appears in its (filtered) option list.
-  useEffect(() => {
-    if (compareMetric === metric) setCompareMetric(NONE_METRIC)
-  }, [metric, compareMetric])
-
   const entityId = idOf(row, level)
   const entityName = nameOf(row, level) || 'Entidad'
 
@@ -80,6 +72,18 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
   )
   const compareEntityName = entityOptions.find((o) => o.id === compareEntityId)?.name
 
+  // The trend chart only ever shows 2 series: the primary metric, plus
+  // either a second metric OR a second entity — never both at once.
+  // Turning one comparison on switches the other off.
+  const handleCompareMetricChange = (value: string) => {
+    setCompareMetric(value)
+    if (value !== NONE_METRIC) setCompareEntityId(NONE_ENTITY)
+  }
+  const handleCompareEntityChange = (value: string) => {
+    setCompareEntityId(value)
+    if (value !== NONE_ENTITY) setCompareMetric(NONE_METRIC)
+  }
+
   const recommendations = auditSingleEntity(row, level)
   const metricConfig = getMetricConfig(metric)
 
@@ -97,14 +101,14 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
             <MetricSelector value={metric} onChange={setMetric} label="" />
             <MetricSelector
               value={compareMetric}
-              onChange={setCompareMetric}
+              onChange={handleCompareMetricChange}
               label="Comparar métrica"
               includeNone
-              options={METRIC_OPTIONS.filter((m) => m.key !== metric)}
+              options={compareEntityId !== NONE_ENTITY ? METRIC_OPTIONS : METRIC_OPTIONS.filter((m) => m.key !== metric)}
             />
             <EntitySelector
               value={compareEntityId}
-              onChange={setCompareEntityId}
+              onChange={handleCompareEntityChange}
               label="Comparar entidad"
               options={entityOptions}
             />

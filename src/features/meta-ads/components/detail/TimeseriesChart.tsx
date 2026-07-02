@@ -5,8 +5,9 @@ import { getMetricConfig, type MetricFormat } from '../../config/metrics'
 interface TimeseriesChartProps {
   data: TimeseriesInsightRow[]
   metric: string
+  // Mutually exclusive with compareEntityData — the caller only ever sets
+  // one of the two, so the chart never has to show more than 2 series.
   compareMetric?: string
-  // A second entity's timeseries, same metric(s), for entity-vs-entity comparison.
   compareEntityData?: TimeseriesInsightRow[]
   entityName?: string
   compareEntityName?: string
@@ -59,10 +60,10 @@ function formatValue(value: number, format?: MetricFormat): string {
   return value.toFixed(2)
 }
 
-// Fixed colors for the compared entity's lines, distinct from whatever the
-// metric's own accent color is (m1/m2 reuse metrics.ts's per-metric color).
-const COMPARE_ENTITY_COLOR_LEFT = '#a78bfa'
-const COMPARE_ENTITY_COLOR_RIGHT = '#f0abfc'
+// Fixed color for the compared entity's line when comparing the same metric
+// across two entities — m1 and m1b would otherwise share metrics.ts's color
+// for that metric.
+const COMPARE_ENTITY_COLOR = '#a78bfa'
 
 interface TooltipPayloadEntry {
   dataKey: string
@@ -86,43 +87,38 @@ export function TimeseriesChart({
   }
 
   const config = getMetricConfig(metric)
-  const compareConfig = compareMetric ? getMetricConfig(compareMetric) : null
+  const comparingMetric = !!compareMetric
   const comparingEntities = !!compareEntityData
+  const compareConfig = comparingMetric ? getMetricConfig(compareMetric!) : null
 
   // Entity-vs-entity comparison aligns by position (Día 1, Día 2, ...)
   // instead of calendar date — two entities can have run in non-overlapping
-  // windows and would otherwise never share an x-axis point. Without an
-  // entity comparison, the trend chart keeps its original date-based axis.
+  // windows and would otherwise never share an x-axis point. Metric-vs-metric
+  // comparison (same entity) keeps the original date-based axis.
   const chartData = comparingEntities
     ? Array.from({ length: Math.max(data.length, compareEntityData!.length) }, (_, i) => ({
         day: `Día ${i + 1}`,
-        m1: extractMetricValue(data[i], metric),
+        m1:  extractMetricValue(data[i], metric),
         m1b: extractMetricValue(compareEntityData![i], metric),
-        ...(compareConfig ? {
-          m2:  extractMetricValue(data[i], compareMetric!),
-          m2b: extractMetricValue(compareEntityData![i], compareMetric!),
-        } : {}),
       }))
     : data.map(row => ({
         day: formatXAxis(row.date_start),
         m1: extractMetricValue(row, metric),
-        ...(compareConfig ? { m2: extractMetricValue(row, compareMetric!) } : {}),
+        ...(comparingMetric ? { m1b: extractMetricValue(row, compareMetric!) } : {}),
       }))
 
-  const entityLabel = (base: string, isCompareEntity: boolean) =>
-    comparingEntities ? `${base} (${isCompareEntity ? (compareEntityName ?? 'Comparación') : (entityName ?? 'Actual')})` : base
+  const m1Label = comparingEntities ? `${config.label} (${entityName ?? 'Actual'})` : config.label
+  const m1bLabel = comparingEntities
+    ? `${config.label} (${compareEntityName ?? 'Comparación'})`
+    : compareConfig?.label ?? ''
+  const m1bColor = comparingEntities ? COMPARE_ENTITY_COLOR : (compareConfig?.color ?? COMPARE_ENTITY_COLOR)
+  const m1bFormat = comparingEntities ? config.format : compareConfig?.format
 
-  const m1Label  = entityLabel(config.label, false)
-  const m1bLabel = entityLabel(config.label, true)
-  const m2Label  = compareConfig ? entityLabel(compareConfig.label, false) : ''
-  const m2bLabel = compareConfig ? entityLabel(compareConfig.label, true)  : ''
+  const showSecondSeries = comparingMetric || comparingEntities
+  const showLegend = showSecondSeries
 
   const formatByKey: Record<string, MetricFormat> = { m1: config.format }
-  if (comparingEntities) formatByKey.m1b = config.format
-  if (compareConfig) {
-    formatByKey.m2 = compareConfig.format
-    if (comparingEntities) formatByKey.m2b = compareConfig.format
-  }
+  if (showSecondSeries) formatByKey.m1b = m1bFormat ?? config.format
 
   function renderTooltip(props: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
     const { active, payload, label } = props
@@ -138,8 +134,6 @@ export function TimeseriesChart({
       </div>
     )
   }
-
-  const showLegend = comparingEntities || !!compareConfig
 
   return (
     <div className="chart-wrapper">
@@ -164,15 +158,6 @@ export function TimeseriesChart({
             axisLine={false} tickLine={false} width={42}
             tickFormatter={(v) => formatTick(v, config.format)}
           />
-          {compareConfig && (
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-              axisLine={false} tickLine={false} width={42}
-              tickFormatter={(v) => formatTick(v, compareConfig.format)}
-            />
-          )}
           <Tooltip content={renderTooltip} />
           {showLegend && <Legend wrapperStyle={{ fontSize: 11 }} />}
           <Area
@@ -187,45 +172,18 @@ export function TimeseriesChart({
             dot={false}
             activeDot={{ r: 4, fill: config.color }}
           />
-          {comparingEntities && (
+          {showSecondSeries && (
             <Line
               yAxisId="left"
               type="monotone"
               dataKey="m1b"
               name={m1bLabel}
-              stroke={COMPARE_ENTITY_COLOR_LEFT}
+              stroke={m1bColor}
               strokeWidth={2}
               strokeDasharray="5 4"
               connectNulls={false}
               dot={false}
-              activeDot={{ r: 4, fill: COMPARE_ENTITY_COLOR_LEFT }}
-            />
-          )}
-          {compareConfig && (
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="m2"
-              name={m2Label}
-              stroke={compareConfig.color}
-              strokeWidth={2}
-              connectNulls={false}
-              dot={false}
-              activeDot={{ r: 4, fill: compareConfig.color }}
-            />
-          )}
-          {compareConfig && comparingEntities && (
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="m2b"
-              name={m2bLabel}
-              stroke={COMPARE_ENTITY_COLOR_RIGHT}
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              connectNulls={false}
-              dot={false}
-              activeDot={{ r: 4, fill: COMPARE_ENTITY_COLOR_RIGHT }}
+              activeDot={{ r: 4, fill: m1bColor }}
             />
           )}
         </ComposedChart>
