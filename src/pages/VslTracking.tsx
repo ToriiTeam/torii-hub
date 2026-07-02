@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -63,12 +65,25 @@ function round1(value: number): number {
 
 interface SessionSummary {
   landingId: string;
+  utmSource: string | null;
   utmCampaign: string | null;
+  utmContent: string | null;
   milestones: Set<string>;
   ctaClicks: number[]; // percent-at-click for every VSL_CTA_Click this session fired
   hasFormSubmit: boolean;
   formSubmitPercent: number | null; // percent watched at the moment of the (first) submit
   lastAbandonPercent: number | null;
+}
+
+// The highest video-progress milestone a session reached, as a discrete
+// percent (0/25/50/75/100). Note this is independent of VSL_Play — a
+// session can have played without crossing the 25% milestone yet.
+function getMaxProgress(s: SessionSummary): number {
+  if (s.milestones.has('VSL_Progress_100')) return 100;
+  if (s.milestones.has('VSL_Progress_75')) return 75;
+  if (s.milestones.has('VSL_Progress_50')) return 50;
+  if (s.milestones.has('VSL_Progress_25')) return 25;
+  return 0;
 }
 
 // Groups raw events by session_id. A session can appear multiple times across
@@ -84,7 +99,9 @@ function buildSessionSummaries(events: VslEvent[]): Map<string, SessionSummary> 
     if (!s) {
       s = {
         landingId: e.landing_id ?? 'desconocida',
+        utmSource: e.utm_source,
         utmCampaign: e.utm_campaign,
+        utmContent: e.utm_content,
         milestones: new Set(),
         ctaClicks: [],
         hasFormSubmit: false,
@@ -225,6 +242,129 @@ function buildLandingSummary(events: VslEvent[]): LandingSummary[] {
   return Array.from(byLanding.values()).sort((a, b) => b.sessions - a.sessions);
 }
 
+interface UtmBreakdownRow {
+  key: string; // display label for the group ('Sin UTM' when the value is null)
+  fullValue: string | null; // untruncated value, for the tooltip — null when there's nothing to show
+  campaign: string | null; // only populated when a getCampaign() fn is passed in
+  sessions: number;
+  playRate: number;
+  avgProgress: number;
+  ctaClicks: number;
+  formSubmits: number;
+  conversionRate: number; // formSubmits / sessions
+}
+
+const NO_UTM_LABEL = 'Sin UTM';
+
+// Shared by the source/content/campaign tables — groups sessions by
+// whatever UTM field getGroupKey() picks, all from data already in memory.
+function buildUtmBreakdown(
+  sessions: SessionSummary[],
+  getGroupKey: (s: SessionSummary) => string | null,
+  getCampaign?: (s: SessionSummary) => string | null,
+): UtmBreakdownRow[] {
+  const groups = new Map<string, SessionSummary[]>();
+  for (const s of sessions) {
+    const key = getGroupKey(s) ?? NO_UTM_LABEL;
+    const group = groups.get(key);
+    if (group) group.push(s);
+    else groups.set(key, [s]);
+  }
+
+  return Array.from(groups.entries()).map(([key, group]) => {
+    const total = group.length;
+    const playCount = group.filter(s => s.milestones.has('VSL_Play')).length;
+    const formSubmits = group.filter(s => s.hasFormSubmit).length;
+    return {
+      key,
+      fullValue: key === NO_UTM_LABEL ? null : key,
+      // Assumes one campaign per group (an ad/campaign doesn't change UTMs
+      // mid-flight) — takes the first session's value as representative.
+      campaign: getCampaign ? getCampaign(group[0]) ?? NO_UTM_LABEL : null,
+      sessions: total,
+      playRate: total ? round1((playCount / total) * 100) : 0,
+      avgProgress: total ? Math.round(group.reduce((sum, s) => sum + getMaxProgress(s), 0) / total) : 0,
+      ctaClicks: group.reduce((sum, s) => sum + s.ctaClicks.length, 0),
+      formSubmits,
+      conversionRate: total ? round1((formSubmits / total) * 100) : 0,
+    };
+  });
+}
+
+function truncateId(value: string, len = 12): string {
+  return value.length > len ? `${value.slice(0, len)}...` : value;
+}
+
+// A value cell that truncates long IDs (utm_content) and shows the full
+// value in a tooltip on hover.
+function TruncatedCell({ value }: { value: string }) {
+  const truncated = truncateId(value);
+  if (truncated === value) return <>{value}</>;
+  return (
+    <UiTooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help underline decoration-dotted decoration-muted-foreground">{truncated}</span>
+      </TooltipTrigger>
+      <TooltipContent>{value}</TooltipContent>
+    </UiTooltip>
+  );
+}
+
+interface UtmBreakdownTableProps {
+  rows: UtmBreakdownRow[];
+  labelHeader: string;
+  truncateLabel?: boolean;
+  showCampaignColumn?: boolean;
+}
+
+function UtmBreakdownTable({ rows, labelHeader, truncateLabel, showCampaignColumn }: UtmBreakdownTableProps) {
+  if (rows.length === 0) {
+    return <p className="text-center text-muted-foreground text-sm py-6">Sin datos para este filtro</p>;
+  }
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{labelHeader}</TableHead>
+          {showCampaignColumn && <TableHead>Campaña</TableHead>}
+          <TableHead className="text-right">Sesiones</TableHead>
+          <TableHead className="text-right">Tasa de play</TableHead>
+          <TableHead className="text-right">% prom. visto</TableHead>
+          <TableHead className="text-right">CTA Clicks</TableHead>
+          <TableHead className="text-right">Form Submits</TableHead>
+          <TableHead className="text-right">Conversión</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map(row => (
+          <TableRow key={row.key}>
+            <TableCell className="font-medium">
+              {truncateLabel && row.fullValue ? <TruncatedCell value={row.fullValue} /> : row.key}
+            </TableCell>
+            {showCampaignColumn && (
+              <TableCell className="text-muted-foreground">
+                {row.campaign && row.campaign !== NO_UTM_LABEL
+                  ? <TruncatedCell value={row.campaign} />
+                  : row.campaign}
+              </TableCell>
+            )}
+            <TableCell className="text-right">{row.sessions}</TableCell>
+            <TableCell className="text-right">{row.playRate}%</TableCell>
+            <TableCell className="text-right">{row.avgProgress}%</TableCell>
+            <TableCell className="text-right">{row.ctaClicks}</TableCell>
+            <TableCell className="text-right">{row.formSubmits}</TableCell>
+            <TableCell className="text-right">
+              <Badge className={row.conversionRate > 0 ? 'bg-success/15 text-success border-0' : 'bg-muted text-muted-foreground border-0'}>
+                {row.conversionRate}%
+              </Badge>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 export default function VslTracking() {
   const [events, setEvents] = useState<VslEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -300,6 +440,22 @@ export default function VslTracking() {
   const landingSummary = useMemo(
     () => (landingId === ALL_LANDINGS ? buildLandingSummary(filteredEvents) : []),
     [filteredEvents, landingId],
+  );
+
+  const sourceBreakdown = useMemo(
+    () => buildUtmBreakdown(sessionSummaries, s => s.utmSource)
+      .sort((a, b) => b.sessions - a.sessions),
+    [sessionSummaries],
+  );
+  const contentBreakdown = useMemo(
+    () => buildUtmBreakdown(sessionSummaries, s => s.utmContent, s => s.utmCampaign)
+      .sort((a, b) => b.conversionRate - a.conversionRate),
+    [sessionSummaries],
+  );
+  const campaignBreakdown = useMemo(
+    () => buildUtmBreakdown(sessionSummaries, s => s.utmCampaign)
+      .sort((a, b) => b.sessions - a.sessions),
+    [sessionSummaries],
   );
 
   // sessionSummaries is built from every event, not just VSL_Play, so its
@@ -597,6 +753,41 @@ export default function VslTracking() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Breakdown by source/ad/campaign — only meaningful with more than one session */}
+          {sessionSummaries.length > 1 && (
+            <div className="space-y-6">
+              <Card className="bg-card border-border/50">
+                <CardHeader>
+                  <CardTitle className="text-base font-medium">Desglose por fuente (utm_source)</CardTitle>
+                  <CardDescription>Ordenado por sesiones</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UtmBreakdownTable rows={sourceBreakdown} labelHeader="Fuente" />
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border/50">
+                <CardHeader>
+                  <CardTitle className="text-base font-medium">Desglose por anuncio (utm_content)</CardTitle>
+                  <CardDescription>Ordenado por tasa de conversión</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UtmBreakdownTable rows={contentBreakdown} labelHeader="Anuncio" truncateLabel showCampaignColumn />
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border/50">
+                <CardHeader>
+                  <CardTitle className="text-base font-medium">Desglose por campaña (utm_campaign)</CardTitle>
+                  <CardDescription>Ordenado por sesiones</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <UtmBreakdownTable rows={campaignBreakdown} labelHeader="Campaña" />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       )}
     </div>
