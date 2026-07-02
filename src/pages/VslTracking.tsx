@@ -15,6 +15,14 @@ type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
 const ALL_LANDINGS = 'all';
 const ALL_CAMPAIGNS = 'all';
 
+// Fixed list, not derived from data — a landing should be selectable (and
+// show up as all-zeros) even before its first event lands.
+const LANDING_OPTIONS = [
+  { id: 'torii-principal', label: 'Torii — Principal' },
+  { id: 'adolfo-blasco', label: 'Adolfo Blasco' },
+  { id: 'raul-galindo', label: 'Raul Galindo' },
+] as const;
+
 // Video progress milestones, in order. Each is a distinct event_name that
 // Torii's VSL tracking script fires at most once per session_id.
 const VIDEO_MILESTONES = [
@@ -399,11 +407,6 @@ export default function VslTracking() {
 
   // Only the date range triggers a refetch — landing/campaign filters and
   // the trend granularity toggle all operate on the already-loaded window.
-  const landingOptions = useMemo(
-    () => Array.from(new Set(events.map(e => e.landing_id).filter((v): v is string => !!v))).sort(),
-    [events],
-  );
-
   const campaignOptions = useMemo(() => {
     const scoped = landingId === ALL_LANDINGS ? events : events.filter(e => e.landing_id === landingId);
     return Array.from(new Set(scoped.map(e => e.utm_campaign).filter((v): v is string => !!v))).sort();
@@ -505,8 +508,8 @@ export default function VslTracking() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_LANDINGS}>Todas las landings</SelectItem>
-            {landingOptions.map(id => (
-              <SelectItem key={id} value={id}>{id}</SelectItem>
+            {LANDING_OPTIONS.map(l => (
+              <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
