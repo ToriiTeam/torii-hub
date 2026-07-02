@@ -7,7 +7,7 @@ import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/componen
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
-import { PlayCircle, MousePointerClick, TrendingDown, Users, CheckCircle2 } from 'lucide-react';
+import { PlayCircle, MousePointerClick, TrendingDown, TrendingUp, Users, CheckCircle2, Eye, Info } from 'lucide-react';
 import { startOfWeek, format } from 'date-fns';
 
 type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
@@ -51,6 +51,21 @@ const DATE_RANGES = [
   { key: '90', label: 'Últimos 90 días', days: 90 },
   { key: 'all', label: 'Todo el historial', days: null },
 ] as const;
+
+const FORM_SUBMIT_NOTE = 'Solo cuenta leads que calificaron en el formulario y completaron el booking. Los no calificados no generan este evento.';
+
+// Small info icon with a hover tooltip, for clarifying a metric's exact
+// definition inline without cluttering the label.
+function InfoNote({ text }: { text: string }) {
+  return (
+    <UiTooltip>
+      <TooltipTrigger asChild>
+        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline-block align-text-top ml-1" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{text}</TooltipContent>
+    </UiTooltip>
+  );
+}
 
 // percent=0 used to be saved as NULL (0 is falsy in the old tracking script).
 // Treat every NULL percent as 0 rather than dropping it, since there's no way
@@ -331,7 +346,10 @@ function UtmBreakdownTable({ rows, labelHeader, truncateLabel, showCampaignColum
           <TableHead className="text-right">Tasa de play</TableHead>
           <TableHead className="text-right">% prom. visto</TableHead>
           <TableHead className="text-right">CTA Clicks</TableHead>
-          <TableHead className="text-right">Form Submits</TableHead>
+          <TableHead className="text-right">
+            Form Submits
+            <InfoNote text={FORM_SUBMIT_NOTE} />
+          </TableHead>
           <TableHead className="text-right">Conversión</TableHead>
         </TableRow>
       </TableHeader>
@@ -483,6 +501,11 @@ export default function VslTracking() {
     return Math.round(withAbandon.reduce((sum, p) => sum + p, 0) / withAbandon.length);
   }, [sessionSummaries]);
 
+  const viewedOver50Count = useMemo(
+    () => sessionSummaries.filter(s => getMaxProgress(s) >= 50).length,
+    [sessionSummaries],
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -536,39 +559,65 @@ export default function VslTracking() {
         </div>
       ) : (
         <>
-          {/* Top stats: real conversion is the headline number, visitors is context */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-card border-success/30">
-              <CardContent className="p-6 flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-success/15 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="h-6 w-6 text-success" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold text-success">{realConversionRate}%</p>
-                    <p className="text-sm text-muted-foreground">conversión real (Form Submit / visitantes)</p>
-                  </div>
-                </div>
-                <Badge className="bg-success/15 text-success border-0 text-sm px-3 py-1.5">
-                  {formSubmitCount} bookings
-                </Badge>
+          {/* Top KPI row */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <Users className="h-6 w-6 text-primary" />
+                <p className="text-2xl font-bold mt-3">{totalSessions.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Visitantes únicos</p>
               </CardContent>
             </Card>
 
             <Card className="bg-card border-border/50">
-              <CardContent className="p-6 flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-                    <Users className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold">{totalSessions.toLocaleString()}</p>
-                    <p className="text-sm text-muted-foreground">visitantes únicos en el período</p>
-                  </div>
-                </div>
-                <Badge className="bg-primary/15 text-primary border-0 text-sm px-3 py-1.5">
-                  {playRate}% dio play
-                </Badge>
+              <CardContent className="p-4">
+                <PlayCircle className="h-6 w-6 text-info" />
+                <p className="text-2xl font-bold mt-3">{maxFunnelCount.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Dieron play</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <TrendingUp className="h-6 w-6 text-info" />
+                <p className="text-2xl font-bold mt-3">{playRate}%</p>
+                <p className="text-xs text-muted-foreground">Tasa de engagement</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <Eye className="h-6 w-6 text-primary" />
+                <p className="text-2xl font-bold mt-3">{viewedOver50Count.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Vieron +50%</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <MousePointerClick className="h-6 w-6 text-primary" />
+                <p className="text-2xl font-bold mt-3">{(ctaStage?.count ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Click en CTA</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-success/30">
+              <CardContent className="p-4">
+                <CheckCircle2 className="h-6 w-6 text-success" />
+                <p className="text-2xl font-bold mt-3 text-success">{formSubmitCount.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  Calificaron y agendaron
+                  <InfoNote text={FORM_SUBMIT_NOTE} />
+                </p>
+                <p className="text-xs text-muted-foreground/70">{realConversionRate}% de los visitantes</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4">
+                <TrendingDown className="h-6 w-6 text-destructive" />
+                <p className="text-2xl font-bold mt-3">{avgAbandonPercent !== null ? `${avgAbandonPercent}%` : '—'}</p>
+                <p className="text-xs text-muted-foreground">Abandono promedio</p>
               </CardContent>
             </Card>
           </div>
@@ -607,7 +656,10 @@ export default function VslTracking() {
               {funnel.map(stage => (
                 <div key={stage.key}>
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">{stage.label}</span>
+                    <span className="font-medium">
+                      {stage.label}
+                      {stage.key === 'submit' && <InfoNote text={FORM_SUBMIT_NOTE} />}
+                    </span>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{stage.count}</span>
                       {stage.key === 'submit' ? (
@@ -679,6 +731,7 @@ export default function VslTracking() {
                 <CardTitle className="text-base font-medium flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-success" />
                   Submits por % visto
+                  <InfoNote text={FORM_SUBMIT_NOTE} />
                 </CardTitle>
                 <CardDescription>¿Cuánto video necesita ver alguien para convertir de verdad?</CardDescription>
               </CardHeader>
