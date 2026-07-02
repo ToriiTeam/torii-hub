@@ -36,10 +36,6 @@ function AppContent() {
 
   return (
     <Routes>
-      {/* Meta Ads has its own full-page layout — no Hub wrapper */}
-      <Route path="/meta-ads" element={<MetaAds />} />
-
-      {/* All other pages use the Hub layout */}
       <Route path="*" element={
         <Layout>
           <Routes>
@@ -51,6 +47,7 @@ function AppContent() {
             <Route path="/finanzas" element={<Finanzas />} />
             <Route path="/reportes" element={<Reportes />} />
             <Route path="/tareas" element={<Tareas />} />
+            <Route path="/meta-ads" element={<MetaAds />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

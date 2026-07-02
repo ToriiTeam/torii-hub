@@ -18,7 +18,7 @@ function MetaAdsContent() {
   const [activeTab, setActiveTab] = useState<TabId>('metricsbar')
 
   return (
-    <div className="meta-ads-root" style={{ minHeight: '100vh' }}>
+    <div className="meta-ads-root">
       <Header />
       <TabNav activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as TabId)} />
 
