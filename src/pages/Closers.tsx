@@ -661,11 +661,13 @@ type DForm = {
   hora_llamada: string; fuente: string; ad_id: string; utm_campaign: string; utm_source: string;
   setter_agendo: string; closer: string; nicho: string;
   se_presento: boolean; situacion_resultado: string; segunda_llamada_fecha: string; segunda_llamada_status: string;
+  oferta_hecha: boolean; segunda_llamada_se_presento: boolean; reagenda_texto: string; situacion_3ra_llamada: string;
   califico: boolean; cerro: boolean; producto: string; precio: string; comision_estimada: string;
   num_cuotas: string; pago_en_llamada: boolean; loss_reason: string;
   situacion_laboral: string; nivel_ingresos: string; capacidad_ahorro: string;
   preocupacion_actual: string; edad: string; hijos_casado: string;
   next_followup_date: string; followup_notes: string; objections: string; notes: string;
+  seguimiento_requerido: boolean; estado_seguimiento: string;
 };
 
 function toForm(c: Call): DForm {
@@ -683,6 +685,10 @@ function toForm(c: Call): DForm {
     situacion_resultado:    c.situacion_resultado ?? NONE,
     segunda_llamada_fecha:  c.segunda_llamada_fecha ? c.segunda_llamada_fecha.slice(0, 10) : '',
     segunda_llamada_status: c.segunda_llamada_status ?? NONE,
+    oferta_hecha:                c.oferta_hecha ?? false,
+    segunda_llamada_se_presento: c.segunda_llamada_se_presento ?? false,
+    reagenda_texto:               c.reagenda_texto ?? '',
+    situacion_3ra_llamada:        c.situacion_3ra_llamada ?? '',
     califico:               c.califico ?? false,
     cerro:                  c.cerro ?? false,
     producto:               c.producto ?? '',
@@ -701,6 +707,8 @@ function toForm(c: Call): DForm {
     followup_notes:         c.followup_notes ?? '',
     objections:             c.objections ?? '',
     notes:                  c.notes ?? '',
+    seguimiento_requerido:  c.seguimiento_requerido ?? false,
+    estado_seguimiento:     c.estado_seguimiento ?? '',
   };
 }
 
@@ -732,6 +740,10 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
       situacion_resultado:    orNull(f.situacion_resultado),
       segunda_llamada_fecha:  f.segunda_llamada_fecha || null,
       segunda_llamada_status: orNull(f.segunda_llamada_status),
+      oferta_hecha:                f.oferta_hecha,
+      segunda_llamada_se_presento: f.segunda_llamada_se_presento,
+      reagenda_texto:               f.reagenda_texto || null,
+      situacion_3ra_llamada:        f.situacion_3ra_llamada || null,
       califico:               f.califico,
       cerro:                  f.cerro,
       producto:               f.producto || null,
@@ -750,6 +762,8 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
       followup_notes:         f.followup_notes || null,
       objections:             f.objections || null,
       notes:                  f.notes || null,
+      seguimiento_requerido:  f.seguimiento_requerido,
+      estado_seguimiento:     f.estado_seguimiento || null,
     }).eq('id', call.id);
     setSaving(false);
     if (error) { toast.error('Error al guardar'); return; }
@@ -826,8 +840,10 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
         {/* ── Llamada ── */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Llamada</p>
-          <div className="flex gap-6 mb-3">
+          <div className="flex flex-wrap gap-6 mb-3">
             <CheckField id="dlg-se_presento" label="Se presentó" checked={f.se_presento} onCheckedChange={v => upd('se_presento', v)} />
+            <CheckField id="dlg-oferta_hecha" label="Oferta hecha" checked={f.oferta_hecha} onCheckedChange={v => upd('oferta_hecha', v)} />
+            <CheckField id="dlg-segunda_se_presento" label="Se presentó a 2da llamada" checked={f.segunda_llamada_se_presento} onCheckedChange={v => upd('segunda_llamada_se_presento', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <F label="Situación / Resultado">
@@ -850,6 +866,12 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
                   {SEGUNDA_LLAMADA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </F>
+            <F label="Reagenda (texto libre)">
+              <Input value={f.reagenda_texto} onChange={e => upd('reagenda_texto', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="ej. Lunes 12 a las 15hs" />
+            </F>
+            <F label="Situación 3ra llamada">
+              <Input value={f.situacion_3ra_llamada} onChange={e => upd('situacion_3ra_llamada', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
             </F>
           </div>
         </div>
@@ -927,13 +949,16 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
         {/* ── Seguimiento ── */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Seguimiento</p>
-          <div className="flex items-center gap-2 mb-3">
-            <Checkbox
-              checked={!!f.next_followup_date}
-              onCheckedChange={v => upd('next_followup_date', v ? (f.next_followup_date || format(new Date(), 'yyyy-MM-dd')) : '')}
-              id="dlg-seguimiento"
-            />
-            <Label htmlFor="dlg-seguimiento" className="text-sm cursor-pointer">Seguimiento realizado</Label>
+          <div className="flex flex-wrap items-center gap-6 mb-3">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={!!f.next_followup_date}
+                onCheckedChange={v => upd('next_followup_date', v ? (f.next_followup_date || format(new Date(), 'yyyy-MM-dd')) : '')}
+                id="dlg-seguimiento"
+              />
+              <Label htmlFor="dlg-seguimiento" className="text-sm cursor-pointer">Seguimiento realizado</Label>
+            </div>
+            <CheckField id="dlg-seguimiento_requerido" label="Seguimiento requerido" checked={f.seguimiento_requerido} onCheckedChange={v => upd('seguimiento_requerido', v)} />
           </div>
           <div className="grid grid-cols-2 gap-3 mb-3">
             {f.next_followup_date && (
@@ -941,6 +966,9 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
                 <Input type="date" value={f.next_followup_date} onChange={e => upd('next_followup_date', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
               </F>
             )}
+            <F label="Estado de seguimiento">
+              <Input value={f.estado_seguimiento} onChange={e => upd('estado_seguimiento', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+            </F>
             <F label="Contactos de seguimiento">
               <p className="text-sm bg-secondary/30 rounded px-2 py-1.5">{call.followup_count ?? 0}</p>
             </F>
@@ -1047,6 +1075,30 @@ const CRM_COLUMNS: Record<string, ColumnDef> = {
     header: 'Situación',
     cell: c => <span className="text-sm text-muted-foreground whitespace-nowrap">{c.situacion_resultado ?? '—'}</span>,
   },
+  oferta_hecha: {
+    header: 'Oferta hecha',
+    cell: c => YES_NO_BADGE(c.oferta_hecha),
+  },
+  segunda_llamada_se_presento: {
+    header: 'Se presentó 2da',
+    cell: c => YES_NO_BADGE(c.segunda_llamada_se_presento),
+  },
+  reagenda_texto: {
+    header: 'Reagenda',
+    cell: c => <span className="text-sm text-muted-foreground whitespace-nowrap">{c.reagenda_texto ?? '—'}</span>,
+  },
+  situacion_3ra_llamada: {
+    header: 'Situación 3ra',
+    cell: c => <span className="text-sm text-muted-foreground whitespace-nowrap">{c.situacion_3ra_llamada ?? '—'}</span>,
+  },
+  seguimiento_requerido: {
+    header: 'Seg. requerido',
+    cell: c => YES_NO_BADGE(c.seguimiento_requerido),
+  },
+  estado_seguimiento: {
+    header: 'Estado seg.',
+    cell: c => <span className="text-sm text-muted-foreground whitespace-nowrap">{c.estado_seguimiento ?? '—'}</span>,
+  },
   cerro: {
     header: 'Cerró',
     cell: c => c.cerro
@@ -1107,14 +1159,16 @@ const CRM_COLUMNS: Record<string, ColumnDef> = {
 
 const TORII_COLUMN_KEYS = [
   'lead_name', 'fecha_llamada', 'hora_llamada', 'fuente', 'setter_agendo', 'nicho', 'closer',
-  'se_presento', 'califico', 'situacion_resultado', 'cerro', 'precio', 'num_cuotas',
-  'pago_en_llamada', 'loss_reason', 'next_followup_date',
+  'se_presento', 'califico', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
+  'reagenda_texto', 'situacion_3ra_llamada', 'cerro', 'precio', 'num_cuotas',
+  'pago_en_llamada', 'loss_reason', 'next_followup_date', 'seguimiento_requerido', 'estado_seguimiento',
 ];
 
 const CLIENT_COLUMN_KEYS = [
   'lead_name', 'fecha_llamada', 'hora_llamada', 'ad_id', 'nicho', 'closer',
-  'se_presento', 'califico', 'situacion_resultado', 'cerro', 'producto', 'precio',
-  'comision_estimada', 'loss_reason', 'next_followup_date',
+  'se_presento', 'califico', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
+  'reagenda_texto', 'situacion_3ra_llamada', 'cerro', 'producto', 'precio',
+  'comision_estimada', 'loss_reason', 'next_followup_date', 'seguimiento_requerido', 'estado_seguimiento',
   'situacion_laboral', 'nivel_ingresos', 'capacidad_ahorro', 'edad',
 ];
 
@@ -1154,8 +1208,9 @@ export default function Closers() {
 
   const [owner, setOwner]   = useState<OwnerKey>('torii');
   const now = new Date();
-  const [year, setYear]   = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear]     = useState(now.getFullYear());
+  const [month, setMonth]   = useState(now.getMonth() + 1);
+  const [allTime, setAllTime] = useState(false);
   function navMonthClick(dir: 'prev' | 'next') {
     const { year: y, month: m } = navMonth(year, month, dir);
     setYear(y); setMonth(m);
@@ -1189,8 +1244,11 @@ export default function Closers() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Owner + selected month → feeds the Dashboard tab and is the base for the CRM tab's own filters
-  const { since, until } = monthBounds(year, month);
+  // Owner + selected month (or all-time) → feeds the Dashboard tab and is
+  // the base for the CRM tab's own filters. inRange() treats a null since
+  // as "no bound", so allTime just skips the month restriction entirely.
+  const { since, until }: { since: string | null; until: string | null } =
+    allTime ? { since: null, until: null } : monthBounds(year, month);
   const viewCalls = useMemo(
     () => calls.filter(c => matchesOwner(c, owner) && inRange(c.fecha_llamada, since, until)),
     [calls, owner, since, until],
@@ -1285,14 +1343,22 @@ export default function Closers() {
           </SelectContent>
         </Select>
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonthClick('prev')}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonthClick('prev')} disabled={allTime}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm font-medium px-3 min-w-[140px] text-center capitalize">
-            {monthLabel(year, month)}
+            {allTime ? 'Todo el historial' : monthLabel(year, month)}
           </span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonthClick('next')}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonthClick('next')} disabled={allTime}>
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn('h-8 px-3 text-sm', allTime && 'bg-primary text-primary-foreground hover:bg-primary/90')}
+            onClick={() => setAllTime(v => !v)}
+          >
+            Todo
           </Button>
         </div>
       </div>

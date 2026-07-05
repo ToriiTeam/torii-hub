@@ -533,6 +533,174 @@ export type Database = {
           },
         ]
       }
+      client_closer_calls: {
+        Row: {
+          ad_id: string | null
+          califico: boolean | null
+          capacidad_ahorro: string | null
+          cerro: boolean | null
+          client_id: string | null
+          closer: string | null
+          comision_estimada: number | null
+          created_at: string | null
+          created_by: string | null
+          edad: number | null
+          estado_seguimiento: string | null
+          fecha_llamada: string | null
+          followup_count: number | null
+          followup_notes: string | null
+          fuente: string | null
+          ghl_appointment_id: string | null
+          hijos_casado: string | null
+          hora_llamada: string | null
+          id: string
+          lead_email: string | null
+          lead_name: string | null
+          lead_phone: string | null
+          loss_reason: string | null
+          next_followup_date: string | null
+          nicho: string | null
+          nivel_ingresos: string | null
+          notes: string | null
+          num_cuotas: number | null
+          objections: string | null
+          oferta_hecha: boolean | null
+          owner_type: string | null
+          pago_en_llamada: boolean | null
+          precio: number | null
+          preocupacion_actual: string | null
+          producto: string | null
+          reagenda_texto: string | null
+          se_presento: boolean | null
+          seguimiento_requerido: boolean | null
+          segunda_llamada_fecha: string | null
+          segunda_llamada_se_presento: boolean | null
+          segunda_llamada_status: string | null
+          setter_agendo: string | null
+          situacion_3ra_llamada: string | null
+          situacion_laboral: string | null
+          situacion_resultado: string | null
+          updated_at: string | null
+          utm_campaign: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          ad_id?: string | null
+          califico?: boolean | null
+          capacidad_ahorro?: string | null
+          cerro?: boolean | null
+          client_id?: string | null
+          closer?: string | null
+          comision_estimada?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          edad?: number | null
+          estado_seguimiento?: string | null
+          fecha_llamada?: string | null
+          followup_count?: number | null
+          followup_notes?: string | null
+          fuente?: string | null
+          ghl_appointment_id?: string | null
+          hijos_casado?: string | null
+          hora_llamada?: string | null
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          loss_reason?: string | null
+          next_followup_date?: string | null
+          nicho?: string | null
+          nivel_ingresos?: string | null
+          notes?: string | null
+          num_cuotas?: number | null
+          objections?: string | null
+          oferta_hecha?: boolean | null
+          owner_type?: string | null
+          pago_en_llamada?: boolean | null
+          precio?: number | null
+          preocupacion_actual?: string | null
+          producto?: string | null
+          reagenda_texto?: string | null
+          se_presento?: boolean | null
+          seguimiento_requerido?: boolean | null
+          segunda_llamada_fecha?: string | null
+          segunda_llamada_se_presento?: boolean | null
+          segunda_llamada_status?: string | null
+          setter_agendo?: string | null
+          situacion_3ra_llamada?: string | null
+          situacion_laboral?: string | null
+          situacion_resultado?: string | null
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          ad_id?: string | null
+          califico?: boolean | null
+          capacidad_ahorro?: string | null
+          cerro?: boolean | null
+          client_id?: string | null
+          closer?: string | null
+          comision_estimada?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          edad?: number | null
+          estado_seguimiento?: string | null
+          fecha_llamada?: string | null
+          followup_count?: number | null
+          followup_notes?: string | null
+          fuente?: string | null
+          ghl_appointment_id?: string | null
+          hijos_casado?: string | null
+          hora_llamada?: string | null
+          id?: string
+          lead_email?: string | null
+          lead_name?: string | null
+          lead_phone?: string | null
+          loss_reason?: string | null
+          next_followup_date?: string | null
+          nicho?: string | null
+          nivel_ingresos?: string | null
+          notes?: string | null
+          num_cuotas?: number | null
+          objections?: string | null
+          oferta_hecha?: boolean | null
+          owner_type?: string | null
+          pago_en_llamada?: boolean | null
+          precio?: number | null
+          preocupacion_actual?: string | null
+          producto?: string | null
+          reagenda_texto?: string | null
+          se_presento?: boolean | null
+          seguimiento_requerido?: boolean | null
+          segunda_llamada_fecha?: string | null
+          segunda_llamada_se_presento?: boolean | null
+          segunda_llamada_status?: string | null
+          setter_agendo?: string | null
+          situacion_3ra_llamada?: string | null
+          situacion_laboral?: string | null
+          situacion_resultado?: string | null
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_closer_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_closer_calls_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_closers: {
         Row: {
           active: boolean | null
