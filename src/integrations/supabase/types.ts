@@ -41,6 +41,8 @@ export type Database = {
     Tables: {
       ads_campanas: {
         Row: {
+          ad_account_id: string | null
+          campaign_id: string | null
           client_id: string | null
           created_at: string | null
           cuenta_ads: string | null
@@ -57,6 +59,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ad_account_id?: string | null
+          campaign_id?: string | null
           client_id?: string | null
           created_at?: string | null
           cuenta_ads?: string | null
@@ -73,6 +77,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ad_account_id?: string | null
+          campaign_id?: string | null
           client_id?: string | null
           created_at?: string | null
           cuenta_ads?: string | null
@@ -169,14 +175,18 @@ export type Database = {
       }
       ads_metricas_diarias: {
         Row: {
+          alcance: number | null
           asistencia: number | null
           calificados: number | null
           campana_id: string
           cerrados: number | null
           clics: number | null
+          conversiones: number | null
           cpa: number | null
           cpbc: number | null
+          cpc: number | null
           cpl: number | null
+          cpm: number | null
           created_at: string | null
           ctr: number | null
           fecha: string
@@ -189,14 +199,18 @@ export type Database = {
           typeforms_calificados: number | null
         }
         Insert: {
+          alcance?: number | null
           asistencia?: number | null
           calificados?: number | null
           campana_id: string
           cerrados?: number | null
           clics?: number | null
+          conversiones?: number | null
           cpa?: number | null
           cpbc?: number | null
+          cpc?: number | null
           cpl?: number | null
+          cpm?: number | null
           created_at?: string | null
           ctr?: number | null
           fecha: string
@@ -209,14 +223,18 @@ export type Database = {
           typeforms_calificados?: number | null
         }
         Update: {
+          alcance?: number | null
           asistencia?: number | null
           calificados?: number | null
           campana_id?: string
           cerrados?: number | null
           clics?: number | null
+          conversiones?: number | null
           cpa?: number | null
           cpbc?: number | null
+          cpc?: number | null
           cpl?: number | null
+          cpm?: number | null
           created_at?: string | null
           ctr?: number | null
           fecha?: string
@@ -2898,6 +2916,53 @@ export type Database = {
           },
         ]
       }
+      reports: {
+        Row: {
+          client_id: string
+          created_at: string
+          enviado: boolean
+          enviado_at: string | null
+          id: string
+          mes: string
+          metricas: Json
+          narrativa: Json
+          pdf_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          enviado?: boolean
+          enviado_at?: string | null
+          id?: string
+          mes: string
+          metricas?: Json
+          narrativa?: Json
+          pdf_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          enviado?: boolean
+          enviado_at?: string | null
+          id?: string
+          mes?: string
+          metricas?: Json
+          narrativa?: Json
+          pdf_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_materials: {
         Row: {
           client_id: string | null
@@ -4382,6 +4447,7 @@ export type Database = {
       }
       vsl_events: {
         Row: {
+          business_line: string | null
           client_id: string | null
           created_at: string | null
           event_name: string
@@ -4396,6 +4462,7 @@ export type Database = {
           utm_source: string | null
         }
         Insert: {
+          business_line?: string | null
           client_id?: string | null
           created_at?: string | null
           event_name: string
@@ -4410,6 +4477,7 @@ export type Database = {
           utm_source?: string | null
         }
         Update: {
+          business_line?: string | null
           client_id?: string | null
           created_at?: string | null
           event_name?: string
