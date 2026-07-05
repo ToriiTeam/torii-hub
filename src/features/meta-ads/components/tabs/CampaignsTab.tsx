@@ -86,7 +86,7 @@ const columns: Column<CampaignRow>[] = [
 ]
 
 export function CampaignsTab() {
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, market } = useAccount()
   const { buildParams } = useDateRange()
   const { setSelectedRow } = useSelection()
   const { isHidden } = useSensitiveData()
@@ -104,8 +104,8 @@ export function CampaignsTab() {
   if (loading) return <SkeletonTable />
 
   const rows: CampaignRow[] = data ?? []
-  const recommendations = auditRows(rows, 'campaign')
-  const healthSummary = getHealthSummary(rows)
+  const recommendations = auditRows(rows, 'campaign', market)
+  const healthSummary = getHealthSummary(rows, market)
 
   const activeSeverityIds = activeSeverity ? entityIdsWithSeverity(recommendations, activeSeverity) : null
   const visibleRows = activeSeverityIds ? rows.filter(r => activeSeverityIds.has(r.campaign_id)) : rows

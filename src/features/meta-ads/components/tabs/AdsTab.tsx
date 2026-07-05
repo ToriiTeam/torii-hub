@@ -125,7 +125,7 @@ const filters: FilterConfig<AdRow>[] = [
 ]
 
 export function AdsTab() {
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, market } = useAccount()
   const { buildParams } = useDateRange()
   const { setSelectedRow } = useSelection()
   const [activeSeverity, setActiveSeverity] = useState<AuditSeverity | null>(null)
@@ -141,8 +141,8 @@ export function AdsTab() {
   if (loading) return <SkeletonTable />
 
   const rows: AdRow[] = data ?? []
-  const recommendations = auditRows(rows, 'ad')
-  const healthSummary = getHealthSummary(rows)
+  const recommendations = auditRows(rows, 'ad', market)
+  const healthSummary = getHealthSummary(rows, market)
 
   const activeSeverityIds = activeSeverity ? entityIdsWithSeverity(recommendations, activeSeverity) : null
   const visibleRows = activeSeverityIds ? rows.filter(r => activeSeverityIds.has(r.ad_id)) : rows

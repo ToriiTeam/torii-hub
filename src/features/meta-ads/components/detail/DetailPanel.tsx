@@ -44,6 +44,7 @@ interface DetailPanelBodyProps {
 // the user opens a different row.
 function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
   const { buildParams } = useDateRange()
+  const { market } = useAccount()
   const [metric, setMetric] = useState('spend')
   const [compareMetric, setCompareMetric] = useState(NONE_METRIC)
   const [compareEntityId, setCompareEntityId] = useState(NONE_ENTITY)
@@ -84,7 +85,7 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
     if (value !== NONE_ENTITY) setCompareMetric(NONE_METRIC)
   }
 
-  const recommendations = auditSingleEntity(row, level)
+  const recommendations = auditSingleEntity(row, level, market)
   const metricConfig = getMetricConfig(metric)
 
   return (

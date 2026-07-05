@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react'
 import type { InsightRow } from '../../types/meta'
 import { extractRoas } from '../../types/meta'
 import { getRowHealth } from '../../lib/auditEngine'
-import type { HealthStatus } from '../../types/audit'
+import type { HealthStatus, Market } from '../../types/audit'
+import { useAccount } from '../../context/AccountContext'
 
 export interface Column<T> {
   key: string
@@ -37,11 +38,11 @@ const HEALTH_STYLES: Record<HealthStatus, { border: string; bg: string; dot: str
   critical:  { border: 'var(--accent-red)',    bg: 'rgba(248, 113, 113, 0.05)', dot: 'var(--accent-red)',   icon: '!' },
 }
 
-function getRowAlertStyle(row: unknown): { style: React.CSSProperties; health: HealthStatus } {
+function getRowAlertStyle(row: unknown, market: Market): { style: React.CSSProperties; health: HealthStatus } {
   const r = row as InsightRow
   // Suppress unused import warning
   void extractRoas
-  const health = getRowHealth(r)
+  const health = getRowHealth(r, market)
   const config = HEALTH_STYLES[health]
   return {
     style: config.border !== 'transparent'
@@ -80,6 +81,7 @@ export function DataTable<T>({
   searchField,
   filters,
 }: DataTableProps<T>) {
+  const { market } = useAccount()
   const [sortKey, setSortKey] = useState<string>('spend')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
@@ -252,7 +254,7 @@ export function DataTable<T>({
             {pageData.map((row, i) => {
               const actualIndex = page * pageSize + i
               const isSelected = selectedRowIndex === actualIndex
-              const { style: alertStyle, health } = getRowAlertStyle(row)
+              const { style: alertStyle, health } = getRowAlertStyle(row, market)
               const healthConfig = HEALTH_STYLES[health]
               return (
                 <tr
