@@ -33,18 +33,64 @@ const VIDEO_MILESTONES = [
   { key: 'p100', label: '100%', eventName: 'VSL_Progress_100' },
 ] as const;
 
-// The full funnel extends video progress with the two conversion steps:
-// clicking a CTA, then actually completing the booking form (fired from the
-// thank-you page — the real conversion signal, more reliable than the click).
-const FUNNEL_STAGES: { key: string; label: string; matches: (s: SessionSummary) => boolean }[] = [
-  ...VIDEO_MILESTONES.map(m => ({
+// Two separate funnels, kept apart because they don't nest the same way.
+// Conversion steps (CTA click, form submit) can happen at any point in the
+// video — someone can click the CTA without finishing it — so mixing them
+// into the strictly-nested video-progress funnel produces "increases" that
+// look like bugs but aren't (e.g. more CTA clicks than 100%-completions).
+
+// Pipeline: visitor → played → clicked CTA → submitted the form. Each step
+// is a strict subset of visitors, so this one is genuinely sequential.
+const CONVERSION_STAGES: { key: string; label: string; matches: (s: SessionSummary) => boolean }[] = [
+  { key: 'visitors', label: 'Visitantes únicos', matches: () => true },
+  { key: 'play', label: 'Dieron Play', matches: (s: SessionSummary) => s.milestones.has('VSL_Play') },
+  { key: 'cta', label: 'Click en CTA', matches: (s: SessionSummary) => s.ctaClicks.length > 0 },
+  { key: 'submit', label: 'Form Submit', matches: (s: SessionSummary) => s.hasFormSubmit },
+];
+
+// Video depth: how far into the video people who played it actually got.
+// Strictly nested (reaching 50% implies having crossed 25%), independent of
+// whether they ever clicked the CTA or submitted the form.
+const VIDEO_DEPTH_STAGES: { key: string; label: string; matches: (s: SessionSummary) => boolean }[] =
+  VIDEO_MILESTONES.map(m => ({
     key: m.key,
     label: m.label,
     matches: (s: SessionSummary) => s.milestones.has(m.eventName),
-  })),
-  { key: 'cta', label: 'CTA Click', matches: (s: SessionSummary) => s.ctaClicks.length > 0 },
-  { key: 'submit', label: 'Form Submit', matches: (s: SessionSummary) => s.hasFormSubmit },
-];
+  }));
+
+// Mutually-exclusive buckets for the pipeline's video-depth breakdown: every
+// session that gave play falls into EXACTLY one of these, by its highest
+// `percent` seen across any event — unlike VIDEO_DEPTH_STAGES above, which
+// is a cumulative "reached at least X%" funnel and double-counts on purpose.
+const VIDEO_DISTRIBUTION_BUCKETS = [
+  { key: '0-24', label: '0% – 24%', test: (p: number) => p < 25 },
+  { key: '25-49', label: '25% – 49%', test: (p: number) => p >= 25 && p < 50 },
+  { key: '50-74', label: '50% – 74%', test: (p: number) => p >= 50 && p < 75 },
+  { key: '75-99', label: '75% – 99%', test: (p: number) => p >= 75 && p < 100 },
+  { key: '100', label: '100%', test: (p: number) => p >= 100 },
+] as const;
+
+interface VideoDistributionBucket { key: string; label: string; count: number; }
+
+// Buckets only the sessions that gave play, each counted once, in its single
+// highest-reached bucket — so the bucket counts always sum to exactly the
+// "Dieron play" count. The ranges are exhaustive and non-overlapping over
+// [0, ∞) by construction, but this is asserted rather than just trusted
+// visually, per the bug this replaced (CTA/submit mixed into a strictly
+// nested funnel made unrelated numbers look like drop-off errors).
+function buildVideoDistribution(sessions: SessionSummary[]): { buckets: VideoDistributionBucket[]; playCount: number } {
+  const playSessions = sessions.filter(s => s.milestones.has('VSL_Play'));
+  const buckets = VIDEO_DISTRIBUTION_BUCKETS.map(b => ({
+    key: b.key,
+    label: b.label,
+    count: playSessions.filter(s => b.test(s.maxPercentSeen)).length,
+  }));
+  const sum = buckets.reduce((acc, b) => acc + b.count, 0);
+  if (sum !== playSessions.length) {
+    console.error(`[VslTracking] video distribution buckets sum to ${sum}, expected ${playSessions.length} (play sessions) — bucket ranges are no longer exhaustive/exclusive`);
+  }
+  return { buckets, playCount: playSessions.length };
+}
 
 const PERCENT_BUCKETS = [
   { key: 'lt25', label: '< 25%', test: (p: number) => p < 25 },
@@ -96,6 +142,13 @@ interface SessionSummary {
   hasFormSubmit: boolean;
   formSubmitPercent: number | null; // percent watched at the moment of the (first) submit
   lastAbandonPercent: number | null;
+  // Highest `percent` seen across every event of this session, regardless of
+  // event type (Play/Pause/Abandon/Progress_*/Complete all carry one). Used
+  // for the pipeline's video-depth distribution, which needs the session's
+  // real high-water mark rather than the discrete Progress_25/50/75/100
+  // milestones — e.g. a session that paused at 55% but never crossed the
+  // Progress_50 milestone-fired threshold still belongs in "50%–74%".
+  maxPercentSeen: number;
 }
 
 // The highest video-progress milestone a session reached, as a discrete
@@ -130,9 +183,13 @@ function buildSessionSummaries(events: VslEvent[]): Map<string, SessionSummary> 
         hasFormSubmit: false,
         formSubmitPercent: null,
         lastAbandonPercent: null,
+        maxPercentSeen: 0,
       };
       map.set(e.session_id, s);
     }
+
+    const eventPercent = pct(e.percent);
+    if (eventPercent > s.maxPercentSeen) s.maxPercentSeen = eventPercent;
 
     if (milestoneNames.has(e.event_name)) s.milestones.add(e.event_name);
     if (e.event_name === 'VSL_CTA_Click') s.ctaClicks.push(pct(e.percent));
@@ -165,8 +222,11 @@ interface FunnelStage {
   dropOffPct: number | null; // vs previous stage
 }
 
-function buildFunnel(sessions: SessionSummary[]): FunnelStage[] {
-  const counts = FUNNEL_STAGES.map(stage => ({
+function buildFunnel(
+  sessions: SessionSummary[],
+  stages: { key: string; label: string; matches: (s: SessionSummary) => boolean }[],
+): FunnelStage[] {
+  const counts = stages.map(stage => ({
     key: stage.key,
     label: stage.label,
     count: sessions.filter(stage.matches).length,
@@ -425,7 +485,9 @@ export default function VslTracking() {
     [filteredEvents],
   );
 
-  const funnel = useMemo(() => buildFunnel(sessionSummaries), [sessionSummaries]);
+  const conversionFunnel = useMemo(() => buildFunnel(sessionSummaries, CONVERSION_STAGES), [sessionSummaries]);
+  const videoFunnel = useMemo(() => buildFunnel(sessionSummaries, VIDEO_DEPTH_STAGES), [sessionSummaries]);
+  const videoDistribution = useMemo(() => buildVideoDistribution(sessionSummaries), [sessionSummaries]);
   const ctaBreakdown = useMemo(
     () => buildPercentBreakdown(sessionSummaries, s => s.ctaClicks),
     [sessionSummaries],
@@ -465,11 +527,12 @@ export default function VslTracking() {
   // size already is the count of distinct session_ids in the filtered
   // period — i.e. everyone who loaded the landing, whether or not they hit play.
   const totalSessions = sessionSummaries.length;
-  const maxFunnelCount = funnel[0]?.count ?? 0;
+  const maxFunnelCount = videoFunnel[0]?.count ?? 0;
   const playRate = totalSessions ? round1((maxFunnelCount / totalSessions) * 100) : 0;
+  const conversionMax = conversionFunnel[0]?.count ?? 0;
 
-  const ctaStage = funnel.find(f => f.key === 'cta');
-  const submitStage = funnel.find(f => f.key === 'submit');
+  const ctaStage = conversionFunnel.find(f => f.key === 'cta');
+  const submitStage = conversionFunnel.find(f => f.key === 'submit');
   const formSubmitCount = submitStage?.count ?? 0;
   // VSL_Form_Submit is the real conversion signal (fired from the thank-you
   // page after booking), more reliable than the CTA click.
@@ -641,44 +704,130 @@ export default function VslTracking() {
             </Card>
           )}
 
-          {/* Funnel */}
+          {/* Pipeline de conversión — visitantes → play son subconjuntos
+              anidados; de ahí en más, cada sesión que dio play cae en
+              EXACTAMENTE un bucket de video (mutuamente excluyentes entre
+              sí, suman "Dieron play"), mientras que CTA y Form Submit son
+              conteos absolutos independientes del bucket — una sesión puede
+              estar en "100%" y también contar en "Click en CTA" a la vez. */}
           <Card className="bg-card border-border/50">
             <CardHeader>
               <CardTitle className="text-base font-medium flex items-center gap-2">
-                <PlayCircle className="h-5 w-5 text-primary" />
-                Funnel de visualización a conversión
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Pipeline de conversión
               </CardTitle>
-              <CardDescription>Sesiones únicas que llegaron a cada etapa, desde Play hasta el booking completado</CardDescription>
+              <CardDescription>En qué etapa está cada sesión — los buckets de video son excluyentes entre sí; CTA y Form Submit son totales absolutos</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {funnel.map(stage => (
-                <div key={stage.key}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium">
-                      {stage.label}
-                      {stage.key === 'submit' && <InfoNote text={FORM_SUBMIT_NOTE} />}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">{stage.count}</span>
-                      {stage.key === 'submit' ? (
-                        formCompletionRate !== null && (
-                          <Badge className="bg-success/15 text-success border-0 text-xs">
-                            {formCompletionRate}% completó el form
-                          </Badge>
-                        )
-                      ) : (
-                        stage.dropOffPct !== null && (
+              {(['visitors', 'play'] as const).map(key => {
+                const stage = conversionFunnel.find(s => s.key === key)!;
+                return (
+                  <div key={stage.key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{stage.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{stage.count}</span>
+                        {stage.dropOffPct !== null && (
                           <Badge variant="outline" className="text-xs gap-1 text-destructive border-destructive/30">
                             <TrendingDown className="h-3 w-3" />
                             -{stage.dropOffPct}%
                           </Badge>
-                        )
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{ width: conversionMax ? `${(stage.count / conversionMax) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Distribución excluyente de las sesiones que dieron play,
+                  por el % máximo alcanzado — suma exactamente "Dieron play". */}
+              <div className="pl-4 border-l-2 border-border/50 space-y-2 py-1">
+                <p className="text-xs text-muted-foreground">De las que dieron play, cuánto vieron (excluyente, suma = {videoDistribution.playCount})</p>
+                {videoDistribution.buckets.map(bucket => (
+                  <div key={bucket.key}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span>{bucket.label}</span>
+                      <span className="text-muted-foreground">{bucket.count}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-info rounded-full transition-all"
+                        style={{ width: videoDistribution.playCount ? `${(bucket.count / videoDistribution.playCount) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {(['cta', 'submit'] as const).map(key => {
+                const stage = conversionFunnel.find(s => s.key === key)!;
+                return (
+                  <div key={stage.key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">
+                        {stage.label}
+                        {stage.key === 'submit' && <InfoNote text={FORM_SUBMIT_NOTE} />}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{stage.count}</span>
+                        {stage.key === 'submit' && formCompletionRate !== null && (
+                          <Badge className="bg-success/15 text-success border-0 text-xs">
+                            {formCompletionRate}% completó el form
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={stage.key === 'submit' ? 'h-full bg-success rounded-full transition-all' : 'h-full bg-primary rounded-full transition-all'}
+                        style={{ width: conversionMax ? `${(stage.count / conversionMax) * 100}%` : '0%' }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {totalSessions === 0 && (
+                <p className="text-center text-muted-foreground text-sm py-6">Sin datos para este filtro</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Profundidad de visualización del video — strictly nested
+              milestones only (Play → 25% → 50% → 75% → 100%), separate from
+              the conversion pipeline above so a CTA click before finishing
+              the video doesn't look like a funnel that "goes back up". */}
+          <Card className="bg-card border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <PlayCircle className="h-5 w-5 text-primary" />
+                Profundidad de visualización del video
+              </CardTitle>
+              <CardDescription>De quienes dieron play, cuánto del video vieron</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {videoFunnel.map(stage => (
+                <div key={stage.key}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="font-medium">{stage.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{stage.count}</span>
+                      {stage.dropOffPct !== null && (
+                        <Badge variant="outline" className="text-xs gap-1 text-destructive border-destructive/30">
+                          <TrendingDown className="h-3 w-3" />
+                          -{stage.dropOffPct}%
+                        </Badge>
                       )}
                     </div>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={stage.key === 'submit' ? 'h-full bg-success rounded-full transition-all' : 'h-full bg-primary rounded-full transition-all'}
+                      className="h-full bg-primary rounded-full transition-all"
                       style={{ width: maxFunnelCount ? `${(stage.count / maxFunnelCount) * 100}%` : '0%' }}
                     />
                   </div>
@@ -805,40 +954,40 @@ export default function VslTracking() {
             </CardContent>
           </Card>
 
-          {/* Breakdown by source/ad/campaign — only meaningful with more than one session */}
-          {sessionSummaries.length > 1 && (
-            <div className="space-y-6">
-              <Card className="bg-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-base font-medium">Desglose por fuente (utm_source)</CardTitle>
-                  <CardDescription>Ordenado por sesiones</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <UtmBreakdownTable rows={sourceBreakdown} labelHeader="Fuente" />
-                </CardContent>
-              </Card>
+          {/* Breakdown by source/ad/campaign — UtmBreakdownTable itself
+              renders the "Sin datos" empty state, so no session-count gate
+              is needed here. */}
+          <div className="space-y-6">
+            <Card className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Desglose por fuente (utm_source)</CardTitle>
+                <CardDescription>Ordenado por sesiones</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UtmBreakdownTable rows={sourceBreakdown} labelHeader="Fuente" />
+              </CardContent>
+            </Card>
 
-              <Card className="bg-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-base font-medium">Desglose por anuncio (utm_content)</CardTitle>
-                  <CardDescription>Ordenado por tasa de conversión</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <UtmBreakdownTable rows={contentBreakdown} labelHeader="Anuncio" truncateLabel showCampaignColumn />
-                </CardContent>
-              </Card>
+            <Card className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Desglose por anuncio (utm_content)</CardTitle>
+                <CardDescription>Ordenado por tasa de conversión</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UtmBreakdownTable rows={contentBreakdown} labelHeader="Anuncio" truncateLabel showCampaignColumn />
+              </CardContent>
+            </Card>
 
-              <Card className="bg-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="text-base font-medium">Desglose por campaña (utm_campaign)</CardTitle>
-                  <CardDescription>Ordenado por sesiones</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <UtmBreakdownTable rows={campaignBreakdown} labelHeader="Campaña" />
-                </CardContent>
-              </Card>
-            </div>
-          )}
+            <Card className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="text-base font-medium">Desglose por campaña (utm_campaign)</CardTitle>
+                <CardDescription>Ordenado por sesiones</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <UtmBreakdownTable rows={campaignBreakdown} labelHeader="Campaña" />
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>
