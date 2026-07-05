@@ -90,6 +90,12 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
 
   return (
     <>
+      {recommendations.length > 0 && (
+        <section className="detail-section">
+          <AuditPanel recommendations={recommendations} />
+        </section>
+      )}
+
       <section className="detail-section">
         <h3 className="detail-section-title">KPIs del período</h3>
         <SummaryKPIs row={row} />
@@ -126,12 +132,6 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
           loading={timeseriesResult.loading || (comparingEntity && compareTimeseriesResult.loading)}
         />
       </section>
-
-      {recommendations.length > 0 && (
-        <section className="detail-section">
-          <AuditPanel recommendations={recommendations} />
-        </section>
-      )}
     </>
   )
 }

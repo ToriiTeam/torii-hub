@@ -162,6 +162,8 @@ export function AdsTab() {
         searchPlaceholder="Buscar anuncio..."
         searchField={(r) => r.ad_name}
         onRowClick={(row) => setSelectedRow(row, 'ad')}
+        recommendations={recommendations}
+        getRowId={(r) => r.ad_id}
       />
     </div>
   )

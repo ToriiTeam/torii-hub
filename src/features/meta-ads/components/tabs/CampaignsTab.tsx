@@ -124,6 +124,8 @@ export function CampaignsTab() {
         searchPlaceholder="Buscar campaña..."
         searchField={(r) => r.campaign_name}
         onRowClick={(row) => setSelectedRow(row, 'campaign')}
+        recommendations={recommendations}
+        getRowId={(r) => r.campaign_id}
       />
     </div>
   )

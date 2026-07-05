@@ -2,8 +2,9 @@ import { useState, useMemo, useCallback } from 'react'
 import type { InsightRow } from '../../types/meta'
 import { extractRoas } from '../../types/meta'
 import { getRowHealth } from '../../lib/auditEngine'
-import type { HealthStatus, Market } from '../../types/audit'
+import type { AuditRecommendation, HealthStatus, Market } from '../../types/audit'
 import { useAccount } from '../../context/AccountContext'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 export interface Column<T> {
   key: string
@@ -29,6 +30,26 @@ interface DataTableProps<T> {
   searchPlaceholder?: string
   searchField?: (row: T) => string
   filters?: FilterConfig<T>[]
+  // Audit recommendations for the whole level (same array the
+  // AuditSeverityBar counts) plus a way to read each row's entity id, so a
+  // row carrying at least one alert can show it without the user having to
+  // click a severity badge first.
+  recommendations?: AuditRecommendation[]
+  getRowId?: (row: T) => string
+}
+
+const SEVERITY_RANK: Record<AuditRecommendation['severity'], number> = { critical: 0, warning: 1, opportunity: 2, info: 3 }
+const SEVERITY_ROW_ICON: Record<AuditRecommendation['severity'], { icon: string; color: string }> = {
+  critical:    { icon: '⚠', color: 'var(--accent-red)' },
+  warning:     { icon: '⚠', color: 'var(--accent-yellow)' },
+  opportunity: { icon: '⚠', color: 'var(--accent-green)' },
+  info:        { icon: '⚠', color: 'var(--accent-blue)' },
+}
+
+// Worst-severity-first, so a row with both a critical and an info alert
+// shows the critical icon color.
+function worstSeverity(recs: AuditRecommendation[]): AuditRecommendation['severity'] {
+  return recs.reduce((worst, r) => (SEVERITY_RANK[r.severity] < SEVERITY_RANK[worst] ? r.severity : worst), recs[0].severity)
 }
 
 const HEALTH_STYLES: Record<HealthStatus, { border: string; bg: string; dot: string; icon: string }> = {
@@ -80,8 +101,19 @@ export function DataTable<T>({
   searchPlaceholder = 'Buscar...',
   searchField,
   filters,
+  recommendations,
+  getRowId,
 }: DataTableProps<T>) {
   const { market } = useAccount()
+  const recsByEntityId = useMemo(() => {
+    const map = new Map<string, AuditRecommendation[]>()
+    if (!recommendations) return map
+    for (const rec of recommendations) {
+      const arr = map.get(rec.entityId)
+      if (arr) arr.push(rec); else map.set(rec.entityId, [rec])
+    }
+    return map
+  }, [recommendations])
   const [sortKey, setSortKey] = useState<string>('spend')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
@@ -256,6 +288,8 @@ export function DataTable<T>({
               const isSelected = selectedRowIndex === actualIndex
               const { style: alertStyle, health } = getRowAlertStyle(row, market)
               const healthConfig = HEALTH_STYLES[health]
+              const rowRecs = getRowId ? recsByEntityId.get(getRowId(row)) : undefined
+              const rowSeverity = rowRecs?.length ? worstSeverity(rowRecs) : null
               return (
                 <tr
                   key={i}
@@ -273,6 +307,25 @@ export function DataTable<T>({
                     >
                       {healthConfig.icon}
                     </span>
+                    {rowSeverity && (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="row-audit-icon"
+                            style={{ color: SEVERITY_ROW_ICON[rowSeverity].color }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {SEVERITY_ROW_ICON[rowSeverity].icon}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">Auditor:</p>
+                          <ul className="list-disc pl-4">
+                            {rowRecs!.map(r => <li key={r.id}>{r.title}</li>)}
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </td>
                   {visibleColumns.map((col) => (
                     <td key={col.key}>{col.render(row)}</td>

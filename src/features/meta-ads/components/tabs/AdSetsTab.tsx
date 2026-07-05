@@ -129,6 +129,8 @@ export function AdSetsTab() {
         searchPlaceholder="Buscar conjunto..."
         searchField={(r) => r.adset_name}
         onRowClick={(row) => setSelectedRow(row, 'adset')}
+        recommendations={recommendations}
+        getRowId={(r) => r.adset_id}
       />
     </div>
   )

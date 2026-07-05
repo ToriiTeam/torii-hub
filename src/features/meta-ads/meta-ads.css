@@ -354,6 +354,16 @@
 .meta-ads-root .health-dot.health-warning   { background: rgba(246, 224, 94, 0.15);  color: var(--accent-yellow); }
 .meta-ads-root .health-dot.health-critical  { background: rgba(252, 129, 129, 0.15); color: var(--accent-red); }
 
+/* Small mark next to the health dot when the row has at least one auditor
+   recommendation — distinct signal from the health dot (which is a coarser,
+   separate heuristic), tied 1:1 to what the AuditSeverityBar badges count. */
+.meta-ads-root .row-audit-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px;
+  margin-left: 2px;
+  cursor: help;
+}
+
 .meta-ads-root .name-cell { display: flex; align-items: center; gap: 10px; }
 
 .meta-ads-root .table-footer {
