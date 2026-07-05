@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../ui/sheet'
 import { useSelection } from '../../context/SelectionContext'
 import { useAccount } from '../../context/AccountContext'
@@ -6,7 +6,7 @@ import { useDateRange } from '../../context/DateRangeContext'
 import { useTimeseries } from '../../hooks/useTimeseries'
 import { useMetaApi } from '../../hooks/useMetaApi'
 import { getMetricConfig, METRIC_OPTIONS } from '../../config/metrics'
-import { auditSingleEntity } from '../../lib/auditEngine'
+import { auditRows } from '../../lib/auditEngine'
 import { useSensitiveData } from '../../context/SensitiveDataContext'
 import type { InsightRow, TabLevel } from '../../types/meta'
 import { SummaryKPIs } from './SummaryKPIs'
@@ -85,7 +85,15 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
     if (value !== NONE_ENTITY) setCompareMetric(NONE_METRIC)
   }
 
-  const recommendations = auditSingleEntity(row, level, market)
+  // Audit the full sibling list (same rows the tab's table uses), not just
+  // this row in isolation — rules like "Concentración de presupuesto" need
+  // the account's total spend to compute a percentage, which is meaningless
+  // (and structurally can't fire) when auditing a single-row array.
+  const allRecommendations = useMemo(
+    () => auditRows(siblingRows ?? [row], level, market),
+    [siblingRows, row, level, market],
+  )
+  const recommendations = allRecommendations.filter((r) => r.entityId === entityId)
   const metricConfig = getMetricConfig(metric)
 
   return (

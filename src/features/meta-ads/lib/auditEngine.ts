@@ -193,10 +193,6 @@ export function auditRows(rows: InsightRow[], level: EntityLevel, market: Market
   return recs
 }
 
-export function auditSingleEntity(row: InsightRow, level: EntityLevel, market: Market = 'latam'): AuditRecommendation[] {
-  return auditRows([row], level, market)
-}
-
 export type SeverityRowCounts = Record<AuditSeverity, number>
 
 // Counts distinct ROWS with at least one recommendation of each severity —
