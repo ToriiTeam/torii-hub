@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Report, ReportMetrics, ReportNarrativa, ReportWithClient } from '../types';
+import type { PeriodType, Report, ReportMetrics, ReportNarrativa, ReportWithClient } from '../types';
 
 interface ClientRow {
   id: string;
@@ -12,6 +12,9 @@ function toReport(row: any): Report {
     id: row.id,
     client_id: row.client_id,
     mes: row.mes,
+    periodo_tipo: (row.periodo_tipo ?? 'month') as PeriodType,
+    fecha_inicio: row.fecha_inicio ?? row.mes,
+    fecha_fin: row.fecha_fin ?? row.mes,
     metricas: (row.metricas ?? {}) as ReportMetrics,
     narrativa: (row.narrativa ?? {}) as ReportNarrativa,
     pdf_url: row.pdf_url,
@@ -45,7 +48,9 @@ export async function listReports(): Promise<ReportWithClient[]> {
 
 export async function createReport(input: {
   client_id: string;
-  mes: string; // yyyy-MM-dd
+  periodo_tipo: PeriodType;
+  fecha_inicio: string; // yyyy-MM-dd
+  fecha_fin: string; // yyyy-MM-dd
   metricas: ReportMetrics;
   narrativa: ReportNarrativa;
 }): Promise<Report> {
@@ -53,7 +58,12 @@ export async function createReport(input: {
     .from('reports')
     .insert({
       client_id: input.client_id,
-      mes: input.mes,
+      // `mes` is kept in sync with fecha_inicio for back-compat with any
+      // code/reporting still reading the old column directly.
+      mes: input.fecha_inicio,
+      periodo_tipo: input.periodo_tipo,
+      fecha_inicio: input.fecha_inicio,
+      fecha_fin: input.fecha_fin,
       metricas: input.metricas as any,
       narrativa: input.narrativa as any,
     })

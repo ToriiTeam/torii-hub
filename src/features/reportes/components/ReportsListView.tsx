@@ -16,6 +16,19 @@ interface ReportsListViewProps {
   refreshKey: number;
 }
 
+function formatReportPeriod(report: ReportWithClient): string {
+  const start = parseISO(report.fecha_inicio);
+  const end = parseISO(report.fecha_fin);
+  if (report.periodo_tipo === 'week') {
+    return `Semana del ${format(start, 'dd')} al ${format(end, "dd 'de' MMMM yyyy", { locale: es })}`;
+  }
+  if (report.periodo_tipo === 'custom') {
+    return `${format(start, 'dd/MM/yyyy')} — ${format(end, 'dd/MM/yyyy')}`;
+  }
+  const label = format(start, 'MMMM yyyy', { locale: es });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProps) {
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,9 +67,8 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
-      const monthLabel = format(parseISO(report.mes), 'MMMM yyyy', { locale: es });
       const { error } = await supabase.functions.invoke('send-report-email', {
-        body: { to: report.clientEmail, clientName: report.clientName, monthLabel, pdfBase64: base64 },
+        body: { to: report.clientEmail, clientName: report.clientName, monthLabel: formatReportPeriod(report), pdfBase64: base64 },
       });
       if (error) throw error;
       await markReportSent(report.id);
@@ -83,7 +95,7 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
           <TableHeader>
             <TableRow>
               <TableHead>Cliente</TableHead>
-              <TableHead>Mes</TableHead>
+              <TableHead>Período</TableHead>
               <TableHead>Generado</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -99,7 +111,7 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
             {reports.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-medium">{r.clientName}</TableCell>
-                <TableCell className="capitalize">{format(parseISO(r.mes), 'MMMM yyyy', { locale: es })}</TableCell>
+                <TableCell>{formatReportPeriod(r)}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{format(parseISO(r.created_at), 'dd/MM/yy HH:mm')}</TableCell>
                 <TableCell>
                   {r.enviado ? (

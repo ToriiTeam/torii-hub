@@ -12,7 +12,7 @@ const PREVIEW_SCALE = 0.42;
 
 interface Step6Props {
   clientName: string;
-  monthLabel: string;
+  periodLabel: string;
   metrics: ReportMetrics;
   trend: TrendPoint[];
   narrativa: ReportNarrativa;
@@ -24,7 +24,7 @@ interface Step6Props {
 
 export function Step6PreviewGenerate({
   clientName,
-  monthLabel,
+  periodLabel,
   metrics,
   trend,
   narrativa,
@@ -47,7 +47,14 @@ export function Step6PreviewGenerate({
     setGenerating(true);
     try {
       const blob = await generatePdfFromNode(hiddenRef.current);
-      downloadBlob(blob, `informe-${clientName}-${monthLabel}.pdf`.replace(/\s+/g, '-').toLowerCase());
+      // periodLabel can contain slashes/dashes for week/custom periods
+      // (e.g. "01/06/2026 — 30/06/2026") — strip anything that isn't
+      // alphanumeric before using it in a filename.
+      const slug = `informe-${clientName}-${periodLabel}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      downloadBlob(blob, `${slug}.pdf`);
       await onGenerated(blob);
       toast.success('PDF generado');
     } catch (err) {
@@ -112,7 +119,7 @@ export function Step6PreviewGenerate({
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
             <ReportPdfDocument
               clientName={clientName || 'Cliente'}
-              monthLabel={monthLabel}
+              periodLabel={periodLabel}
               metrics={metrics}
               trend={trend}
               narrativa={narrativa}
@@ -128,7 +135,7 @@ export function Step6PreviewGenerate({
         <div ref={hiddenRef}>
           <ReportPdfDocument
             clientName={clientName || 'Cliente'}
-            monthLabel={monthLabel}
+            periodLabel={periodLabel}
             metrics={metrics}
             trend={trend}
             narrativa={narrativa}

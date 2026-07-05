@@ -2922,11 +2922,14 @@ export type Database = {
           created_at: string
           enviado: boolean
           enviado_at: string | null
+          fecha_fin: string | null
+          fecha_inicio: string | null
           id: string
           mes: string
           metricas: Json
           narrativa: Json
           pdf_url: string | null
+          periodo_tipo: string
           updated_at: string
         }
         Insert: {
@@ -2934,11 +2937,14 @@ export type Database = {
           created_at?: string
           enviado?: boolean
           enviado_at?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           mes: string
           metricas?: Json
           narrativa?: Json
           pdf_url?: string | null
+          periodo_tipo?: string
           updated_at?: string
         }
         Update: {
@@ -2946,11 +2952,14 @@ export type Database = {
           created_at?: string
           enviado?: boolean
           enviado_at?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           mes?: string
           metricas?: Json
           narrativa?: Json
           pdf_url?: string | null
+          periodo_tipo?: string
           updated_at?: string
         }
         Relationships: [

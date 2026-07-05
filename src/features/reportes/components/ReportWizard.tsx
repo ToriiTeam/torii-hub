@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { Step1ClientMonth } from './wizard/Step1ClientMonth';
 import { Step2MetricsReview } from './wizard/Step2MetricsReview';
@@ -13,6 +11,7 @@ import { Step6PreviewGenerate } from './wizard/Step6PreviewGenerate';
 import { useReportDraft } from '../hooks/useReportDraft';
 import { createReport, updateReportPdfUrl, uploadReportPdf, markReportSent } from '../lib/reportsRepo';
 import { blobToBase64 } from '../lib/generatePdf';
+import { generateNarrativeDraft } from '../lib/generateNarrativeDraft';
 import { supabase } from '@/integrations/supabase/client';
 
 const STEP_LABELS = [
@@ -30,14 +29,27 @@ interface ReportWizardProps {
 }
 
 export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
-  const { draft, setClient, setPeriod, setMetrics, setNarrativa, loadMetrics, loadingMetrics } = useReportDraft();
+  const {
+    draft,
+    periodRange,
+    setClient,
+    setPeriodType,
+    setMonthPeriod,
+    setWeekStart,
+    setCustomRange,
+    setMetrics,
+    setNarrativa,
+    loadMetrics,
+    loadingMetrics,
+  } = useReportDraft();
   const [step, setStep] = useState(0);
   const [reportId, setReportId] = useState<string | null>(null);
   const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [generatingNarrativa, setGeneratingNarrativa] = useState(false);
 
   // Auto-fill once when the metrics step is first reached for a given
   // client/period — Step2 also has a manual "Auto-llenar de nuevo" button
-  // for after the user changes client/month.
+  // for after the user changes client/period.
   useEffect(() => {
     if (step === 1 && draft.clientId && !draft.metricsAutoFilled) {
       loadMetrics();
@@ -54,16 +66,37 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
     });
   }, [draft.clientId]);
 
-  const monthLabel = format(new Date(draft.year, draft.month - 1, 1), 'MMMM yyyy', { locale: es });
-  const mesDate = format(new Date(draft.year, draft.month - 1, 1), 'yyyy-MM-dd');
-
   const canGoNext = step === 0 ? !!draft.clientId : true;
+
+  async function handleGenerateNarrativa() {
+    if (!draft.clientId) return;
+    setGeneratingNarrativa(true);
+    try {
+      const narrativa = await generateNarrativeDraft({
+        clientId: draft.clientId,
+        clientName: draft.clientName,
+        periodLabel: periodRange.label,
+        fechaInicio: periodRange.fechaInicio,
+        fechaFin: periodRange.fechaFin,
+        metrics: draft.metrics,
+      });
+      setNarrativa(narrativa);
+      toast.success('Borrador generado — revisalo en los pasos siguientes');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al generar el borrador con IA');
+    } finally {
+      setGeneratingNarrativa(false);
+    }
+  }
 
   async function ensureReport(): Promise<string> {
     if (reportId) return reportId;
     const report = await createReport({
       client_id: draft.clientId,
-      mes: mesDate,
+      periodo_tipo: draft.periodType,
+      fecha_inicio: periodRange.fechaInicio,
+      fecha_fin: periodRange.fechaFin,
       metricas: draft.metrics,
       narrativa: draft.narrativa,
     });
@@ -73,7 +106,7 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
 
   async function handleGenerated(blob: Blob) {
     const id = await ensureReport();
-    const url = await uploadReportPdf(id, draft.clientId, mesDate, blob);
+    const url = await uploadReportPdf(id, draft.clientId, periodRange.fechaInicio, blob);
     await updateReportPdfUrl(id, url);
     onSaved();
   }
@@ -84,7 +117,7 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
       return;
     }
     const id = await ensureReport();
-    const url = await uploadReportPdf(id, draft.clientId, mesDate, blob);
+    const url = await uploadReportPdf(id, draft.clientId, periodRange.fechaInicio, blob);
     await updateReportPdfUrl(id, url);
 
     const base64 = await blobToBase64(blob);
@@ -92,7 +125,7 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
       body: {
         to: clientEmail,
         clientName: draft.clientName,
-        monthLabel,
+        monthLabel: periodRange.label,
         pdfBase64: base64,
       },
     });
@@ -108,10 +141,17 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
         return (
           <Step1ClientMonth
             clientId={draft.clientId}
+            periodType={draft.periodType}
             year={draft.year}
             month={draft.month}
+            weekStart={draft.weekStart}
+            customSince={draft.customSince}
+            customUntil={draft.customUntil}
             onClientChange={setClient}
-            onPeriodChange={setPeriod}
+            onPeriodTypeChange={setPeriodType}
+            onMonthPeriodChange={setMonthPeriod}
+            onWeekStartChange={setWeekStart}
+            onCustomRangeChange={setCustomRange}
           />
         );
       case 1:
@@ -123,6 +163,8 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
             onChange={setMetrics}
             onReload={loadMetrics}
             disabled={!draft.clientId}
+            onGenerateNarrativa={handleGenerateNarrativa}
+            generatingNarrativa={generatingNarrativa}
           />
         );
       case 2:
@@ -135,7 +177,7 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
         return (
           <Step6PreviewGenerate
             clientName={draft.clientName}
-            monthLabel={monthLabel}
+            periodLabel={periodRange.label}
             metrics={draft.metrics}
             trend={draft.trend}
             narrativa={draft.narrativa}
