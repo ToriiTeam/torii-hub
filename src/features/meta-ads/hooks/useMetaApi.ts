@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../integrations/supabase/client'
+import { useAccount } from '../context/AccountContext'
+import { syncMetaAccountDaily } from '../lib/syncMetaToSupabase'
 
 // ─── URL parser ───────────────────────────────────────────────────────────────
 // Tabs build endpoints like: /accounts/act_123/campaigns?date_preset=last_14d
@@ -38,6 +40,7 @@ function parseEndpoint(endpoint: string): ParsedEndpoint | null {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useMetaApi<T>(endpoint: string, enabled = true) {
+  const { clientId } = useAccount()
   const [data,    setData]    = useState<T | null>(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState<string | null>(null)
@@ -70,6 +73,19 @@ export function useMetaApi<T>(endpoint: string, enabled = true) {
         }
         setData((res?.data ?? []) as T)
         setLoading(false)
+
+        // Background sync to Supabase — only from the 'campaigns' fetch
+        // (adsets/ads tabs would otherwise re-trigger the same campaign-
+        // level sync every time the user switches tabs). Fire-and-forget:
+        // syncMetaAccountDaily never throws, and this must not block or
+        // delay the UI that already rendered from `res`.
+        if (parsed.type === 'campaigns') {
+          syncMetaAccountDaily(parsed.account_id, clientId, {
+            date_preset: parsed.date_preset,
+            since: parsed.since,
+            until: parsed.until,
+          })
+        }
       })
       .catch((err: Error) => {
         if (cancelled) return
@@ -78,7 +94,7 @@ export function useMetaApi<T>(endpoint: string, enabled = true) {
       })
 
     return () => { cancelled = true }
-  }, [endpoint, enabled])
+  }, [endpoint, enabled, clientId])
 
   return { data, loading, error, refetch: () => {} }
 }

@@ -10,6 +10,10 @@ interface AccountContextType {
   loading: boolean
   error:   string | null
   market:  Market
+  // The clients.id matched to the selected account, or null for Torii's own
+  // house accounts / unmatched accounts. Used to stamp ads_campanas.client_id
+  // when syncing — separate from `market`, which only cares about country.
+  clientId: string | null
 }
 
 const AccountContext = createContext<AccountContextType>({
@@ -19,6 +23,7 @@ const AccountContext = createContext<AccountContextType>({
   loading:            true,
   error:              null,
   market:             'latam',
+  clientId:           null,
 })
 
 // The Meta ad account name is whatever the business typed into Business
@@ -27,7 +32,7 @@ const AccountContext = createContext<AccountContextType>({
 // match. Only clients.country === 'Spain' maps to the 'spain' market;
 // everything else (Mexico, Colombia, unmatched, or null) defaults to LATAM,
 // per spec.
-function matchClientToAccount(accountName: string, clients: { name: string | null; country: string | null }[]) {
+function matchClientToAccount(accountName: string, clients: { id: string; name: string | null; country: string | null }[]) {
   const normalizedAccount = accountName.trim().toLowerCase()
   return clients.filter((c) => {
     const clientName = (c.name || '').trim().toLowerCase()
@@ -58,6 +63,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [loading,         setLoading]         = useState(true)
   const [error,           setError]           = useState<string | null>(null)
   const [market,          setMarket]          = useState<Market>('latam')
+  const [clientId,        setClientId]        = useState<string | null>(null)
 
   useEffect(() => {
     supabase.functions
@@ -90,24 +96,27 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!selectedAccount) {
       setMarket('latam')
+      setClientId(null)
       return
     }
 
     const hardcoded = matchHardcodedAccount(selectedAccount.name)
     if (hardcoded) {
       setMarket(hardcoded)
+      setClientId(null) // house account — no clients row to attribute spend to
       return
     }
 
     let cancelled = false
     supabase
       .from('clients')
-      .select('name, country')
+      .select('id, name, country')
       .then(({ data, error: fetchErr }) => {
         if (cancelled) return
         if (fetchErr || !data) {
           console.warn('[AccountContext] could not load clients for market match:', fetchErr?.message)
           setMarket('latam')
+          setClientId(null)
           return
         }
         const matches = matchClientToAccount(selectedAccount.name, data)
@@ -118,15 +127,18 @@ export function AccountProvider({ children }: { children: ReactNode }) {
             '— defaulting to LATAM thresholds',
           )
           setMarket('latam')
+          setClientId(null)
           return
         }
         if (matches.length === 0) {
           // No client row and not in the hardcoded Torii list either — a
           // new account, not an error. Default quietly, no console.warn.
           setMarket('latam')
+          setClientId(null)
           return
         }
         setMarket(matches[0].country === 'Spain' ? 'spain' : 'latam')
+        setClientId(matches[0].id)
       })
     return () => {
       cancelled = true
@@ -134,7 +146,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, [selectedAccount])
 
   return (
-    <AccountContext.Provider value={{ accounts, selectedAccount, setSelectedAccount, loading, error, market }}>
+    <AccountContext.Provider value={{ accounts, selectedAccount, setSelectedAccount, loading, error, market, clientId }}>
       {children}
     </AccountContext.Provider>
   )

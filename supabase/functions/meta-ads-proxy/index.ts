@@ -59,6 +59,18 @@ function insightsNested(fields: string, datePreset?: string, since?: string, unt
   return `insights.date_preset(${datePreset ?? 'last_14d'}){${fields}}`
 }
 
+// Same nested-expansion syntax as insightsNested(), but chains
+// .time_increment(1) so `insights.data` comes back as one entry PER DAY
+// instead of a single total for the whole period — used only by the
+// background sync (campaigns_daily), never by the tabs' aggregated views.
+function insightsNestedDaily(fields: string, datePreset?: string, since?: string, until?: string): string {
+  const withDates = `${fields},date_start,date_stop`
+  if (since && until) {
+    return `insights.time_range(${JSON.stringify({ since, until })}).time_increment(1){${withDates}}`
+  }
+  return `insights.date_preset(${datePreset ?? 'last_14d'}).time_increment(1){${withDates}}`
+}
+
 function dateParams(datePreset?: string, since?: string, until?: string): Record<string, string> {
   if (since && until) return { time_range: JSON.stringify({ since, until }), time_increment: '1' }
   return { date_preset: datePreset ?? 'last_14d', time_increment: '1' }
@@ -99,6 +111,24 @@ function transformCampaign(c: Raw): Raw {
     campaign_objective: c.objective,
     ...baseMetrics(ins),
   }
+}
+
+// Unlike transformCampaign(), insights.data here has one entry PER DAY
+// (see insightsNestedDaily), so this returns an array — one row per
+// campaign per day it had delivery. Days with zero activity are simply
+// absent from Meta's response, not returned as zero rows.
+function transformCampaignDaily(c: Raw): Raw[] {
+  const insData = ((c.insights as { data?: Ins[] } | undefined)?.data) ?? []
+  return insData.map((ins) => ({
+    campaign_id:        c.id,
+    campaign_name:      c.name,
+    effective_status:   c.effective_status,
+    status:             c.status,
+    campaign_objective: c.objective,
+    date_start:         ins.date_start,
+    date_stop:          ins.date_stop,
+    ...baseMetrics(ins),
+  }))
 }
 
 function transformAdset(a: Raw): Raw {
@@ -239,6 +269,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
         return json({ data: items.map(transformCampaign) })
+      }
+
+      // ── /{account_id}/campaigns with daily insights ─────────────────────────
+      // Independent of the 'campaigns' case above (which collapses the whole
+      // selected period into one aggregated row per campaign, with no date to
+      // key a daily table by). Used only by the background Supabase sync.
+      case 'campaigns_daily': {
+        if (!account_id) return json({ error: 'account_id is required' }, 400)
+        const nested = insightsNestedDaily(BASE_FIELDS, date_preset, since, until)
+        const u = new URL(`${META_BASE}/${actId(account_id)}/campaigns`)
+        u.searchParams.set('fields', `id,name,effective_status,status,objective,${nested}`)
+        u.searchParams.set('limit', '100')
+        u.searchParams.set('access_token', token)
+        const items = await fetchAllPages(u.toString()) as Raw[]
+        return json({ data: items.flatMap(transformCampaignDaily) })
       }
 
       // ── /{account_id}/adsets ────────────────────────────────────────────────
