@@ -1,15 +1,17 @@
+import { useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
 import { useDateRange } from '../../context/DateRangeContext'
 import { useSelection } from '../../context/SelectionContext'
 import { useMetaApi } from '../../hooks/useMetaApi'
-import { auditRows, getHealthSummary } from '../../lib/auditEngine'
+import { auditRows, entityIdsWithSeverity, getHealthSummary } from '../../lib/auditEngine'
+import type { AuditSeverity } from '../../types/audit'
 import type { InsightRow } from '../../types/meta'
 import { extractLeads, extractCpl } from '../../types/meta'
 import { DataTable } from '../common/DataTable'
 import type { Column } from '../common/DataTable'
 import { SkeletonTable } from '../common/SkeletonLoader'
 import { StatusBadge } from '../common/StatusBadge'
-import { AuditPanel } from '../common/AuditPanel'
+import { AuditSeverityBar } from '../common/AuditSeverityBar'
 import { HealthBanner } from '../common/HealthBanner'
 import { SensitiveNumber } from '../common/SensitiveNumber'
 import { SensitiveText } from '../common/SensitiveText'
@@ -89,6 +91,7 @@ export function CampaignsTab() {
   const { setSelectedRow } = useSelection()
   const { isHidden } = useSensitiveData()
   void isHidden
+  const [activeSeverity, setActiveSeverity] = useState<AuditSeverity | null>(null)
 
   const params = buildParams()
   const endpoint = selectedAccount
@@ -104,21 +107,20 @@ export function CampaignsTab() {
   const recommendations = auditRows(rows, 'campaign')
   const healthSummary = getHealthSummary(rows)
 
+  const activeSeverityIds = activeSeverity ? entityIdsWithSeverity(recommendations, activeSeverity) : null
+  const visibleRows = activeSeverityIds ? rows.filter(r => activeSeverityIds.has(r.campaign_id)) : rows
+
   return (
     <div className="tab-content">
       <HealthBanner summary={healthSummary} />
-      {recommendations.length > 0 && (
-        <AuditPanel
-          recommendations={recommendations}
-          onSelect={(rec) => {
-            const row = rows.find(r => r.campaign_name === rec.entityName)
-            if (row) setSelectedRow(row, 'campaign')
-          }}
-        />
-      )}
+      <AuditSeverityBar
+        recommendations={recommendations}
+        activeSeverity={activeSeverity}
+        onToggle={(severity) => setActiveSeverity(prev => (prev === severity ? null : severity))}
+      />
       <DataTable
         columns={columns}
-        data={rows}
+        data={visibleRows}
         searchPlaceholder="Buscar campaña..."
         searchField={(r) => r.campaign_name}
         onRowClick={(row) => setSelectedRow(row, 'campaign')}

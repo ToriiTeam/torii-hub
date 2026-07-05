@@ -1,6 +1,6 @@
 import type { InsightRow } from '../types/meta'
 import { extractRoas, getPrimaryResult } from '../types/meta'
-import type { AuditRecommendation, HealthStatus, HealthSummary } from '../types/audit'
+import type { AuditRecommendation, AuditSeverity, HealthStatus, HealthSummary } from '../types/audit'
 import { AUDIT_THRESHOLDS as T } from '../types/audit'
 
 type EntityLevel = 'campaign' | 'adset' | 'ad'
@@ -200,4 +200,38 @@ export function auditRows(rows: InsightRow[], level: EntityLevel): AuditRecommen
 
 export function auditSingleEntity(row: InsightRow, level: EntityLevel): AuditRecommendation[] {
   return auditRows([row], level)
+}
+
+export type SeverityRowCounts = Record<AuditSeverity, number>
+
+// Counts distinct ROWS with at least one recommendation of each severity —
+// not recommendation counts. A row with two 'critical' recs (e.g. low ROAS
+// + high frequency) must only count once toward "críticos", otherwise the
+// badge total overstates how many rows actually need attention. The four
+// severities aren't mutually exclusive with each other (a row can be both
+// critical and have an info-level note), so a row may be counted in more
+// than one bucket — that's intentional.
+export function countRowsBySeverity(recommendations: AuditRecommendation[]): SeverityRowCounts {
+  const idsBySeverity: Record<AuditSeverity, Set<string>> = {
+    critical: new Set(), warning: new Set(), opportunity: new Set(), info: new Set(),
+  }
+  for (const rec of recommendations) {
+    idsBySeverity[rec.severity].add(rec.entityId)
+  }
+  return {
+    critical: idsBySeverity.critical.size,
+    warning: idsBySeverity.warning.size,
+    opportunity: idsBySeverity.opportunity.size,
+    info: idsBySeverity.info.size,
+  }
+}
+
+// entityId set for one severity — used to filter the table down to just the
+// rows carrying an alert of that level when a badge is clicked.
+export function entityIdsWithSeverity(recommendations: AuditRecommendation[], severity: AuditSeverity): Set<string> {
+  const ids = new Set<string>()
+  for (const rec of recommendations) {
+    if (rec.severity === severity) ids.add(rec.entityId)
+  }
+  return ids
 }

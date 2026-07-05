@@ -447,6 +447,30 @@
 .meta-ads-root .audit-card-description { font-size: 12px; color: var(--text-secondary); }
 .meta-ads-root .audit-card-action { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--accent-blue); margin-top: 2px; }
 
+/* ── AUDIT SEVERITY BAR ─────────────────────────
+   Thin clickable-badge strip replacing the AuditPanel list on the
+   Campañas/Conjuntos/Anuncios tabs — sits between HealthBanner and DataTable. */
+.meta-ads-root .audit-severity-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 2px; flex-wrap: wrap;
+}
+.meta-ads-root .severity-badge {
+  padding: 4px 10px; border-radius: 100px; font-size: 12px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer; transition: all 0.15s;
+  background: transparent;
+}
+.meta-ads-root .severity-badge-critical    { color: var(--accent-red);    border-color: rgba(252,129,129,0.3); }
+.meta-ads-root .severity-badge-warning     { color: var(--accent-yellow); border-color: rgba(246,224,94,0.3); }
+.meta-ads-root .severity-badge-opportunity { color: var(--accent-green);  border-color: rgba(104,211,145,0.3); }
+.meta-ads-root .severity-badge-info        { color: var(--accent-blue);   border-color: rgba(99,179,237,0.3); }
+
+.meta-ads-root .severity-badge:hover { background: var(--bg-hover); }
+
+.meta-ads-root .severity-badge-critical.active    { background: rgba(252,129,129,0.15); border-color: var(--accent-red); }
+.meta-ads-root .severity-badge-warning.active     { background: rgba(246,224,94,0.15);  border-color: var(--accent-yellow); }
+.meta-ads-root .severity-badge-opportunity.active { background: rgba(104,211,145,0.15); border-color: var(--accent-green); }
+.meta-ads-root .severity-badge-info.active        { background: rgba(99,179,237,0.15);  border-color: var(--accent-blue); }
+
 /* ── SKELETON ────────────────────────────────── */
 @keyframes meta-shimmer {
   0%   { background-position: -200px 0; }
