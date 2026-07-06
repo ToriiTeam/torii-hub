@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Upload, ExternalLink, FileText, Loader2, Save } from 'lucide-react';
@@ -191,27 +190,6 @@ export default function TabCSL({ clientId }: Props) {
                 className="w-full h-[500px]"
                 title="Previsualización CSL (Drive)"
               />
-            </div>
-          )}
-        </section>
-
-        <Separator className="bg-border/40" />
-
-        {/* ── Previsualización del docx subido ── */}
-        <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Previsualización
-          </h3>
-          {record?.csl_content ? (
-            <div className="bg-white text-gray-900 p-8 rounded-lg shadow-inner min-h-96 max-h-[600px] overflow-y-auto">
-              <div
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: record.csl_content }}
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-32 text-muted-foreground border border-dashed border-border/50 rounded-lg text-sm">
-              Sin CSL subido — usá "Subir CSL" o el link de Drive de arriba
             </div>
           )}
         </section>
