@@ -712,12 +712,18 @@ function toForm(c: Call): DForm {
   };
 }
 
-function DetailDialog({ call, closers, onClose, onSaved }: {
-  call: Call; closers: CloserRow[]; onClose: () => void; onSaved: () => void;
+function DetailDialog({ call, closers, owner, onClose, onSaved }: {
+  call: Call; closers: CloserRow[]; owner: OwnerKey; onClose: () => void; onSaved: () => void;
 }) {
   const [f, setF] = useState<DForm>(toForm(call));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Torii's own funnel (owner_type='torii') sells a fixed-price product
+  // directly, so it has no client-commission or lead-qualification fields;
+  // client-run calls (Adolfo/Raul/etc.) sell on Torii's behalf for a
+  // commission and track a fuller lead profile. Same distinction as
+  // matchesOwner()/revenueOf() above.
+  const isTorii = owner === 'torii';
 
   function upd<K extends keyof DForm>(k: K, v: DForm[K]) {
     setF(prev => ({ ...prev, [k]: v }));
@@ -811,21 +817,27 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
             <F label="Hora">
               <Input value={f.hora_llamada} onChange={e => upd('hora_llamada', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="ej. 14:30" />
             </F>
-            <F label="Fuente">
-              <Input value={f.fuente} onChange={e => upd('fuente', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="ej. IG, FB, Referido" />
-            </F>
-            <F label="Ad ID">
-              <Input value={f.ad_id} onChange={e => upd('ad_id', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
+            {isTorii && (
+              <F label="Fuente">
+                <Input value={f.fuente} onChange={e => upd('fuente', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="ej. IG, FB, Referido" />
+              </F>
+            )}
+            {!isTorii && (
+              <F label="Ad ID">
+                <Input value={f.ad_id} onChange={e => upd('ad_id', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+              </F>
+            )}
             <F label="UTM Campaign">
               <Input value={f.utm_campaign} onChange={e => upd('utm_campaign', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
             </F>
             <F label="UTM Source">
               <Input value={f.utm_source} onChange={e => upd('utm_source', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
             </F>
-            <F label="Setter que agendó">
-              <Input value={f.setter_agendo} onChange={e => upd('setter_agendo', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
+            {isTorii && (
+              <F label="Setter que agendó">
+                <Input value={f.setter_agendo} onChange={e => upd('setter_agendo', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+              </F>
+            )}
             <F label="Closer">
               <CloserField value={f.closer} onChange={v => upd('closer', v)} closers={closers} />
             </F>
@@ -855,18 +867,22 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
                 </SelectContent>
               </Select>
             </F>
-            <F label="Fecha 2da llamada">
-              <Input type="date" value={f.segunda_llamada_fecha} onChange={e => upd('segunda_llamada_fecha', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <F label="Estado 2da llamada">
-              <Select value={f.segunda_llamada_status} onValueChange={v => upd('segunda_llamada_status', v)}>
-                <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>—</SelectItem>
-                  {SEGUNDA_LLAMADA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </F>
+            {isTorii && (
+              <F label="Fecha 2da llamada">
+                <Input type="date" value={f.segunda_llamada_fecha} onChange={e => upd('segunda_llamada_fecha', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+              </F>
+            )}
+            {isTorii && (
+              <F label="Estado 2da llamada">
+                <Select value={f.segunda_llamada_status} onValueChange={v => upd('segunda_llamada_status', v)}>
+                  <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>—</SelectItem>
+                    {SEGUNDA_LLAMADA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </F>
+            )}
             <F label="Reagenda (texto libre)">
               <Input value={f.reagenda_texto} onChange={e => upd('reagenda_texto', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="ej. Lunes 12 a las 15hs" />
             </F>
@@ -884,21 +900,27 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
           <div className="flex flex-wrap gap-6 mb-3">
             <CheckField id="dlg-califico" label="Calificado" checked={f.califico} onCheckedChange={v => upd('califico', v)} />
             <CheckField id="dlg-cerro" label="Cerrado" checked={f.cerro} onCheckedChange={v => upd('cerro', v)} />
-            <CheckField id="dlg-pago_en_llamada" label="Pagó en llamada" checked={f.pago_en_llamada} onCheckedChange={v => upd('pago_en_llamada', v)} />
+            {isTorii && (
+              <CheckField id="dlg-pago_en_llamada" label="Pagó en llamada" checked={f.pago_en_llamada} onCheckedChange={v => upd('pago_en_llamada', v)} />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Producto">
-              <Input value={f.producto} onChange={e => upd('producto', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
+            {!isTorii && (
+              <F label="Producto">
+                <Input value={f.producto} onChange={e => upd('producto', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+              </F>
+            )}
             <F label="Número de cuotas">
               <Input type="number" min={1} value={f.num_cuotas} onChange={e => upd('num_cuotas', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
             </F>
             <F label="Precio (Torii, USD)">
               <Input type="number" value={f.precio} onChange={e => upd('precio', e.target.value)} className="bg-secondary/50 h-8 text-sm" placeholder="3000" />
             </F>
-            <F label="Comisión estimada (clientes, USD)">
-              <Input type="number" value={f.comision_estimada} onChange={e => upd('comision_estimada', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
+            {!isTorii && (
+              <F label="Comisión estimada (clientes, USD)">
+                <Input type="number" value={f.comision_estimada} onChange={e => upd('comision_estimada', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+              </F>
+            )}
           </div>
           {f.califico && !f.cerro && (
             <div className="mt-3">
@@ -915,34 +937,38 @@ function DetailDialog({ call, closers, onClose, onSaved }: {
           )}
         </div>
 
-        <Separator />
+        {!isTorii && (
+          <>
+            <Separator />
 
-        {/* ── Perfil del Lead ── */}
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Perfil del Lead</p>
-          <div className="grid grid-cols-2 gap-3">
-            <F label="Situación laboral">
-              <Input value={f.situacion_laboral} onChange={e => upd('situacion_laboral', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <F label="Nivel de ingresos">
-              <Input value={f.nivel_ingresos} onChange={e => upd('nivel_ingresos', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <F label="Capacidad de ahorro">
-              <Input value={f.capacidad_ahorro} onChange={e => upd('capacidad_ahorro', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <F label="Edad">
-              <Input type="number" value={f.edad} onChange={e => upd('edad', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <F label="Hijos / Estado civil">
-              <Input value={f.hijos_casado} onChange={e => upd('hijos_casado', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
-            </F>
-            <div className="col-span-2">
-              <F label="Preocupación actual">
-                <Textarea rows={2} value={f.preocupacion_actual} onChange={e => upd('preocupacion_actual', e.target.value)} className="bg-secondary/50 text-sm resize-none" />
-              </F>
+            {/* ── Perfil del Lead ── */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Perfil del Lead</p>
+              <div className="grid grid-cols-2 gap-3">
+                <F label="Situación laboral">
+                  <Input value={f.situacion_laboral} onChange={e => upd('situacion_laboral', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+                </F>
+                <F label="Nivel de ingresos">
+                  <Input value={f.nivel_ingresos} onChange={e => upd('nivel_ingresos', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+                </F>
+                <F label="Capacidad de ahorro">
+                  <Input value={f.capacidad_ahorro} onChange={e => upd('capacidad_ahorro', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+                </F>
+                <F label="Edad">
+                  <Input type="number" value={f.edad} onChange={e => upd('edad', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+                </F>
+                <F label="Hijos / Estado civil">
+                  <Input value={f.hijos_casado} onChange={e => upd('hijos_casado', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
+                </F>
+                <div className="col-span-2">
+                  <F label="Preocupación actual">
+                    <Textarea rows={2} value={f.preocupacion_actual} onChange={e => upd('preocupacion_actual', e.target.value)} className="bg-secondary/50 text-sm resize-none" />
+                  </F>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
         <Separator />
 
@@ -1519,6 +1545,7 @@ export default function Closers() {
         <DetailDialog
           call={selected}
           closers={closers}
+          owner={owner}
           onClose={() => setSelected(null)}
           onSaved={() => { fetchData(); setSelected(null); }}
         />
