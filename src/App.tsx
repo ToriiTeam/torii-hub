@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import ExecutiveDashboard from "@/pages/ExecutiveDashboard";
 import Tareas from "@/pages/Tareas";
 import Finanzas from "@/pages/Finanzas";
 import Setters from "@/pages/Setters";
@@ -15,6 +16,7 @@ import Clientes from "@/pages/Clientes";
 import ClienteDetalle from "@/pages/ClienteDetalle";
 import Reportes from "@/pages/Reportes";
 import VslTracking from "@/pages/VslTracking";
+import MaquinaCierres from "@/pages/MaquinaCierres";
 import MetaAds from "@/pages/MetaAds";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +43,7 @@ function AppContent() {
         <Layout>
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<ExecutiveDashboard />} />
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/clientes/:id" element={<ClienteDetalle />} />
             <Route path="/setters" element={<Setters />} />
@@ -48,6 +51,7 @@ function AppContent() {
             <Route path="/finanzas" element={<Finanzas />} />
             <Route path="/reportes" element={<Reportes />} />
             <Route path="/vsl-tracking" element={<VslTracking />} />
+            <Route path="/maquina-cierres" element={<MaquinaCierres />} />
             <Route path="/tareas" element={<Tareas />} />
             <Route path="/meta-ads" element={<MetaAds />} />
             <Route path="*" element={<NotFound />} />

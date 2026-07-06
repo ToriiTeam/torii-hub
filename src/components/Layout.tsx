@@ -26,6 +26,8 @@ import {
   AlertCircle,
   BarChart2,
   Video,
+  ShoppingCart,
+  Gauge,
 } from 'lucide-react';
 
 interface Task {
@@ -38,12 +40,14 @@ interface Task {
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard Ejecutivo', href: '/dashboard', icon: Gauge },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Setting', href: '/setters', icon: PhoneCall },
   { name: 'Closing', href: '/closers', icon: Handshake },
   { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
   { name: 'Reportes', href: '/reportes', icon: FileText },
   { name: 'VSL', href: '/vsl-tracking', icon: Video },
+  { name: 'Máquina de Cierres', href: '/maquina-cierres', icon: ShoppingCart },
   { name: 'Tareas', href: '/tareas', icon: CheckSquare },
   { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
 ];
