@@ -18,6 +18,14 @@ interface CSLRecord {
   updated_at: string | null;
 }
 
+function extractGoogleDocId(url: string): string | null {
+  if (!url.trim()) return null;
+  const match = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) return match[1];
+  // Bare ID pasted directly (no slashes), not a full URL
+  return /^[a-zA-Z0-9_-]+$/.test(url.trim()) ? url.trim() : null;
+}
+
 interface Props {
   clientId: string;
 }
@@ -176,6 +184,15 @@ export default function TabCSL({ clientId }: Props) {
               Guardar
             </Button>
           </div>
+          {extractGoogleDocId(driveId) && (
+            <div className="rounded-lg border border-border/50 overflow-hidden">
+              <iframe
+                src={`https://docs.google.com/document/d/${extractGoogleDocId(driveId)}/preview`}
+                className="w-full h-[500px]"
+                title="Previsualización CSL (Drive)"
+              />
+            </div>
+          )}
         </section>
 
         <Separator className="bg-border/40" />
@@ -186,9 +203,9 @@ export default function TabCSL({ clientId }: Props) {
             Previsualización
           </h3>
           {record?.csl_content ? (
-            <div className="max-h-[600px] overflow-y-auto rounded-lg border border-border/50 bg-secondary/20 p-6">
+            <div className="bg-white text-gray-900 p-8 rounded-lg shadow-inner min-h-96 max-h-[600px] overflow-y-auto">
               <div
-                className="prose prose-sm dark:prose-invert max-w-none"
+                className="prose prose-sm max-w-none"
                 dangerouslySetInnerHTML={{ __html: record.csl_content }}
               />
             </div>
