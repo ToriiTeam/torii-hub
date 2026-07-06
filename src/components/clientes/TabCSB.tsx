@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Save, ExternalLink, FileText, Loader2 } from 'lucide-react';
+import { Save, ExternalLink, FileText, Loader2, Upload } from 'lucide-react';
 import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
+import mammoth from 'mammoth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,8 @@ export default function TabCSB({ clientId }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchCSB = useCallback(async () => {
     setLoading(true);
@@ -95,6 +98,55 @@ export default function TabCSB({ clientId }: Props) {
   const setField = (key: keyof CSBForm, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
     setDirty(true);
+  };
+
+  const handleImportClick = () => fileInputRef.current?.click();
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const { value: text } = await mammoth.extractRawText({ arrayBuffer });
+      if (!text.trim()) {
+        toast.error('No se pudo extraer texto del documento');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-csb-from-doc', {
+        body: { text },
+      });
+      if (error) throw error;
+
+      const extracted = data?.data as Partial<Record<keyof CSBForm, string | number | null>> | undefined;
+      if (!extracted) {
+        toast.error('La IA no devolvió campos extraídos');
+        return;
+      }
+
+      setForm(prev => ({
+        ...prev,
+        oferta: extracted.oferta != null ? String(extracted.oferta) : prev.oferta,
+        icp: extracted.icp != null ? String(extracted.icp) : prev.icp,
+        mercado: extracted.mercado != null ? String(extracted.mercado) : prev.mercado,
+        angulo_principal: extracted.angulo_principal != null ? String(extracted.angulo_principal) : prev.angulo_principal,
+        hipotesis_activa: extracted.hipotesis_activa != null ? String(extracted.hipotesis_activa) : prev.hipotesis_activa,
+        objecion_principal: extracted.objecion_principal != null ? String(extracted.objecion_principal) : prev.objecion_principal,
+        propuesta_de_valor: extracted.propuesta_de_valor != null ? String(extracted.propuesta_de_valor) : prev.propuesta_de_valor,
+        precio: extracted.precio != null ? String(extracted.precio) : prev.precio,
+        garantia: extracted.garantia != null ? String(extracted.garantia) : prev.garantia,
+      }));
+      setDirty(true);
+      toast.success('Campos autocompletados — revisá y guardá los cambios');
+    } catch (err) {
+      console.error('[TabCSB] import from Word failed:', err);
+      toast.error('Error al importar el documento');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleSave = async () => {
@@ -161,6 +213,25 @@ export default function TabCSB({ clientId }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx"
+            className="hidden"
+            onChange={handleFileSelected}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleImportClick}
+            disabled={importing}
+          >
+            {importing
+              ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              : <Upload className="h-3.5 w-3.5 mr-1.5" />
+            }
+            Importar desde Word
+          </Button>
           {form.drive_csl_id && (
             <Button
               variant="outline"

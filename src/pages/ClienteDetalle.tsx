@@ -10,10 +10,9 @@ import { cn } from '@/lib/utils';
 import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
 import TabFichaBasica from '@/components/clientes/TabFichaBasica';
 import TabCSB from '@/components/clientes/TabCSB';
-import TabMetaAds from '@/components/clientes/TabMetaAds';
+import TabCSL from '@/components/clientes/TabCSL';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import TabHipotesis from '@/components/clientes/TabHipotesis';
-import TabCRMCalls from '@/components/clientes/TabCRMCalls';
 
 export interface Client {
   id: string;
@@ -62,10 +61,8 @@ const TABS = [
   { value: 'basica', label: 'Ficha Básica' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
-  { value: 'ads', label: 'Meta Ads' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'hipotesis', label: 'Hipótesis' },
-  { value: 'calls', label: 'CRM Calls' },
 ];
 
 export default function ClienteDetalle() {
@@ -161,13 +158,7 @@ export default function ClienteDetalle() {
         </TabsContent>
 
         <TabsContent value="csl">
-          <div className="flex items-center justify-center h-48 text-muted-foreground border border-dashed border-border/50 rounded-lg">
-            CSL — próximamente
-          </div>
-        </TabsContent>
-
-        <TabsContent value="ads">
-          <TabMetaAds clientId={client.id} />
+          <TabCSL clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="creativos">
@@ -176,10 +167,6 @@ export default function ClienteDetalle() {
 
         <TabsContent value="hipotesis">
           <TabHipotesis clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="calls">
-          <TabCRMCalls clientId={client.id} />
         </TabsContent>
       </Tabs>
     </div>

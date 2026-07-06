@@ -897,6 +897,7 @@ export type Database = {
           angulo_principal: string | null
           client_id: string | null
           created_at: string | null
+          csl_content: string | null
           drive_csl_id: string | null
           garantia: string | null
           hipotesis_activa: string | null
@@ -914,6 +915,7 @@ export type Database = {
           angulo_principal?: string | null
           client_id?: string | null
           created_at?: string | null
+          csl_content?: string | null
           drive_csl_id?: string | null
           garantia?: string | null
           hipotesis_activa?: string | null
@@ -931,6 +933,7 @@ export type Database = {
           angulo_principal?: string | null
           client_id?: string | null
           created_at?: string | null
+          csl_content?: string | null
           drive_csl_id?: string | null
           garantia?: string | null
           hipotesis_activa?: string | null
