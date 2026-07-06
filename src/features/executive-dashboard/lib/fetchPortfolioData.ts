@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { subMonths, format, startOfMonth } from 'date-fns';
+import { subMonths, format, startOfMonth, differenceInCalendarDays, parseISO } from 'date-fns';
 import { safeDiv, computeHealth } from './clientHealth';
+import { PHASE_LABELS } from '@/features/delivery-os/types';
 import type { AdsMetrics, ClientBase, ClosingMetrics, PortfolioClientRow, PortfolioData, RevenueMetrics } from '../types';
 
 const EMPTY_ADS: AdsMetrics = { inversion: 0, impresiones: 0, clics: 0, leads: 0, cpl: null, ctr: null, cpm: null, cpc: null };
@@ -13,10 +14,27 @@ const NO_REVENUE: RevenueMetrics = { hasData: false, revenue: null, roi: null, c
 async function fetchClients(): Promise<ClientBase[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, name, country, fase, days_in_phase, renewal_risk, mrr, start_date')
+    .select('id, name, country, renewal_risk, mrr, start_date')
     .order('name');
   if (error) throw error;
-  return data ?? [];
+  const clients = data ?? [];
+
+  const { data: phases, error: phaseErr } = await supabase
+    .from('delivery_phases')
+    .select('client_id, fase, fecha_inicio')
+    .is('fecha_fin', null);
+  if (phaseErr) throw phaseErr;
+
+  const phaseByClient = new Map((phases ?? []).map((p) => [p.client_id, p]));
+
+  return clients.map((c) => {
+    const phase = phaseByClient.get(c.id);
+    return {
+      ...c,
+      fase: phase ? (PHASE_LABELS[phase.fase as keyof typeof PHASE_LABELS] ?? phase.fase) : null,
+      days_in_phase: phase ? differenceInCalendarDays(new Date(), parseISO(phase.fecha_inicio)) : null,
+    };
+  });
 }
 
 async function fetchAdsByClient(since: string, until: string): Promise<Map<string, AdsMetrics>> {

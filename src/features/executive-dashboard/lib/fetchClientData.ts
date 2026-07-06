@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { subMonths, format, startOfMonth, endOfMonth, differenceInCalendarDays, startOfWeek, parseISO } from 'date-fns';
 import { safeDiv } from './clientHealth';
 import { eachDay, previousPeriodRange } from './periodRange';
+import { PHASE_LABELS } from '@/features/delivery-os/types';
 import type {
   AdsMetrics, ClientBase, ClientDetailData, ClosingMetrics, DailyPoint, MonthlyCpbcPoint,
   RevenueMetrics, TopCampaign, TrendPoint, VslSummary,
@@ -200,11 +201,23 @@ async function fetchCpbcHistory(clientId: string): Promise<MonthlyCpbcPoint[]> {
 export async function fetchClientData(clientId: string, since: string, until: string, isShortPeriod: boolean): Promise<ClientDetailData> {
   const { data: clientRow, error: clientErr } = await supabase
     .from('clients')
-    .select('id, name, country, fase, days_in_phase, renewal_risk, mrr, start_date')
+    .select('id, name, country, renewal_risk, mrr, start_date')
     .eq('id', clientId)
     .single();
   if (clientErr) throw clientErr;
-  const client = clientRow as ClientBase;
+
+  const { data: phaseRow } = await supabase
+    .from('delivery_phases')
+    .select('fase, fecha_inicio')
+    .eq('client_id', clientId)
+    .is('fecha_fin', null)
+    .maybeSingle();
+
+  const client: ClientBase = {
+    ...(clientRow as Omit<ClientBase, 'fase' | 'days_in_phase'>),
+    fase: phaseRow ? (PHASE_LABELS[phaseRow.fase as keyof typeof PHASE_LABELS] ?? phaseRow.fase) : null,
+    days_in_phase: phaseRow ? differenceInCalendarDays(new Date(), parseISO(phaseRow.fecha_inicio)) : null,
+  };
 
   const { since: prevSince, until: prevUntil } = previousPeriodRange(since, until);
 

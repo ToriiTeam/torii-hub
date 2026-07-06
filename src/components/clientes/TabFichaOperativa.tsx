@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { type Client } from '@/pages/ClienteDetalle';
 import {
-  DollarSign, CreditCard, Calendar, AlertTriangle,
+  AlertTriangle,
   ChevronDown, ChevronUp, Plus, MessageSquare,
   Phone, Mail, Video, Users, Activity, Heart,
 } from 'lucide-react';
@@ -30,14 +30,6 @@ import { fetchClientPhases, fetchChecklist } from '@/features/delivery-os/lib/ph
 import type { DeliveryPhase, PhaseChecklistItem } from '@/features/delivery-os/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Installment {
-  installment_number: number;
-  amount: number;
-  due_date: string | null;
-  paid: boolean;
-  paid_date: string | null;
-}
 
 interface HealthRecord {
   id: string;
@@ -157,7 +149,6 @@ interface Props {
 }
 
 export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
-  const [installments, setInstallments] = useState<Installment[]>([]);
   const [health, setHealth] = useState<HealthRecord | null>(null);
   const [bottlenecks, setBottlenecks] = useState<Bottleneck[]>([]);
   const [experience, setExperience] = useState<Experience[]>([]);
@@ -198,12 +189,7 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [instRes, healthRes, bnRes, expRes] = await Promise.all([
-      supabase
-        .from('client_installments')
-        .select('installment_number, amount, due_date, paid, paid_date')
-        .eq('client_id', client.id)
-        .order('installment_number', { ascending: true }),
+    const [healthRes, bnRes, expRes] = await Promise.all([
       supabase
         .from('client_health')
         .select('id, confianza, trust, engagement, respuesta, economia, score_total, fecha, notas')
@@ -225,7 +211,6 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
         .limit(3),
     ]);
 
-    if (instRes.data)    setInstallments(instRes.data as Installment[]);
     if (healthRes.data)  setHealth(healthRes.data as HealthRecord);
     if (bnRes.data)      setBottlenecks(bnRes.data as Bottleneck[]);
     if (expRes.data)     setExperience(expRes.data as Experience[]);
@@ -281,16 +266,6 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
     setBnForm(emptyBottleneckForm);
     fetchAll();
   };
-
-  // ── Derived payment data ─────────────────────────────────────────────────────
-  const totalPaid    = installments.filter(i => i.paid).reduce((s, i) => s + Number(i.amount), 0);
-  const totalPending = installments.filter(i => !i.paid).reduce((s, i) => s + Number(i.amount), 0);
-  const nextUnpaid   = installments.find(i => !i.paid && i.due_date) ?? null;
-  const payProgress  = installments.length > 0
-    ? (installments.filter(i => i.paid).length / installments.length) * 100
-    : (client.total_installments > 0
-        ? (client.paid_installments / client.total_installments) * 100
-        : 0);
 
   const mainBn         = bottlenecks[0] ?? null;
   const extraBnCount   = bottlenecks.length - 1;
@@ -510,58 +485,9 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
           </CardContent>
         </Card>
 
-        {/* ── ROW 2 LEFT: Pagos ─────────────────────────────────────────── */}
-        <Card className="col-span-2 bg-card border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Pagos
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-8 w-8 text-success flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Cobrado</p>
-                  <p className="text-xl font-bold text-success">${totalPaid.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-8 w-8 text-warning flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Pendiente</p>
-                  <p className="text-xl font-bold text-warning">${totalPending.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-8 w-8 text-muted-foreground flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Próxima cuota</p>
-                  {nextUnpaid ? (
-                    <>
-                      <p className="text-lg font-bold">${Number(nextUnpaid.amount).toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">{fmtDate(nextUnpaid.due_date)}</p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">—</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>
-                  {installments.filter(i => i.paid).length} de {installments.length || client.total_installments} cuotas pagadas
-                </span>
-                <span>{Math.round(payProgress)}%</span>
-              </div>
-              <Progress value={payProgress} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── ROW 2 RIGHT: Último contacto ──────────────────────────────── */}
-        <Card className="col-span-1 bg-card border-border/50">
+        {/* ── ROW 2: Último contacto ──────────────────────────────────────
+             (Pagos se movió a Tab Ficha Básica) */}
+        <Card className="col-span-3 bg-card border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
               Último contacto

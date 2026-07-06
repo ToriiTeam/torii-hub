@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
+import TabFichaBasica from '@/components/clientes/TabFichaBasica';
 import TabCSB from '@/components/clientes/TabCSB';
 import TabMetaAds from '@/components/clientes/TabMetaAds';
 import TabCreativos from '@/components/clientes/TabCreativos';
@@ -32,6 +33,7 @@ export interface Client {
   platform: string;
   platform_fee: number;
   country?: string;
+  canal?: string;
   notes?: string;
   mrr?: number;
   renewal_risk?: string;
@@ -57,6 +59,7 @@ const statusLabels: Record<string, string> = {
 
 const TABS = [
   { value: 'ficha', label: 'Ficha Operativa' },
+  { value: 'basica', label: 'Ficha Básica' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
   { value: 'ads', label: 'Meta Ads' },
@@ -147,6 +150,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="ficha">
           <TabFichaOperativa client={client} onClientUpdate={fetchClient} />
+        </TabsContent>
+
+        <TabsContent value="basica">
+          <TabFichaBasica client={client} onClientUpdate={fetchClient} />
         </TabsContent>
 
         <TabsContent value="csb">
