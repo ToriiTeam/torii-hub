@@ -19,6 +19,15 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { StartToriiOSBanner } from './torii-os/StartToriiOSBanner';
+import { PhaseTimeline } from './torii-os/PhaseTimeline';
+import { CurrentPhaseCard } from './torii-os/CurrentPhaseCard';
+import { PhaseChecklistCard } from './torii-os/PhaseChecklistCard';
+import { PhaseMetricsCard } from './torii-os/PhaseMetricsCard';
+import { PhaseHistoryTable } from './torii-os/PhaseHistoryTable';
+import { PhaseHistoryDialog } from './torii-os/PhaseHistoryDialog';
+import { fetchClientPhases, fetchChecklist } from '@/features/delivery-os/lib/phasesRepo';
+import type { DeliveryPhase, PhaseChecklistItem } from '@/features/delivery-os/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -163,7 +172,29 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
   const [bnForm, setBnForm] = useState(emptyBottleneckForm);
   const [savingBn, setSavingBn] = useState(false);
 
-  useEffect(() => { fetchAll(); }, [client.id]);
+  // ── Torii OS (delivery_phases) ──────────────────────────────────────────
+  const [currentPhase, setCurrentPhase] = useState<DeliveryPhase | null>(null);
+  const [phaseHistory, setPhaseHistory] = useState<DeliveryPhase[]>([]);
+  const [checklistItems, setChecklistItems] = useState<PhaseChecklistItem[]>([]);
+  const [loadingPhases, setLoadingPhases] = useState(true);
+  const [historyDialogPhase, setHistoryDialogPhase] = useState<DeliveryPhase | null>(null);
+  const hasAnyPhase = currentPhase != null || phaseHistory.length > 0;
+
+  const fetchPhases = async () => {
+    setLoadingPhases(true);
+    try {
+      const { current, history } = await fetchClientPhases(client.id);
+      setCurrentPhase(current);
+      setPhaseHistory(history);
+      setChecklistItems(current ? await fetchChecklist(client.id, current.fase) : []);
+    } catch (err) {
+      console.error('[TabFichaOperativa] failed to load Torii OS phases:', err);
+    } finally {
+      setLoadingPhases(false);
+    }
+  };
+
+  useEffect(() => { fetchAll(); fetchPhases(); }, [client.id]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -353,37 +384,51 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
         </DialogContent>
       </Dialog>
 
+      {/* ── Torii OS (delivery_phases) ───────────────────────────────────── */}
+      {loadingPhases ? (
+        <div className="h-40 rounded-lg bg-secondary/40 animate-pulse" />
+      ) : !hasAnyPhase ? (
+        <StartToriiOSBanner clientId={client.id} onStarted={fetchPhases} />
+      ) : (
+        <div className="space-y-4">
+          <PhaseTimeline current={currentPhase} history={phaseHistory} onSelectHistoryPhase={setHistoryDialogPhase} />
+          {currentPhase && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <CurrentPhaseCard
+                phase={currentPhase}
+                clientId={client.id}
+                onAdvanced={fetchPhases}
+                onRegisterBottleneck={() => setBnDialogOpen(true)}
+              />
+              <PhaseChecklistCard fase={currentPhase.fase} items={checklistItems} onChange={fetchPhases} />
+            </div>
+          )}
+          {currentPhase && (
+            <PhaseMetricsCard clientId={client.id} fase={currentPhase.fase} since={currentPhase.fecha_inicio} />
+          )}
+          <PhaseHistoryTable history={phaseHistory} onSelect={setHistoryDialogPhase} />
+        </div>
+      )}
+
+      <PhaseHistoryDialog phase={historyDialogPhase} onClose={() => setHistoryDialogPhase(null)} />
+
       {/* ── Main Grid ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
 
-        {/* ── ROW 1 LEFT: Fases ─────────────────────────────────────────── */}
+        {/* ── ROW 1 LEFT: Renovación ───────────────────────────────────────
+             (lo que quedó de la vieja card "Fases del delivery" —
+             task_phase/result_phase/days_in_phase quedan reemplazados por
+             el sistema de delivery_phases de arriba; renewal_risk/
+             renewal_probability no tienen otro lugar en el spec nuevo, así
+             que se mantienen acá.) */}
         <Card className="col-span-2 bg-card border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Fases del delivery
+              Renovación
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Fase interna (Delivery OS)</p>
-                <p className="font-semibold text-sm leading-snug">
-                  {client.task_phase || <span className="text-muted-foreground italic">Sin asignar</span>}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Fase cliente</p>
-                <p className="font-semibold text-sm leading-snug">
-                  {client.result_phase || <span className="text-muted-foreground italic">Sin asignar</span>}
-                </p>
-              </div>
-            </div>
-            <Separator className="bg-border/40" />
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Días en fase</p>
-                <p className="text-2xl font-bold">{client.days_in_phase ?? 0}</p>
-              </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Riesgo de renovación</p>
                 {client.renewal_risk ? (

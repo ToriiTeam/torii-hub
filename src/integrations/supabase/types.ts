@@ -1891,6 +1891,50 @@ export type Database = {
           },
         ]
       }
+      delivery_phases: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          fase: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          notas: string | null
+          objetivo_cumplido: boolean | null
+          tiempo_objetivo_dias: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          fase: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          notas?: string | null
+          objetivo_cumplido?: boolean | null
+          tiempo_objetivo_dias?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          fase?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          notas?: string | null
+          objetivo_cumplido?: boolean | null
+          tiempo_objetivo_dias?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_phases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           category: Database["public"]["Enums"]["document_category"] | null
@@ -2386,6 +2430,33 @@ export type Database = {
           },
         ]
       }
+      mc_client_ops: {
+        Row: {
+          academia_access_granted: boolean | null
+          ghl_contact_id: string
+          id: string
+          notes: string | null
+          updated_at: string | null
+          whatsapp_group_added: boolean | null
+        }
+        Insert: {
+          academia_access_granted?: boolean | null
+          ghl_contact_id: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          whatsapp_group_added?: boolean | null
+        }
+        Update: {
+          academia_access_granted?: boolean | null
+          ghl_contact_id?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string | null
+          whatsapp_group_added?: boolean | null
+        }
+        Relationships: []
+      }
       metrics_templates: {
         Row: {
           created_at: string | null
@@ -2711,6 +2782,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      phase_checklist_items: {
+        Row: {
+          client_id: string | null
+          completada: boolean | null
+          created_at: string | null
+          fase: string
+          fecha_completada: string | null
+          id: string
+          notas: string | null
+          orden: number | null
+          tarea: string
+        }
+        Insert: {
+          client_id?: string | null
+          completada?: boolean | null
+          created_at?: string | null
+          fase: string
+          fecha_completada?: string | null
+          id?: string
+          notas?: string | null
+          orden?: number | null
+          tarea: string
+        }
+        Update: {
+          client_id?: string | null
+          completada?: boolean | null
+          created_at?: string | null
+          fase?: string
+          fecha_completada?: string | null
+          id?: string
+          notas?: string | null
+          orden?: number | null
+          tarea?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_checklist_items_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       playbook_attachments: {
         Row: {
