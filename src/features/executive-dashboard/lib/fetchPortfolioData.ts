@@ -6,10 +6,6 @@ import type { AdsMetrics, ClientBase, ClosingMetrics, PortfolioClientRow, Portfo
 
 const EMPTY_ADS: AdsMetrics = { inversion: 0, impresiones: 0, clics: 0, leads: 0, cpl: null, ctr: null, cpm: null, cpc: null };
 const EMPTY_CLOSING: ClosingMetrics = { reuniones: 0, asistieron: 0, calificados: 0, cierres: 0, showRate: null, closeRate: null, lossReasons: [], byCloser: [] };
-// hasData=false everywhere — see the null-safety note: no client has a
-// reliable revenue source today (incomes.client_id is always null,
-// client_closer_calls has zero owner_type='client' rows).
-const NO_REVENUE: RevenueMetrics = { hasData: false, revenue: null, roi: null, cac: null };
 
 async function fetchClients(): Promise<ClientBase[]> {
   const { data, error } = await supabase
@@ -119,15 +115,43 @@ async function fetchClosingByClient(since: string, until: string): Promise<Map<s
   return result;
 }
 
-async function fetchPortfolioMrr(since: string, until: string): Promise<number> {
+// Torii's own direct sales (its own funnel, not run on behalf of a client) —
+// owner_type='torii' rows carry no client_id, and the full deal price is
+// Torii's revenue since there's no client to split commission with.
+// Replaces the old incomes-table read, which is always empty.
+async function fetchToriiRevenue(since: string, until: string): Promise<number> {
   const { data, error } = await supabase
-    .from('incomes')
-    .select('amount, type')
-    .gte('date', since)
-    .lte('date', until)
-    .neq('type', 'Aporte de capital');
+    .from('client_closer_calls')
+    .select('precio')
+    .eq('owner_type', 'torii')
+    .eq('cerro', true)
+    .gte('fecha_llamada', since)
+    .lte('fecha_llamada', until);
   if (error) throw error;
-  return (data ?? []).reduce((sum, r) => sum + (r.amount ? parseFloat(String(r.amount)) : 0), 0);
+  return (data ?? []).reduce((sum, r) => sum + (r.precio ? parseFloat(String(r.precio)) : 0), 0);
+}
+
+// Per-client revenue attributable to Torii: the commission earned servicing
+// that client's closed deals, falling back to precio when comision_estimada
+// hasn't been filled in yet.
+async function fetchRevenueByClient(since: string, until: string): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('client_closer_calls')
+    .select('client_id, comision_estimada, precio')
+    .eq('owner_type', 'client')
+    .eq('cerro', true)
+    .gte('fecha_llamada', since)
+    .lte('fecha_llamada', until);
+  if (error) throw error;
+
+  const byClient = new Map<string, number>();
+  for (const row of data ?? []) {
+    if (!row.client_id) continue;
+    const amount = row.comision_estimada ?? row.precio;
+    if (!amount) continue;
+    byClient.set(row.client_id, (byClient.get(row.client_id) ?? 0) + parseFloat(String(amount)));
+  }
+  return byClient;
 }
 
 // Last 6 months of closes per client, for the trend line chart — one query
@@ -162,17 +186,24 @@ async function fetchClosesTrend(clients: ClientBase[]): Promise<PortfolioData['m
 
 export async function fetchPortfolioData(since: string, until: string): Promise<PortfolioData> {
   const clients = await fetchClients();
-  const [adsByClient, closingByClient, totalMrr, monthlyClosesTrend] = await Promise.all([
+  const [adsByClient, closingByClient, revenueByClient, totalMrr, monthlyClosesTrend] = await Promise.all([
     fetchAdsByClient(since, until),
     fetchClosingByClient(since, until),
-    fetchPortfolioMrr(since, until),
+    fetchRevenueByClient(since, until),
+    fetchToriiRevenue(since, until),
     fetchClosesTrend(clients),
   ]);
 
   const rows: PortfolioClientRow[] = clients.map((client) => {
     const ads = adsByClient.get(client.id) ?? EMPTY_ADS;
     const closing = closingByClient.get(client.id) ?? EMPTY_CLOSING;
-    const revenue = NO_REVENUE;
+    const revenueTotal = revenueByClient.get(client.id) ?? 0;
+    const revenue: RevenueMetrics = {
+      hasData: true,
+      revenue: revenueTotal,
+      roi: safeDiv(revenueTotal, ads.inversion),
+      cac: safeDiv(ads.inversion, closing.cierres),
+    };
     const cpbc = safeDiv(ads.inversion, closing.reuniones);
     return { client, ads, closing, revenue, cpbc, health: computeHealth(revenue) };
   });

@@ -19,7 +19,7 @@ export function ToriiView({ data }: ToriiViewProps) {
   const { ads, closing, incomesTotal, expensesTotal, netProfit, portfolioMrr, portfolio } = data;
 
   const kpis = [
-    { label: 'MRR total del portfolio', value: fmtMoney(portfolioMrr), icon: DollarSign },
+    { label: 'Revenue de Torii (ventas propias)', value: fmtMoney(portfolioMrr), icon: DollarSign, cls: portfolioMrr > 0 ? 'text-success' : undefined },
     { label: 'Ingresos totales del mes', value: fmtMoney(incomesTotal), icon: TrendingUp },
     { label: 'Egresos totales del mes', value: fmtMoney(expensesTotal), icon: TrendingDown },
     { label: 'Resultado neto', value: fmtMoney(netProfit), icon: DollarSign, cls: netProfit >= 0 ? 'text-success' : 'text-destructive' },

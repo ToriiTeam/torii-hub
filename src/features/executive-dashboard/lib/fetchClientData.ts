@@ -8,7 +8,24 @@ import type {
   RevenueMetrics, TopCampaign, TrendPoint, VslSummary,
 } from '../types';
 
-const NO_REVENUE: RevenueMetrics = { hasData: false, revenue: null, roi: null, cac: null };
+// Commission Torii earns servicing this client's closed deals, falling back
+// to precio when comision_estimada hasn't been filled in yet — same source
+// and fallback rule as fetchRevenueByClient in fetchPortfolioData.ts.
+async function fetchClientRevenue(clientId: string, since: string, until: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('client_closer_calls')
+    .select('comision_estimada, precio')
+    .eq('owner_type', 'client')
+    .eq('client_id', clientId)
+    .eq('cerro', true)
+    .gte('fecha_llamada', since)
+    .lte('fecha_llamada', until);
+  if (error) throw error;
+  return (data ?? []).reduce((sum, r) => {
+    const amount = r.comision_estimada ?? r.precio;
+    return sum + (amount ? parseFloat(String(amount)) : 0);
+  }, 0);
+}
 
 export interface RawAdsRow { fecha: string; inversion: number | null; impresiones: number | null; clics: number | null; leads: number | null; ctr: number | null; cpm: number | null; cpc: number | null; campaign_name: string | null; }
 
@@ -221,18 +238,24 @@ export async function fetchClientData(clientId: string, since: string, until: st
 
   const { since: prevSince, until: prevUntil } = previousPeriodRange(since, until);
 
-  const [adsRows, closingRows, prevAdsRows, prevClosingRows, vsl, cpbcHistory] = await Promise.all([
+  const [adsRows, closingRows, prevAdsRows, prevClosingRows, vsl, cpbcHistory, revenueTotal] = await Promise.all([
     fetchAdsRows(clientId, since, until),
     fetchClosingRows(clientId, since, until),
     fetchAdsRows(clientId, prevSince, prevUntil),
     fetchClosingRows(clientId, prevSince, prevUntil),
     fetchVslSummary(clientId, since, until),
     fetchCpbcHistory(clientId),
+    fetchClientRevenue(clientId, since, until),
   ]);
 
   const ads = summarizeAds(adsRows);
   const closing = summarizeClosing(closingRows);
-  const revenue = NO_REVENUE;
+  const revenue: RevenueMetrics = {
+    hasData: true,
+    revenue: revenueTotal,
+    roi: safeDiv(revenueTotal, ads.inversion),
+    cac: safeDiv(ads.inversion, closing.cierres),
+  };
   const cpbc = safeDiv(ads.inversion, closing.reuniones);
   const dailySeries = buildDailySeries(adsRows, closingRows, since, until);
 

@@ -98,13 +98,13 @@ export function PortfolioView({ data }: PortfolioViewProps) {
   const avgTarget = rows.length ? rows.reduce((s, r) => s + cpbcTargetFor(r.client.country), 0) / rows.length : 30;
 
   const kpis = [
-    { label: 'MRR total (portfolio)', value: fmtMoney(totalMrr), icon: DollarSign, sub: 'incomes, sin desglose por cliente' },
+    { label: 'Revenue de Torii', value: fmtMoney(totalMrr), icon: DollarSign, sub: 'ventas propias, closer calls', className: totalMrr > 0 ? 'text-success' : undefined },
     { label: 'Inversión en ads del mes', value: fmtMoney(totalInversion), icon: TrendingUp, sub: null },
     { label: 'Leads generados', value: totalLeads.toLocaleString(), icon: Users, sub: null },
     { label: 'Reuniones agendadas', value: totalReuniones.toLocaleString(), icon: Handshake, sub: null },
     { label: 'Cierres', value: totalCierres.toLocaleString(), icon: Handshake, sub: null },
     { label: 'CPBC promedio', value: fmtMoney(avgCpbc), icon: Target, sub: null },
-    { label: 'ROI promedio', value: avgRoi != null ? `${avgRoi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp, sub: 'requiere revenue por cliente' },
+    { label: 'ROI promedio', value: avgRoi != null ? `${avgRoi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp, sub: null, className: avgRoi != null && avgRoi > 0 ? 'text-success' : undefined },
   ];
 
   return (
@@ -116,7 +116,7 @@ export function PortfolioView({ data }: PortfolioViewProps) {
             <Card key={k.label} className="bg-card border-border/50">
               <CardContent className="p-4 text-center">
                 <Icon className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <p className="text-lg font-bold">{k.value}</p>
+                <p className={`text-lg font-bold ${k.className ?? ''}`}>{k.value}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{k.label}</p>
                 {k.sub && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{k.sub}</p>}
               </CardContent>
@@ -159,9 +159,9 @@ export function PortfolioView({ data }: PortfolioViewProps) {
                   <TableCell>{row.closing.calificados}</TableCell>
                   <TableCell>{row.closing.cierres}</TableCell>
                   <TableCell>{fmtPct(row.closing.closeRate)}</TableCell>
-                  <TableCell>{row.revenue.hasData ? fmtMoney(row.revenue.revenue) : <span className="text-muted-foreground text-xs">Sin datos</span>}</TableCell>
+                  <TableCell className={row.revenue.revenue != null && row.revenue.revenue > 0 ? 'text-success' : undefined}>{row.revenue.hasData ? fmtMoney(row.revenue.revenue) : <span className="text-muted-foreground text-xs">Sin datos</span>}</TableCell>
                   <TableCell className={cpbcSemaphoreClass(row.cpbc, row.client.country)}>{fmtMoney(row.cpbc)}</TableCell>
-                  <TableCell>{row.revenue.hasData ? fmtMoney(row.revenue.cac) : <span className="text-muted-foreground text-xs">Sin datos</span>}</TableCell>
+                  <TableCell className={row.revenue.cac != null && row.revenue.cac > 0 ? 'text-success' : undefined}>{row.revenue.hasData ? fmtMoney(row.revenue.cac) : <span className="text-muted-foreground text-xs">Sin datos</span>}</TableCell>
                   <TableCell>
                     {row.revenue.roi != null
                       ? <span className={row.revenue.roi > 3 ? 'text-success' : row.revenue.roi >= 1 ? 'text-warning' : 'text-destructive'}>{row.revenue.roi.toFixed(1)}x</span>
@@ -182,7 +182,7 @@ export function PortfolioView({ data }: PortfolioViewProps) {
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-base font-medium">Inversión vs Revenue por cliente</CardTitle>
-            <CardDescription>Revenue no tiene fuente confiable por cliente hoy — aparece en 0</CardDescription>
+            <CardDescription>Revenue = comisión de Torii en client_closer_calls (cerró=true)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">

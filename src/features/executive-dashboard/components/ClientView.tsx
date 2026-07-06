@@ -83,9 +83,9 @@ export function ClientView({ data }: ClientViewProps) {
     { label: 'Show rate', value: fmtPct(closing.showRate), icon: Users, prevValue: prevPeriod ? safeDiv(prevPeriod.closing.asistieron, prevPeriod.closing.reuniones) : null, currentValue: closing.showRate },
     { label: 'Calificados', value: closing.calificados.toLocaleString(), icon: Users, prevValue: prevPeriod?.closing.calificados, currentValue: closing.calificados },
     { label: 'Cierres', value: closing.cierres.toLocaleString(), icon: Handshake, sparklineData: last7(dailySeries).map((d) => d.cierres), sparklineColor: COLORS.cierres, prevValue: prevPeriod?.closing.cierres, currentValue: closing.cierres },
-    { label: 'CAC', value: revenue.hasData ? fmtMoney(revenue.cac) : 'Sin datos', icon: DollarSign },
-    { label: 'Revenue', value: revenue.hasData ? fmtMoney(revenue.revenue) : 'Sin datos', icon: DollarSign },
-    { label: 'ROI', value: revenue.roi != null ? `${revenue.roi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp },
+    { label: 'CAC', value: revenue.hasData ? fmtMoney(revenue.cac) : 'Sin datos', icon: DollarSign, valueClassName: revenue.cac != null && revenue.cac > 0 ? 'text-success' : undefined },
+    { label: 'Revenue', value: revenue.hasData ? fmtMoney(revenue.revenue) : 'Sin datos', icon: DollarSign, valueClassName: revenue.revenue != null && revenue.revenue > 0 ? 'text-success' : undefined },
+    { label: 'ROI', value: revenue.roi != null ? `${revenue.roi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp, valueClassName: revenue.roi != null && revenue.roi > 0 ? 'text-success' : undefined },
     { label: 'Días activo', value: diasActivo != null ? diasActivo.toLocaleString() : '—', icon: CalendarDays },
   ];
 
