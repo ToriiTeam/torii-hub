@@ -11,6 +11,7 @@ import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
 import TabFichaBasica from '@/components/clientes/TabFichaBasica';
 import TabCSB from '@/components/clientes/TabCSB';
 import TabCSL from '@/components/clientes/TabCSL';
+import CreativeTree from '@/components/clientes/creative-tree/CreativeTree';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import TabHipotesis from '@/components/clientes/TabHipotesis';
 
@@ -61,6 +62,7 @@ const TABS = [
   { value: 'basica', label: 'Ficha Básica' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
+  { value: 'arbol', label: 'Árbol de Creativos' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'hipotesis', label: 'Hipótesis' },
 ];
@@ -159,6 +161,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="csl">
           <TabCSL clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="arbol">
+          <CreativeTree clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="creativos">
