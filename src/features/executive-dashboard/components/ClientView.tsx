@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -8,10 +9,16 @@ import {
   DollarSign, Users, Target, Handshake, TrendingUp,
   CalendarDays, PlayCircle, AlertTriangle,
 } from 'lucide-react';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { HEALTH_CONFIG, cpbcSemaphoreClass, computeHealth, safeDiv } from '../lib/clientHealth';
 import { KpiCardWithTrend } from './shared/KpiCardWithTrend';
 import { DonutMetricGauge } from './shared/DonutMetricGauge';
 import { TopCampaignsTable } from './shared/TopCampaignsTable';
+import { PhaseTimeline } from '@/components/clientes/torii-os/PhaseTimeline';
+import { fetchClientPhases, fetchChecklist, nextPhaseOf } from '@/features/delivery-os/lib/phasesRepo';
+import { PHASE_LABELS, PHASE_DEFAULT_DAYS } from '@/features/delivery-os/types';
+import type { DeliveryPhase, PhaseChecklistItem } from '@/features/delivery-os/types';
 import type { ClientDetailData } from '../types';
 
 const COLORS = { inversion: '#e5182b', leads: '#3b82f6', reuniones: '#10b981', cierres: '#f59e0b', revenue: '#8b5cf6' };
@@ -34,6 +41,33 @@ export function ClientView({ data }: ClientViewProps) {
   const { client, ads, closing, revenue, cpbc, prevPeriod, dailySeries, periodTrend, cpbcHistory, revenueHistory, topCampaigns, vsl, diasActivo } = data;
   const health = computeHealth(revenue);
   const healthCfg = HEALTH_CONFIG[health];
+
+  const [currentPhase, setCurrentPhase] = useState<DeliveryPhase | null>(null);
+  const [phaseHistory, setPhaseHistory] = useState<DeliveryPhase[]>([]);
+  const [checklistItems, setChecklistItems] = useState<PhaseChecklistItem[]>([]);
+  const [loadingPhases, setLoadingPhases] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingPhases(true);
+    fetchClientPhases(client.id)
+      .then(async ({ current, history }) => {
+        if (cancelled) return;
+        setCurrentPhase(current);
+        setPhaseHistory(history);
+        setChecklistItems(current ? await fetchChecklist(client.id, current.fase) : []);
+      })
+      .catch((err) => console.error('[ClientView] failed to load Torii OS phases:', err))
+      .finally(() => { if (!cancelled) setLoadingPhases(false); });
+    return () => { cancelled = true; };
+  }, [client.id]);
+
+  const daysInPhase = currentPhase ? differenceInCalendarDays(new Date(), parseISO(currentPhase.fecha_inicio)) : null;
+  const objetivo = currentPhase ? (currentPhase.tiempo_objetivo_dias ?? PHASE_DEFAULT_DAYS[currentPhase.fase]) : null;
+  const phaseRatio = daysInPhase != null && objetivo ? daysInPhase / objetivo : null;
+  const phaseSemaphoreClass = phaseRatio == null ? 'text-muted-foreground' : phaseRatio > 1 ? 'text-destructive' : phaseRatio >= 0.8 ? 'text-warning' : 'text-success';
+  const checklistDone = checklistItems.filter((i) => i.completada).length;
+  const nextPhase = currentPhase ? nextPhaseOf(currentPhase.fase) : null;
 
   const cpblSeries = last7(dailySeries).map((d) => safeDiv(d.inversion, d.leads) ?? 0);
   const cpbcSeries = last7(dailySeries).map((d) => safeDiv(d.inversion, d.reuniones) ?? 0);
@@ -67,6 +101,47 @@ export function ClientView({ data }: ClientViewProps) {
 
   return (
     <div className="space-y-6">
+      {loadingPhases ? (
+        <div className="h-28 rounded-lg bg-secondary/40 animate-pulse" />
+      ) : !currentPhase ? (
+        <Card className="bg-card border-border/50">
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            Torii OS no iniciado para este cliente.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-2 bg-card border-2 border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide">Torii OS · Fase de Delivery</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-1 overflow-x-auto">
+              <PhaseTimeline current={currentPhase} history={phaseHistory} onSelectHistoryPhase={() => {}} compact />
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">{PHASE_LABELS[currentPhase.fase]}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className={cn('text-lg font-bold', phaseSemaphoreClass)}>{daysInPhase}<span className="text-muted-foreground text-xs font-normal"> / {objetivo}d</span></p>
+                <p className="text-xs text-muted-foreground">Días en fase</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold">{checklistDone}/{checklistItems.length}</p>
+                <p className="text-xs text-muted-foreground">Checklist</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-sm font-medium">{nextPhase ? PHASE_LABELS[nextPhase] : 'Última fase'}</p>
+                <p className="text-xs text-muted-foreground">Próxima fase</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {kpis.map((k) => (
           <KpiCardWithTrend
