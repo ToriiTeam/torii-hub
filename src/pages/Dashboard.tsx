@@ -141,7 +141,7 @@ export default function Dashboard() {
       if (usersData) setTeamUsers(usersData);
 
       // Load clients count
-      const { count: activeClients } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'activo');
+      const { count: activeClients } = await supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'active');
       setClientCount(activeClients || 0);
 
       // Load documents count

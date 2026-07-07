@@ -9,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Search, Trash2, Edit2, User } from 'lucide-react';
+import { Plus, Search, Ban, Edit2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type ClientStatus = 'activo' | 'pausado' | 'finalizado' | 'cancelado';
+type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
 type PaymentType = 'Upfront' | 'Mensual' | 'Cuotas';
 type PaymentPlatform = 'Stripe' | 'Binance' | 'Transfer';
@@ -41,20 +42,22 @@ interface Client {
   task_phase?: string;
   result_phase?: string;
   renewal_risk?: string;
+  motivo_cancelacion?: string;
+  fecha_cancelacion?: string;
 }
 
 const statusColors: Record<ClientStatus, string> = {
-  activo: 'bg-success/20 text-success',
-  pausado: 'bg-warning/20 text-warning',
-  finalizado: 'bg-info/20 text-info',
-  cancelado: 'bg-destructive/20 text-destructive',
+  active: 'bg-success/20 text-success',
+  paused: 'bg-warning/20 text-warning',
+  finished: 'bg-info/20 text-info',
+  cancelled: 'bg-destructive/20 text-destructive',
 };
 
 const statusLabels: Record<ClientStatus, string> = {
-  activo: 'Activo',
-  pausado: 'Pausado',
-  finalizado: 'Finalizado',
-  cancelado: 'Cancelado',
+  active: 'Activo',
+  paused: 'Pausado',
+  finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const renewalRiskColors: Record<string, string> = {
@@ -65,11 +68,16 @@ const renewalRiskColors: Record<string, string> = {
 
 const emptyForm = {
   name: '', email: '', phone: '', offer_type: 'DFY' as OfferType,
-  start_date: '', end_date: '', status: 'activo' as ClientStatus,
+  start_date: '', end_date: '', status: 'active' as ClientStatus,
   payment_type: 'Cuotas' as PaymentType, total_installments: '1',
   paid_installments: '0', installment_amount: '0', total_amount: '0',
   next_due_date: '', platform: 'Stripe' as PaymentPlatform,
   platform_fee: '2.9', country: '', notes: '',
+};
+
+const emptyCancelForm = {
+  motivo: '',
+  fecha: new Date().toISOString().slice(0, 10),
 };
 
 export default function Clientes() {
@@ -82,6 +90,10 @@ export default function Clientes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Client | null>(null);
+  const [cancelForm, setCancelForm] = useState(emptyCancelForm);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -97,6 +109,7 @@ export default function Clientes() {
   };
 
   const filtered = clients.filter(c => {
+    if (!showCancelled && c.status === 'cancelled' && filterStatus !== 'cancelled') return false;
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
     return true;
@@ -155,15 +168,32 @@ export default function Clientes() {
     fetchData();
   };
 
-  const deleteClient = async (id: string, e: React.MouseEvent) => {
+  const openCancel = (client: Client, e: React.MouseEvent) => {
     e.stopPropagation();
-    const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (error) { toast.error('Error al eliminar'); return; }
-    toast.success('Cliente eliminado');
+    setCancelTarget(client);
+    setCancelForm(emptyCancelForm);
+  };
+
+  const handleCancelClient = async () => {
+    if (!cancelTarget) return;
+    if (!cancelForm.motivo.trim()) { toast.error('El motivo es requerido'); return; }
+    setCancelling(true);
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        status: 'cancelled' as ClientStatus,
+        motivo_cancelacion: cancelForm.motivo.trim(),
+        fecha_cancelacion: cancelForm.fecha,
+      })
+      .eq('id', cancelTarget.id);
+    setCancelling(false);
+    if (error) { toast.error('Error al cancelar el cliente'); return; }
+    toast.success('Cliente cancelado');
+    setCancelTarget(null);
     fetchData();
   };
 
-  const activeClients = clients.filter(c => c.status === 'activo');
+  const activeClients = clients.filter(c => c.status === 'active');
   const totalContractValue = activeClients.reduce((s, c) => s + (c.total_amount || 0), 0);
   const totalPending = activeClients.reduce((s, c) => {
     const ci = installments.filter(i => i.client_id === c.id);
@@ -256,14 +286,20 @@ export default function Clientes() {
             <h1 className="text-2xl font-bold">Clientes</h1>
             <p className="text-muted-foreground">{clients.length} clientes • ${totalContractValue.toLocaleString()} total</p>
           </div>
-          <Button className="bg-primary" onClick={() => setDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />Nuevo Cliente
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch checked={showCancelled} onCheckedChange={setShowCancelled} id="show-cancelled" />
+              <Label htmlFor="show-cancelled" className="text-sm text-muted-foreground cursor-pointer">Mostrar cancelados</Label>
+            </div>
+            <Button className="bg-primary" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />Nuevo Cliente
+            </Button>
+          </div>
         </div>
 
         {/* Status filter */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {(['activo', 'pausado', 'finalizado', 'cancelado'] as ClientStatus[]).map(status => (
+          {(['active', 'paused', 'finished', 'cancelled'] as ClientStatus[]).map(status => (
             <Card
               key={status}
               className={cn('bg-card border-border/50 cursor-pointer transition-all', filterStatus === status && 'ring-2 ring-primary')}
@@ -348,9 +384,11 @@ export default function Clientes() {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => openEdit(client, e)}>
                       <Edit2 className="h-3 w-3" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={e => deleteClient(client.id, e)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    {client.status !== 'cancelled' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={e => openCancel(client, e)} title="Cancelar cliente">
+                        <Ban className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -395,6 +433,47 @@ export default function Clientes() {
           </Card>
         </div>
       </div>
+
+      <Dialog open={!!cancelTarget} onOpenChange={open => !open && setCancelTarget(null)}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader><DialogTitle>Cancelar cliente</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {cancelTarget?.name} pasará a estado <strong>Cancelado</strong> y dejará de contarse como cliente activo.
+            No se elimina ningún dato — todo su historial queda accesible.
+          </p>
+          <div className="space-y-3 mt-2">
+            <div>
+              <Label>Motivo de cancelación *</Label>
+              <Textarea
+                value={cancelForm.motivo}
+                onChange={e => setCancelForm({ ...cancelForm, motivo: e.target.value })}
+                className="bg-secondary/50 mt-1"
+                rows={3}
+                placeholder="Por qué se cancela este cliente..."
+              />
+            </div>
+            <div>
+              <Label>Fecha de cancelación</Label>
+              <Input
+                type="date"
+                value={cancelForm.fecha}
+                onChange={e => setCancelForm({ ...cancelForm, fecha: e.target.value })}
+                className="bg-secondary/50 mt-1"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setCancelTarget(null)}>Volver</Button>
+            <Button
+              onClick={handleCancelClient}
+              disabled={cancelling || !cancelForm.motivo.trim()}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {cancelling ? 'Cancelando…' : 'Confirmar cancelación'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

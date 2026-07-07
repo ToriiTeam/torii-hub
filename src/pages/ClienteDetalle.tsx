@@ -13,6 +13,7 @@ import TabCSB from '@/components/clientes/TabCSB';
 import TabCSL from '@/components/clientes/TabCSL';
 import CreativeTree from '@/components/clientes/creative-tree/CreativeTree';
 import TabCreativos from '@/components/clientes/TabCreativos';
+import TabAngulos from '@/components/clientes/TabAngulos';
 import TabHipotesis from '@/components/clientes/TabHipotesis';
 
 export interface Client {
@@ -23,7 +24,7 @@ export interface Client {
   offer_type: string;
   start_date?: string;
   end_date?: string;
-  status: 'activo' | 'pausado' | 'finalizado' | 'cancelado';
+  status: 'active' | 'paused' | 'finished' | 'cancelled';
   payment_type: string;
   total_installments: number;
   paid_installments: number;
@@ -41,20 +42,22 @@ export interface Client {
   task_phase?: string;
   result_phase?: string;
   days_in_phase?: number;
+  motivo_cancelacion?: string;
+  fecha_cancelacion?: string;
 }
 
 const statusColors: Record<string, string> = {
-  activo: 'bg-success/20 text-success',
-  pausado: 'bg-warning/20 text-warning',
-  finalizado: 'bg-info/20 text-info',
-  cancelado: 'bg-destructive/20 text-destructive',
+  active: 'bg-success/20 text-success',
+  paused: 'bg-warning/20 text-warning',
+  finished: 'bg-info/20 text-info',
+  cancelled: 'bg-destructive/20 text-destructive',
 };
 
 const statusLabels: Record<string, string> = {
-  activo: 'Activo',
-  pausado: 'Pausado',
-  finalizado: 'Finalizado',
-  cancelado: 'Cancelado',
+  active: 'Activo',
+  paused: 'Pausado',
+  finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const TABS = [
@@ -63,6 +66,7 @@ const TABS = [
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
   { value: 'arbol', label: 'Árbol de Creativos' },
+  { value: 'angulos', label: 'Ángulos' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'hipotesis', label: 'Hipótesis' },
 ];
@@ -165,6 +169,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="arbol">
           <CreativeTree clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="angulos">
+          <TabAngulos clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="creativos">

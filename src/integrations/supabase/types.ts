@@ -316,11 +316,14 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string | null
+          creative_node_id: string | null
           drive_folder_id: string | null
+          estado: string | null
           hipotesis_activa: string | null
           id: string
           narrativa: string | null
           nombre: string | null
+          origen: string | null
           pipeline_stage: string | null
           resultado: string | null
           updated_at: string | null
@@ -328,11 +331,14 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string | null
+          creative_node_id?: string | null
           drive_folder_id?: string | null
+          estado?: string | null
           hipotesis_activa?: string | null
           id?: string
           narrativa?: string | null
           nombre?: string | null
+          origen?: string | null
           pipeline_stage?: string | null
           resultado?: string | null
           updated_at?: string | null
@@ -340,11 +346,14 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string | null
+          creative_node_id?: string | null
           drive_folder_id?: string | null
+          estado?: string | null
           hipotesis_activa?: string | null
           id?: string
           narrativa?: string | null
           nombre?: string | null
+          origen?: string | null
           pipeline_stage?: string | null
           resultado?: string | null
           updated_at?: string | null
@@ -355,6 +364,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "angles_creative_node_id_fkey"
+            columns: ["creative_node_id"]
+            isOneToOne: false
+            referencedRelation: "creative_nodes"
             referencedColumns: ["id"]
           },
         ]
@@ -1523,8 +1539,10 @@ export type Database = {
           email: string | null
           end_date: string | null
           fase: string | null
+          fecha_cancelacion: string | null
           id: string
           installment_amount: number | null
+          motivo_cancelacion: string | null
           mrr: number | null
           name: string
           next_due_date: string | null
@@ -1556,8 +1574,10 @@ export type Database = {
           email?: string | null
           end_date?: string | null
           fase?: string | null
+          fecha_cancelacion?: string | null
           id?: string
           installment_amount?: number | null
+          motivo_cancelacion?: string | null
           mrr?: number | null
           name: string
           next_due_date?: string | null
@@ -1589,8 +1609,10 @@ export type Database = {
           email?: string | null
           end_date?: string | null
           fase?: string | null
+          fecha_cancelacion?: string | null
           id?: string
           installment_amount?: number | null
+          motivo_cancelacion?: string | null
           mrr?: number | null
           name?: string
           next_due_date?: string | null
