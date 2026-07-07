@@ -567,6 +567,27 @@ export type Database = {
           },
         ]
       }
+      cash_opening_balance: {
+        Row: {
+          amount: number
+          as_of_date: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          amount?: number
+          as_of_date?: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          amount?: number
+          as_of_date?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       client_closer_calls: {
         Row: {
           ad_id: string | null
@@ -1982,6 +2003,36 @@ export type Database = {
           },
         ]
       }
+      debts: {
+        Row: {
+          amount: number
+          created_at: string
+          creditor: string
+          due_date: string | null
+          id: string
+          note: string | null
+          paid: boolean
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          creditor: string
+          due_date?: string | null
+          id?: string
+          note?: string | null
+          paid?: boolean
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          creditor?: string
+          due_date?: string | null
+          id?: string
+          note?: string | null
+          paid?: boolean
+        }
+        Relationships: []
+      }
       delivery_phases: {
         Row: {
           client_id: string | null
@@ -2245,6 +2296,39 @@ export type Database = {
           },
         ]
       }
+      finance_targets: {
+        Row: {
+          current_active_clients: number | null
+          current_mrr: number | null
+          id: string
+          new_clients_ytd: number | null
+          target_clients: number | null
+          target_margin: number | null
+          target_mrr: number | null
+          updated_at: string
+        }
+        Insert: {
+          current_active_clients?: number | null
+          current_mrr?: number | null
+          id?: string
+          new_clients_ytd?: number | null
+          target_clients?: number | null
+          target_margin?: number | null
+          target_mrr?: number | null
+          updated_at?: string
+        }
+        Update: {
+          current_active_clients?: number | null
+          current_mrr?: number | null
+          id?: string
+          new_clients_ytd?: number | null
+          target_clients?: number | null
+          target_margin?: number | null
+          target_mrr?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fixed_costs: {
         Row: {
           amount: number
@@ -2400,9 +2484,17 @@ export type Database = {
           client_id: string | null
           created_at: string
           date: string
+          due_date: string | null
+          fee_percent: number | null
           id: string
+          installment_number: number | null
+          legacy_frequency: string | null
+          model: string | null
+          notes: string | null
           sheet_row_id: string | null
           source: string
+          status: string | null
+          total_installments: number | null
           type: string | null
         }
         Insert: {
@@ -2410,9 +2502,17 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           date: string
+          due_date?: string | null
+          fee_percent?: number | null
           id?: string
+          installment_number?: number | null
+          legacy_frequency?: string | null
+          model?: string | null
+          notes?: string | null
           sheet_row_id?: string | null
           source: string
+          status?: string | null
+          total_installments?: number | null
           type?: string | null
         }
         Update: {
@@ -2420,9 +2520,17 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           date?: string
+          due_date?: string | null
+          fee_percent?: number | null
           id?: string
+          installment_number?: number | null
+          legacy_frequency?: string | null
+          model?: string | null
+          notes?: string | null
           sheet_row_id?: string | null
           source?: string
+          status?: string | null
+          total_installments?: number | null
           type?: string | null
         }
         Relationships: [
