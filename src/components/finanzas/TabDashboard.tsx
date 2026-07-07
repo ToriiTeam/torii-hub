@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { categorize } from '@/features/finanzas/lib/categorize';
 import { calcCajaActual, calcDeuda, calcPatrimonioNeto, calcPorCobrar } from '@/features/finanzas/lib/financeCalc';
 import type { Expense, Income } from '@/features/finanzas/lib/types';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
 function fmtUSD(n: number | null | undefined): string {
@@ -60,8 +61,11 @@ function computePeriod(incomes: Income[], expenses: Expense[], since: string, un
   return { ingresos, gastos, resultado, margen };
 }
 
-function KpiCard({ label, value, sub, icon: Icon, valueClassName }: {
+function KpiCard({ label, value, sub, icon: Icon, valueClassName, sensitive, subSensitive }: {
   label: string; value: string; sub?: string; icon: React.ComponentType<{ className?: string }>; valueClassName?: string;
+  // Dollar figures only — percentages and counts (Clientes activos, etc.)
+  // stay visible when "Ocultar" is on, per the screen-share use case.
+  sensitive?: boolean; subSensitive?: boolean;
 }) {
   return (
     <Card className="bg-card border-border/50">
@@ -70,31 +74,42 @@ function KpiCard({ label, value, sub, icon: Icon, valueClassName }: {
           <p className="text-xs text-muted-foreground">{label}</p>
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-        <p className={cn('text-xl font-bold', valueClassName)}>{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+        <p className={cn('text-xl font-bold', valueClassName)}>
+          {sensitive ? <SensitiveAmount>{value}</SensitiveAmount> : value}
+        </p>
+        {sub && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {subSensitive ? <SensitiveAmount>{sub}</SensitiveAmount> : sub}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-export default function TabDashboard({ activeMonth, periodBounds, incomes, expenses, clients, debts, financeTargets, openingBalance }: FinanzasTabProps) {
-  const { monthStart, monthEnd, yearStart } = periodBounds;
-  const activeYear = activeMonth.getFullYear();
+export default function TabDashboard({ periodBounds, periodType, preset, incomes, expenses, clients, debts, financeTargets, openingBalance }: FinanzasTabProps) {
+  const { periodStart, periodEnd, yearStart, yearEnd, currentYear } = periodBounds;
+  // CAC over an unbounded multi-year window (the "Todo" default) isn't a
+  // meaningful single number — it'd mix acquisition spend and new clients
+  // from years that have nothing to do with each other. Shown as "Sin
+  // período definido" instead of a technically-computed-but-misleading one.
+  const isAllTime = periodType === 'preset' && preset === 'all';
 
-  // ── 1. Resultado del mes ────────────────────────────────────────────────
-  const monthResult = useMemo(
-    () => computePeriod(incomes, expenses, monthStart, monthEnd),
-    [incomes, expenses, monthStart, monthEnd],
+  // ── 1. Resultado del período ─────────────────────────────────────────────
+  const periodResult = useMemo(
+    () => computePeriod(incomes, expenses, periodStart, periodEnd),
+    [incomes, expenses, periodStart, periodEnd],
   );
 
-  // ── 2. Acumulado del año activo — year-to-date real: yearStart hasta
-  // monthEnd (NO yearEnd), compuesto acá según la nota de Paso A.
+  // ── 2. Acumulado del año — año calendario completo (mismo criterio que
+  // Resultado's TOTAL AÑO): navegado si periodType==='month', año real
+  // corriente en cualquier otro modo (ver getPeriodBounds).
   const ytdResult = useMemo(
-    () => computePeriod(incomes, expenses, yearStart, monthEnd),
-    [incomes, expenses, yearStart, monthEnd],
+    () => computePeriod(incomes, expenses, yearStart, yearEnd),
+    [incomes, expenses, yearStart, yearEnd],
   );
 
-  // ── 3. Balance — posición financiera ────────────────────────────────────
+  // ── 3. Balance — posición financiera (histórico, no filtra por período) ──
   const cajaActual = useMemo(
     () => calcCajaActual({ openingBalance, incomes, expenses }),
     [openingBalance, incomes, expenses],
@@ -108,24 +123,24 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
 
   // ── 4. Métricas clave ────────────────────────────────────────────────────
   const costosDirectosAno = useMemo(
-    () => sumExpensesByBucket(expenses, yearStart, monthEnd, ['Equipo', 'Software']),
-    [expenses, yearStart, monthEnd],
+    () => sumExpensesByBucket(expenses, yearStart, yearEnd, ['Equipo', 'Software']),
+    [expenses, yearStart, yearEnd],
   );
   const margenBruto = safeDiv(ytdResult.ingresos - costosDirectosAno, ytdResult.ingresos);
 
-  const publicidadMes = useMemo(
-    () => sumExpensesByBucket(expenses, monthStart, monthEnd, ['Publicidad']),
-    [expenses, monthStart, monthEnd],
+  const publicidadPeriodo = useMemo(
+    () => sumExpensesByBucket(expenses, periodStart, periodEnd, ['Publicidad']),
+    [expenses, periodStart, periodEnd],
   );
-  const adquisicionMes = useMemo(
-    () => sumExpensesByBucket(expenses, monthStart, monthEnd, ['Adquisición']),
-    [expenses, monthStart, monthEnd],
+  const adquisicionPeriodo = useMemo(
+    () => sumExpensesByBucket(expenses, periodStart, periodEnd, ['Adquisición']),
+    [expenses, periodStart, periodEnd],
   );
-  const nuevosClientesMes = useMemo(
-    () => clients.filter((c) => inRange(c.start_date, monthStart, monthEnd)).length,
-    [clients, monthStart, monthEnd],
+  const nuevosClientesPeriodo = useMemo(
+    () => clients.filter((c) => inRange(c.start_date, periodStart, periodEnd)).length,
+    [clients, periodStart, periodEnd],
   );
-  const cac = nuevosClientesMes > 0 ? (publicidadMes + adquisicionMes) / nuevosClientesMes : null;
+  const cac = nuevosClientesPeriodo > 0 ? (publicidadPeriodo + adquisicionPeriodo) / nuevosClientesPeriodo : null;
 
   // ── 5. Cómo cuadra la caja — cascada completa, histórico (all-time) ─────
   const ingresosOperativosHistorico = useMemo(
@@ -143,42 +158,44 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
   return (
     <div className="space-y-6">
 
-      {/* ── 1. Resultado del mes ── */}
+      {/* ── 1. Resultado del período ── */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-          Resultado del mes
+          Resultado del período
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Ingresos" value={fmtUSD(monthResult.ingresos)} icon={TrendingUp} valueClassName="text-success" />
-          <KpiCard label="Gastos" value={fmtUSD(monthResult.gastos)} icon={TrendingDown} valueClassName="text-destructive" />
+          <KpiCard label="Ingresos" value={fmtUSD(periodResult.ingresos)} icon={TrendingUp} valueClassName="text-success" sensitive />
+          <KpiCard label="Gastos" value={fmtUSD(periodResult.gastos)} icon={TrendingDown} valueClassName="text-destructive" sensitive />
           <KpiCard
             label="Resultado neto"
-            value={fmtUSD(monthResult.resultado)}
+            value={fmtUSD(periodResult.resultado)}
             icon={DollarSign}
-            valueClassName={monthResult.resultado >= 0 ? 'text-success' : 'text-destructive'}
+            valueClassName={periodResult.resultado >= 0 ? 'text-success' : 'text-destructive'}
+            sensitive
           />
           <KpiCard
             label="Margen neto"
-            value={fmtPct(monthResult.margen)}
+            value={fmtPct(periodResult.margen)}
             icon={Target}
-            valueClassName={monthResult.margen == null ? 'text-muted-foreground' : monthResult.margen >= 0 ? 'text-success' : 'text-destructive'}
+            valueClassName={periodResult.margen == null ? 'text-muted-foreground' : periodResult.margen >= 0 ? 'text-success' : 'text-destructive'}
           />
         </div>
       </div>
 
-      {/* ── 2. Acumulado del año activo (YTD real: yearStart → monthEnd) ── */}
+      {/* ── 2. Acumulado del año (año calendario completo) ── */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-          Acumulado {activeYear}
+          Acumulado {currentYear}
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Ingresos" value={fmtUSD(ytdResult.ingresos)} icon={TrendingUp} valueClassName="text-success" />
-          <KpiCard label="Gastos" value={fmtUSD(ytdResult.gastos)} icon={TrendingDown} valueClassName="text-destructive" />
+          <KpiCard label="Ingresos" value={fmtUSD(ytdResult.ingresos)} icon={TrendingUp} valueClassName="text-success" sensitive />
+          <KpiCard label="Gastos" value={fmtUSD(ytdResult.gastos)} icon={TrendingDown} valueClassName="text-destructive" sensitive />
           <KpiCard
             label="Resultado neto"
             value={fmtUSD(ytdResult.resultado)}
             icon={DollarSign}
             valueClassName={ytdResult.resultado >= 0 ? 'text-success' : 'text-destructive'}
+            sensitive
           />
           <KpiCard
             label="Margen neto"
@@ -195,14 +212,15 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
           Balance — posición financiera
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Caja actual" value={fmtUSD(cajaActual)} icon={Wallet} valueClassName={cajaActual >= 0 ? 'text-success' : 'text-destructive'} />
-          <KpiCard label="Por cobrar" value={fmtUSD(porCobrar)} icon={Clock} valueClassName={porCobrar > 0 ? 'text-warning' : 'text-muted-foreground'} />
-          <KpiCard label="Deuda" value={fmtUSD(deuda)} icon={AlertTriangle} valueClassName={deuda > 0 ? 'text-destructive' : 'text-muted-foreground'} />
+          <KpiCard label="Caja actual" value={fmtUSD(cajaActual)} icon={Wallet} valueClassName={cajaActual >= 0 ? 'text-success' : 'text-destructive'} sensitive />
+          <KpiCard label="Por cobrar" value={fmtUSD(porCobrar)} icon={Clock} valueClassName={porCobrar > 0 ? 'text-warning' : 'text-muted-foreground'} sensitive />
+          <KpiCard label="Deuda" value={fmtUSD(deuda)} icon={AlertTriangle} valueClassName={deuda > 0 ? 'text-destructive' : 'text-muted-foreground'} sensitive />
           <KpiCard
             label="Patrimonio neto"
             value={fmtUSD(patrimonioNeto)}
             icon={DollarSign}
             valueClassName={patrimonioNeto >= 0 ? 'text-success' : 'text-destructive'}
+            sensitive
           />
         </div>
       </div>
@@ -218,6 +236,8 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
             value={fmtUSD(financeTargets?.current_mrr ?? null)}
             sub={financeTargets?.target_mrr != null ? `objetivo: ${fmtUSD(financeTargets.target_mrr)}` : undefined}
             icon={DollarSign}
+            sensitive
+            subSensitive
           />
           <KpiCard
             label="Clientes activos"
@@ -231,12 +251,14 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
             sub={`costos directos: ${fmtUSD(costosDirectosAno)}`}
             icon={Target}
             valueClassName={margenBruto == null ? 'text-muted-foreground' : margenBruto >= 0 ? 'text-success' : 'text-destructive'}
+            subSensitive
           />
           <KpiCard
             label="CAC"
-            value={cac != null ? fmtUSD(cac) : 'Sin datos'}
-            sub={`${nuevosClientesMes} cliente${nuevosClientesMes !== 1 ? 's' : ''} nuevo${nuevosClientesMes !== 1 ? 's' : ''} este mes`}
+            value={isAllTime ? 'Sin período definido' : cac != null ? fmtUSD(cac) : 'Sin datos'}
+            sub={isAllTime ? 'elegí un período acotado' : `${nuevosClientesPeriodo} cliente${nuevosClientesPeriodo !== 1 ? 's' : ''} nuevo${nuevosClientesPeriodo !== 1 ? 's' : ''} en el período`}
             icon={Target}
+            sensitive={!isAllTime && cac != null}
           />
         </div>
       </div>
@@ -251,26 +273,26 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
         <CardContent>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Ingresos operativos (histórico)</span>
-            <span className="font-semibold text-success">{fmtUSD(ingresosOperativosHistorico)}</span>
+            <span className="font-semibold text-success"><SensitiveAmount>{fmtUSD(ingresosOperativosHistorico)}</SensitiveAmount></span>
             <span className="text-muted-foreground">+</span>
             <span className="text-muted-foreground">Aportes de capital (histórico)</span>
-            <span className="font-semibold text-success">{fmtUSD(aportesHistorico)}</span>
+            <span className="font-semibold text-success"><SensitiveAmount>{fmtUSD(aportesHistorico)}</SensitiveAmount></span>
             <ArrowRight className="h-4 w-4 text-muted-foreground mx-1" />
             <span className="text-muted-foreground">Total cobrado</span>
-            <span className="font-semibold">{fmtUSD(totalCobrado)}</span>
+            <span className="font-semibold"><SensitiveAmount>{fmtUSD(totalCobrado)}</SensitiveAmount></span>
           </div>
           <div className="flex items-center pl-1 my-1">
             <ArrowDown className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">Total cobrado</span>
-            <span className="font-semibold">{fmtUSD(totalCobrado)}</span>
+            <span className="font-semibold"><SensitiveAmount>{fmtUSD(totalCobrado)}</SensitiveAmount></span>
             <span className="text-muted-foreground">−</span>
             <span className="text-muted-foreground">Egresos (histórico)</span>
-            <span className="font-semibold text-destructive">{fmtUSD(egresosHistorico)}</span>
+            <span className="font-semibold text-destructive"><SensitiveAmount>{fmtUSD(egresosHistorico)}</SensitiveAmount></span>
             <span className="text-muted-foreground">+</span>
             <span className="text-muted-foreground">Saldo inicial</span>
-            <span className="font-semibold">{fmtUSD(saldoInicial)}</span>
+            <span className="font-semibold"><SensitiveAmount>{fmtUSD(saldoInicial)}</SensitiveAmount></span>
           </div>
           <div className="flex items-center pl-1 my-1">
             <ArrowDown className="h-4 w-4 text-muted-foreground" />
@@ -278,7 +300,7 @@ export default function TabDashboard({ activeMonth, periodBounds, incomes, expen
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Caja actual</span>
             <span className={cn('text-lg font-bold', cajaActual >= 0 ? 'text-success' : 'text-destructive')}>
-              {fmtUSD(totalCobrado - egresosHistorico + saldoInicial)}
+              <SensitiveAmount>{fmtUSD(totalCobrado - egresosHistorico + saldoInicial)}</SensitiveAmount>
             </span>
           </div>
         </CardContent>

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { addMonths, subMonths, format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { Eye, EyeOff } from 'lucide-react';
+import { PeriodSelector } from '@/features/executive-dashboard/components/shared/PeriodSelector';
+import { getPeriodRange, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
+import { SensitiveDataProvider, useSensitiveData } from '@/features/meta-ads/context/SensitiveDataContext';
 import { getPeriodBounds } from '@/features/finanzas/lib/periodBounds';
 import type { CashOpeningBalance, Debt, Expense, FinanceTargets, Income } from '@/features/finanzas/lib/types';
 import type { ClientRow, InstallmentWithClient } from '@/components/finanzas/types';
@@ -24,9 +25,34 @@ const TABS = [
   { value: 'egresos', label: '💸 Egresos', Component: TabEgresos },
 ];
 
+// Same shape/behavior as ExecutiveDashboard.tsx's navMonth — reused
+// verbatim rather than reinvented.
+function navMonth(year: number, month: number, dir: 'prev' | 'next'): { year: number; month: number } {
+  if (dir === 'prev') return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+  return month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+}
+
 export default function Finanzas() {
-  const [activeMonth, setActiveMonth] = useState(new Date());
+  return (
+    <SensitiveDataProvider>
+      <FinanzasContent />
+    </SensitiveDataProvider>
+  );
+}
+
+function FinanzasContent() {
+  const { isHidden, toggle } = useSensitiveData();
+  const now = new Date();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Same PeriodSelector state shape as ExecutiveDashboard.tsx, but
+  // defaulting to preset 'all' ("Todo") instead of '30d'.
+  const [periodType, setPeriodType] = useState<PeriodType>('preset');
+  const [preset, setPreset] = useState<PresetKey>('all');
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [customSince, setCustomSince] = useState(() => now.toISOString().slice(0, 10));
+  const [customUntil, setCustomUntil] = useState(() => now.toISOString().slice(0, 10));
 
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -40,7 +66,7 @@ export default function Finanzas() {
   // Full datasets, loaded once — every tab filters/aggregates against
   // these client-side using periodBounds, per the pure-function design in
   // features/finanzas/lib (Paso A). No per-tab fetching, no re-fetching on
-  // month navigation.
+  // period navigation.
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [
@@ -69,15 +95,14 @@ export default function Finanzas() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const periodBounds = useMemo(() => getPeriodBounds(activeMonth), [activeMonth]);
-
-  function navMonth(dir: 'prev' | 'next') {
-    setActiveMonth((prev) => (dir === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1)));
-  }
+  const periodInput = { periodType, preset, year, month, customSince, customUntil };
+  const periodBounds = useMemo(() => getPeriodBounds(periodInput), [periodType, preset, year, month, customSince, customUntil]);
+  const monthLabel = useMemo(() => getPeriodRange(periodInput).label, [periodType, preset, year, month, customSince, customUntil]);
 
   const tabProps = {
-    activeMonth,
     periodBounds,
+    periodType,
+    preset,
     incomes,
     expenses,
     clients,
@@ -91,24 +116,29 @@ export default function Finanzas() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* ── Header + Month Nav ── */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1">
+      {/* ── Header + Period Selector ── */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">Finanzas</h1>
-          <p className="text-sm text-muted-foreground capitalize">{format(activeMonth, 'MMMM yyyy', { locale: es })}</p>
+          <p className="text-sm text-muted-foreground">{periodBounds.periodLabel}</p>
         </div>
-        <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonth('prev')}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium px-3 min-w-[140px] text-center capitalize">
-            {format(activeMonth, 'MMMM yyyy', { locale: es })}
-          </span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonth('next')}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={toggle} title={isHidden ? 'Mostrar datos sensibles' : 'Ocultar datos sensibles'}>
+          {isHidden ? <Eye className="h-4 w-4 mr-1.5" /> : <EyeOff className="h-4 w-4 mr-1.5" />}
+          {isHidden ? 'Mostrar' : 'Ocultar'}
+        </Button>
       </div>
+
+      <PeriodSelector
+        periodType={periodType}
+        preset={preset}
+        monthLabel={monthLabel}
+        customSince={customSince}
+        customUntil={customUntil}
+        onPresetChange={(p) => { setPeriodType('preset'); setPreset(p); }}
+        onModeChange={setPeriodType}
+        onNavMonth={(dir) => { const n = navMonth(year, month, dir); setYear(n.year); setMonth(n.month); }}
+        onCustomChange={(since, until) => { setCustomSince(since); setCustomUntil(until); }}
+      />
 
       {/* ── Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

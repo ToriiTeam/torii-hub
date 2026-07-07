@@ -16,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { calcCajaActual, calcDeuda, calcPatrimonioNeto, calcPorCobrar } from '@/features/finanzas/lib/financeCalc';
 import type { Income } from '@/features/finanzas/lib/types';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
 function fmtUSD(n: number): string {
@@ -27,8 +28,8 @@ function fmtDate(d: string | null): string {
   try { return format(parseISO(d), 'dd/MM/yy', { locale: es }); } catch { return '—'; }
 }
 
-function KpiCard({ label, value, icon: Icon, valueClassName }: {
-  label: string; value: string; icon: React.ComponentType<{ className?: string }>; valueClassName?: string;
+function KpiCard({ label, value, icon: Icon, valueClassName, sensitive }: {
+  label: string; value: string; icon: React.ComponentType<{ className?: string }>; valueClassName?: string; sensitive?: boolean;
 }) {
   return (
     <Card className="bg-card border-border/50">
@@ -37,7 +38,9 @@ function KpiCard({ label, value, icon: Icon, valueClassName }: {
           <p className="text-xs text-muted-foreground">{label}</p>
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-        <p className={cn('text-xl font-bold', valueClassName)}>{value}</p>
+        <p className={cn('text-xl font-bold', valueClassName)}>
+          {sensitive ? <SensitiveAmount>{value}</SensitiveAmount> : value}
+        </p>
       </CardContent>
     </Card>
   );
@@ -201,15 +204,17 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Total cobrado (histórico)</p>
-              <p className="text-lg font-bold text-success">{fmtUSD(totalCobradoHistorico)}</p>
+              <p className="text-lg font-bold text-success"><SensitiveAmount>{fmtUSD(totalCobradoHistorico)}</SensitiveAmount></p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Total egresos (histórico)</p>
-              <p className="text-lg font-bold text-destructive">{fmtUSD(totalEgresosHistorico)}</p>
+              <p className="text-lg font-bold text-destructive"><SensitiveAmount>{fmtUSD(totalEgresosHistorico)}</SensitiveAmount></p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Caja actual</p>
-              <p className={cn('text-lg font-bold', cajaActual >= 0 ? 'text-success' : 'text-destructive')}>{fmtUSD(cajaActual)}</p>
+              <p className={cn('text-lg font-bold', cajaActual >= 0 ? 'text-success' : 'text-destructive')}>
+                <SensitiveAmount>{fmtUSD(cajaActual)}</SensitiveAmount>
+              </p>
             </div>
           </div>
         </CardContent>
@@ -221,10 +226,10 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
           Qué tenés y qué debés
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Caja actual" value={fmtUSD(cajaActual)} icon={Wallet} valueClassName={cajaActual >= 0 ? 'text-success' : 'text-destructive'} />
-          <KpiCard label="Cuentas por cobrar" value={fmtUSD(porCobrar)} icon={Clock} valueClassName={porCobrar > 0 ? 'text-warning' : 'text-muted-foreground'} />
-          <KpiCard label="Deuda" value={fmtUSD(deuda)} icon={AlertTriangle} valueClassName={deuda > 0 ? 'text-destructive' : 'text-muted-foreground'} />
-          <KpiCard label="Patrimonio neto" value={fmtUSD(patrimonioNeto)} icon={DollarSign} valueClassName={patrimonioNeto >= 0 ? 'text-success' : 'text-destructive'} />
+          <KpiCard label="Caja actual" value={fmtUSD(cajaActual)} icon={Wallet} valueClassName={cajaActual >= 0 ? 'text-success' : 'text-destructive'} sensitive />
+          <KpiCard label="Cuentas por cobrar" value={fmtUSD(porCobrar)} icon={Clock} valueClassName={porCobrar > 0 ? 'text-warning' : 'text-muted-foreground'} sensitive />
+          <KpiCard label="Deuda" value={fmtUSD(deuda)} icon={AlertTriangle} valueClassName={deuda > 0 ? 'text-destructive' : 'text-muted-foreground'} sensitive />
+          <KpiCard label="Patrimonio neto" value={fmtUSD(patrimonioNeto)} icon={DollarSign} valueClassName={patrimonioNeto >= 0 ? 'text-success' : 'text-destructive'} sensitive />
         </div>
       </div>
 
@@ -249,7 +254,7 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
               {cuentasPorCobrar.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="text-sm font-medium">{clienteLabel(i, clientNameById)}</TableCell>
-                  <TableCell className="text-sm text-right font-medium">{fmtUSD(Number(i.amount))}</TableCell>
+                  <TableCell className="text-sm text-right font-medium"><SensitiveAmount>{fmtUSD(Number(i.amount))}</SensitiveAmount></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{fmtDate(i.due_date)}</TableCell>
                   <TableCell>{estadoBadge(i.status)}</TableCell>
                 </TableRow>
@@ -259,7 +264,7 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
               )}
               <TableRow className="border-t-2 bg-secondary/20 font-semibold">
                 <TableCell>Total</TableCell>
-                <TableCell className="text-right text-warning">{fmtUSD(porCobrar)}</TableCell>
+                <TableCell className="text-right text-warning"><SensitiveAmount>{fmtUSD(porCobrar)}</SensitiveAmount></TableCell>
                 <TableCell /><TableCell />
               </TableRow>
             </TableBody>
@@ -296,7 +301,7 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
                 <TableRow key={d.id} className={cn(d.paid && 'opacity-50')}>
                   <TableCell className="text-sm font-medium">{d.creditor}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{d.note ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-right font-medium">{fmtUSD(Number(d.amount))}</TableCell>
+                  <TableCell className="text-sm text-right font-medium"><SensitiveAmount>{fmtUSD(Number(d.amount))}</SensitiveAmount></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{fmtDate(d.due_date)}</TableCell>
                   <TableCell className="text-center">
                     <Switch checked={d.paid} onCheckedChange={(v) => toggleDebtPaid(d.id, v)} />
@@ -313,7 +318,7 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
               )}
               <TableRow className="border-t-2 bg-secondary/20 font-semibold">
                 <TableCell colSpan={2}>Total (no pagada)</TableCell>
-                <TableCell className="text-right text-destructive">{fmtUSD(deuda)}</TableCell>
+                <TableCell className="text-right text-destructive"><SensitiveAmount>{fmtUSD(deuda)}</SensitiveAmount></TableCell>
                 <TableCell /><TableCell /><TableCell />
               </TableRow>
             </TableBody>

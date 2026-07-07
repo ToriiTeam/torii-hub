@@ -16,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { INCOME_STATUSES, INCOME_TYPES } from '@/features/finanzas/lib/types';
 import type { Income, IncomeStatus, IncomeType } from '@/features/finanzas/lib/types';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { ClientRow, FinanzasTabProps } from './types';
 
 // Radix's SelectItem forbids value="" — same sentinel pattern used
@@ -171,19 +172,28 @@ function AddIncomeDialog({ clients, onClose, onSaved }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabProps) {
+export default function TabIngresos({ periodBounds, incomes, clients, refetch }: FinanzasTabProps) {
   const [adding, setAdding] = useState(false);
+  const { periodStart, periodEnd } = periodBounds;
 
   const clientNameById = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
 
-  const sorted = useMemo(
-    () => [...incomes].sort((a, b) => b.date.localeCompare(a.date)),
-    [incomes],
+  // "Todo" (el default) resuelve a periodStart='2000-01-01', o sea que en la
+  // práctica no filtra nada — pero queda cableado para cuando se elija
+  // cualquier otro período.
+  const filtered = useMemo(
+    () => incomes.filter((i) => i.date >= periodStart && i.date <= periodEnd),
+    [incomes, periodStart, periodEnd],
   );
 
-  const totalCobrado = useMemo(() => incomes.filter((i) => i.status === 'Paid').reduce((s, i) => s + Number(i.amount), 0), [incomes]);
-  const totalPendiente = useMemo(() => incomes.filter((i) => i.status === 'Pending').reduce((s, i) => s + Number(i.amount), 0), [incomes]);
-  const totalOverdue = useMemo(() => incomes.filter((i) => i.status === 'Overdue').reduce((s, i) => s + Number(i.amount), 0), [incomes]);
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => b.date.localeCompare(a.date)),
+    [filtered],
+  );
+
+  const totalCobrado = useMemo(() => filtered.filter((i) => i.status === 'Paid').reduce((s, i) => s + Number(i.amount), 0), [filtered]);
+  const totalPendiente = useMemo(() => filtered.filter((i) => i.status === 'Pending').reduce((s, i) => s + Number(i.amount), 0), [filtered]);
+  const totalOverdue = useMemo(() => filtered.filter((i) => i.status === 'Overdue').reduce((s, i) => s + Number(i.amount), 0), [filtered]);
 
   async function handleStatusChange(income: Income, newStatus: string) {
     const { error } = await supabase.from('incomes').update({ status: newStatus }).eq('id', income.id);
@@ -211,7 +221,7 @@ export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabPr
               <p className="text-xs text-muted-foreground">Cobrado</p>
               <TrendingUp className="h-4 w-4 text-success" />
             </div>
-            <p className="text-xl font-bold text-success">{fmtUSD(totalCobrado)}</p>
+            <p className="text-xl font-bold text-success"><SensitiveAmount>{fmtUSD(totalCobrado)}</SensitiveAmount></p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -220,7 +230,7 @@ export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabPr
               <p className="text-xs text-muted-foreground">Pendiente</p>
               <Clock className="h-4 w-4 text-warning" />
             </div>
-            <p className="text-xl font-bold text-warning">{fmtUSD(totalPendiente)}</p>
+            <p className="text-xl font-bold text-warning"><SensitiveAmount>{fmtUSD(totalPendiente)}</SensitiveAmount></p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -229,7 +239,7 @@ export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabPr
               <p className="text-xs text-muted-foreground">Overdue</p>
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </div>
-            <p className="text-xl font-bold text-destructive">{fmtUSD(totalOverdue)}</p>
+            <p className="text-xl font-bold text-destructive"><SensitiveAmount>{fmtUSD(totalOverdue)}</SensitiveAmount></p>
           </CardContent>
         </Card>
       </div>
@@ -239,7 +249,7 @@ export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabPr
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Ingresos ({incomes.length})
+              Ingresos ({filtered.length})
             </CardTitle>
             <Button size="sm" onClick={() => setAdding(true)} className="bg-primary h-7 text-xs px-2 ml-auto">
               <Plus className="h-3 w-3 mr-1" />Agregar Ingreso
@@ -266,7 +276,7 @@ export default function TabIngresos({ incomes, clients, refetch }: FinanzasTabPr
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(i.date)}</TableCell>
                   <TableCell className="text-sm font-medium">{clienteLabel(i, clientNameById)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{i.model ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-right font-medium text-success">{fmtUSD(Number(i.amount))}</TableCell>
+                  <TableCell className="text-sm text-right font-medium text-success"><SensitiveAmount>{fmtUSD(Number(i.amount))}</SensitiveAmount></TableCell>
                   <TableCell className="text-xs text-center text-muted-foreground">
                     {i.installment_number ? `${i.installment_number}/${i.total_installments ?? '?'}` : '—'}
                   </TableCell>

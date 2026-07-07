@@ -1,23 +1,31 @@
-import { startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
+import { getPeriodRange, type PeriodInput } from '@/features/executive-dashboard/lib/periodRange';
 
 export interface PeriodBounds {
-  monthStart: string; // yyyy-MM-dd
-  monthEnd: string;
-  yearStart: string;
-  yearEnd: string;
+  periodStart: string; // yyyy-MM-dd — the literal selected filter (7d/30d/90d/Todo/Mes/Personalizado)
+  periodEnd: string;
+  periodLabel: string;
+  currentYear: number;
+  yearStart: string; // yyyy-01-01
+  yearEnd: string;   // yyyy-12-31
 }
 
-// yearEnd is the actual calendar year end (Dec 31), not "through the active
-// month" — Resultado's 12-month table needs the whole year regardless of
-// which month is active. A tab that needs a partial-year cutoff (e.g.
-// Dashboard's "acumulado del año activo" running only through the active
-// month) composes its own range as [yearStart, monthEnd] instead of adding
-// a special field here.
-export function getPeriodBounds(activeMonth: Date): PeriodBounds {
+// Year-scoped sections (Resultado's 12-month table, Métricas' "Rentabilidad
+// acumulado {año}", Dashboard's "Acumulado {año}") need a real single
+// calendar year no matter what — "Todo"/7d/30d/90d/Personalizado don't
+// carry one. Rule: when the period selector is in 'month' mode, anchor to
+// the year of the navigated month (preserves browsing to past years via
+// the ← → arrows); for every other mode, anchor to the real current
+// calendar year, since there's nothing else to anchor to.
+export function getPeriodBounds(input: PeriodInput): PeriodBounds {
+  const range = getPeriodRange(input);
+  const currentYear = input.periodType === 'month' ? input.year : new Date().getFullYear();
+
   return {
-    monthStart: format(startOfMonth(activeMonth), 'yyyy-MM-dd'),
-    monthEnd: format(endOfMonth(activeMonth), 'yyyy-MM-dd'),
-    yearStart: format(startOfYear(activeMonth), 'yyyy-MM-dd'),
-    yearEnd: format(endOfYear(activeMonth), 'yyyy-MM-dd'),
+    periodStart: range.since,
+    periodEnd: range.until,
+    periodLabel: range.label,
+    currentYear,
+    yearStart: `${currentYear}-01-01`,
+    yearEnd: `${currentYear}-12-31`,
   };
 }

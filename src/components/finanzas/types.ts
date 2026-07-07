@@ -1,4 +1,5 @@
 import type { Database } from '@/integrations/supabase/types';
+import type { PeriodType, PresetKey } from '@/features/executive-dashboard/lib/periodRange';
 import type { PeriodBounds } from '@/features/finanzas/lib/periodBounds';
 import type { CashOpeningBalance, Debt, Expense, FinanceTargets, Income } from '@/features/finanzas/lib/types';
 
@@ -21,8 +22,13 @@ export interface InstallmentWithClient extends ClientInstallmentRow {
 // CRUD action — no tab does its own supabase calls for the datasets listed
 // here.
 export interface FinanzasTabProps {
-  activeMonth: Date;
   periodBounds: PeriodBounds;
+  // Exposed alongside periodBounds so tabs can special-case the "Todo"
+  // preset — e.g. CAC over an unbounded multi-year window isn't a
+  // meaningful single number, so TabDashboard shows "Sin período definido"
+  // instead of computing it when periodType==='preset' && preset==='all'.
+  periodType: PeriodType;
+  preset: PresetKey;
 
   incomes: Income[];
   expenses: Expense[];

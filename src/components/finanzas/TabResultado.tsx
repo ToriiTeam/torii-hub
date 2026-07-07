@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { categorize } from '@/features/finanzas/lib/categorize';
 import type { ExpenseCategoryBucket } from '@/features/finanzas/lib/categorize';
 import type { Expense, Income } from '@/features/finanzas/lib/types';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -80,8 +81,8 @@ function computeColumn(label: string, incomes: Income[], expenses: Expense[], si
   return { label, ingresosClientes, otrosIngresos, totalIngresos, porCategoria, totalEgresos, resultado, margen };
 }
 
-export default function TabResultado({ activeMonth, incomes, expenses }: FinanzasTabProps) {
-  const year = activeMonth.getFullYear();
+export default function TabResultado({ periodBounds, incomes, expenses }: FinanzasTabProps) {
+  const year = periodBounds.currentYear;
 
   const columns = useMemo(() => {
     const months = MONTH_LABELS.map((label, idx) => {
@@ -128,19 +129,19 @@ export default function TabResultado({ activeMonth, incomes, expenses }: Finanza
               <TableRow>
                 <TableCell className="text-sm sticky left-0 bg-card">Ingresos por clientes</TableCell>
                 {allColumns.map((col) => (
-                  <TableCell key={col.label} className="text-sm text-right text-success">{fmtUSD(col.ingresosClientes)}</TableCell>
+                  <TableCell key={col.label} className="text-sm text-right text-success"><SensitiveAmount>{fmtUSD(col.ingresosClientes)}</SensitiveAmount></TableCell>
                 ))}
               </TableRow>
               <TableRow>
                 <TableCell className="text-sm sticky left-0 bg-card">Otros ingresos operativos</TableCell>
                 {allColumns.map((col) => (
-                  <TableCell key={col.label} className="text-sm text-right text-success">{fmtUSD(col.otrosIngresos)}</TableCell>
+                  <TableCell key={col.label} className="text-sm text-right text-success"><SensitiveAmount>{fmtUSD(col.otrosIngresos)}</SensitiveAmount></TableCell>
                 ))}
               </TableRow>
               <TableRow className="bg-secondary/20 font-semibold">
                 <TableCell className="text-sm sticky left-0 bg-secondary/20">TOTAL INGRESOS OPERATIVOS</TableCell>
                 {allColumns.map((col) => (
-                  <TableCell key={col.label} className="text-sm text-right text-success">{fmtUSD(col.totalIngresos)}</TableCell>
+                  <TableCell key={col.label} className="text-sm text-right text-success"><SensitiveAmount>{fmtUSD(col.totalIngresos)}</SensitiveAmount></TableCell>
                 ))}
               </TableRow>
 
@@ -149,14 +150,14 @@ export default function TabResultado({ activeMonth, incomes, expenses }: Finanza
                 <TableRow key={cat}>
                   <TableCell className="text-sm pl-6 sticky left-0 bg-card text-muted-foreground">{cat}</TableCell>
                   {allColumns.map((col) => (
-                    <TableCell key={col.label} className="text-sm text-right">{fmtUSD(col.porCategoria[cat])}</TableCell>
+                    <TableCell key={col.label} className="text-sm text-right"><SensitiveAmount>{fmtUSD(col.porCategoria[cat])}</SensitiveAmount></TableCell>
                   ))}
                 </TableRow>
               ))}
               <TableRow className="bg-secondary/20 font-semibold">
                 <TableCell className="text-sm sticky left-0 bg-secondary/20">TOTAL EGRESOS</TableCell>
                 {allColumns.map((col) => (
-                  <TableCell key={col.label} className="text-sm text-right text-destructive">{fmtUSD(col.totalEgresos)}</TableCell>
+                  <TableCell key={col.label} className="text-sm text-right text-destructive"><SensitiveAmount>{fmtUSD(col.totalEgresos)}</SensitiveAmount></TableCell>
                 ))}
               </TableRow>
 
@@ -168,7 +169,7 @@ export default function TabResultado({ activeMonth, incomes, expenses }: Finanza
                     key={col.label}
                     className={cn('text-sm text-right', col.resultado >= 0 ? 'text-success' : 'text-destructive')}
                   >
-                    {fmtUSD(col.resultado)}
+                    <SensitiveAmount>{fmtUSD(col.resultado)}</SensitiveAmount>
                   </TableCell>
                 ))}
               </TableRow>

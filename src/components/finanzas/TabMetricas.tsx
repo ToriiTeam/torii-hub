@@ -10,6 +10,7 @@ import { DollarSign, Users, Target, Save, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { categorize } from '@/features/finanzas/lib/categorize';
 import type { ExpenseCategoryBucket } from '@/features/finanzas/lib/categorize';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
 const CATEGORY_ORDER: ExpenseCategoryBucket[] = ['Equipo', 'Adquisición', 'Software', 'Publicidad', 'Mentoría', 'Otros'];
@@ -33,8 +34,9 @@ function inRange(dateStr: string | null, since: string, until: string): boolean 
   return dateStr >= since && dateStr <= until;
 }
 
-function KpiCard({ label, value, sub, icon: Icon, valueClassName }: {
+function KpiCard({ label, value, sub, icon: Icon, valueClassName, sensitive, subSensitive }: {
   label: string; value: string; sub?: string; icon: React.ComponentType<{ className?: string }>; valueClassName?: string;
+  sensitive?: boolean; subSensitive?: boolean;
 }) {
   return (
     <Card className="bg-card border-border/50">
@@ -43,8 +45,14 @@ function KpiCard({ label, value, sub, icon: Icon, valueClassName }: {
           <p className="text-xs text-muted-foreground">{label}</p>
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-        <p className={cn('text-xl font-bold', valueClassName)}>{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+        <p className={cn('text-xl font-bold', valueClassName)}>
+          {sensitive ? <SensitiveAmount>{value}</SensitiveAmount> : value}
+        </p>
+        {sub && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {subSensitive ? <SensitiveAmount>{sub}</SensitiveAmount> : sub}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -59,9 +67,8 @@ interface TargetsForm {
   new_clients_ytd: string;
 }
 
-export default function TabMetricas({ activeMonth, periodBounds, incomes, expenses, financeTargets, refetch }: FinanzasTabProps) {
-  const { monthStart, monthEnd, yearStart, yearEnd } = periodBounds;
-  const activeYear = activeMonth.getFullYear();
+export default function TabMetricas({ periodBounds, incomes, expenses, financeTargets, refetch }: FinanzasTabProps) {
+  const { periodStart, periodEnd, yearStart, yearEnd, currentYear } = periodBounds;
 
   // ── 1. Rentabilidad (año calendario completo, NO YTD-hasta-mes) ─────────
   const ingresosAno = useMemo(
@@ -95,14 +102,16 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
     ingresosClienteAno.length,
   );
 
-  const ingresosClienteMes = useMemo(
+  // "del mes activo" generalizado a "del período seleccionado" — ya no hay
+  // un mes fijo por defecto (el default ahora es "Todo").
+  const ingresosClientePeriodo = useMemo(
     () => incomes
-      .filter((i) => i.status === 'Paid' && i.type === 'Cliente' && inRange(i.date, monthStart, monthEnd))
+      .filter((i) => i.status === 'Paid' && i.type === 'Cliente' && inRange(i.date, periodStart, periodEnd))
       .reduce((s, i) => s + Number(i.amount), 0),
-    [incomes, monthStart, monthEnd],
+    [incomes, periodStart, periodEnd],
   );
   const ingresoPorClienteActivo = financeTargets?.current_active_clients
-    ? safeDiv(ingresosClienteMes, financeTargets.current_active_clients)
+    ? safeDiv(ingresosClientePeriodo, financeTargets.current_active_clients)
     : null;
 
   // ── 3. Adquisición ────────────────────────────────────────────────────────
@@ -199,7 +208,7 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
       {/* ── 1. Rentabilidad ── */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-          Rentabilidad (acumulado {activeYear})
+          Rentabilidad (acumulado {currentYear})
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard
@@ -208,6 +217,7 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
             sub={`costos directos: ${fmtUSD(costosDirectosAno)}`}
             icon={Target}
             valueClassName={margenBruto == null ? 'text-muted-foreground' : margenBruto >= 0 ? 'text-success' : 'text-destructive'}
+            subSensitive
           />
           <KpiCard
             label="Margen neto"
@@ -220,8 +230,9 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
             value={fmtUSD(resultadoAno)}
             icon={DollarSign}
             valueClassName={resultadoAno >= 0 ? 'text-success' : 'text-destructive'}
+            sensitive
           />
-          <KpiCard label="Ingresos operativos" value={fmtUSD(ingresosAno)} icon={DollarSign} valueClassName="text-success" />
+          <KpiCard label="Ingresos operativos" value={fmtUSD(ingresosAno)} icon={DollarSign} valueClassName="text-success" sensitive />
         </div>
       </div>
 
@@ -236,6 +247,8 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
             value={fmtUSD(financeTargets?.current_mrr ?? null)}
             sub={financeTargets?.target_mrr != null ? `objetivo: ${fmtUSD(financeTargets.target_mrr)}` : undefined}
             icon={DollarSign}
+            sensitive
+            subSensitive
           />
           <KpiCard
             label="Clientes activos"
@@ -246,14 +259,16 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
           <KpiCard
             label="Ticket promedio"
             value={fmtUSD(ticketPromedio)}
-            sub={`${ingresosClienteAno.length} cobro${ingresosClienteAno.length !== 1 ? 's' : ''} en ${activeYear}`}
+            sub={`${ingresosClienteAno.length} cobro${ingresosClienteAno.length !== 1 ? 's' : ''} en ${currentYear}`}
             icon={DollarSign}
+            sensitive
           />
           <KpiCard
             label="Ingreso por cliente activo"
             value={ingresoPorClienteActivo != null ? fmtUSD(ingresoPorClienteActivo) : 'Sin datos'}
-            sub="del mes activo"
+            sub="del período seleccionado"
             icon={Users}
+            sensitive={ingresoPorClienteActivo != null}
           />
         </div>
       </div>
@@ -261,17 +276,18 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
       {/* ── 3. Adquisición ── */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-          Adquisición ({activeYear})
+          Adquisición ({currentYear})
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Publicidad" value={fmtUSD(publicidadAno)} icon={DollarSign} />
-          <KpiCard label="Comisiones + Helper" value={fmtUSD(adquisicionAno)} icon={DollarSign} />
-          <KpiCard label="Costo de adquisición total" value={fmtUSD(costoAdquisicionTotal)} icon={DollarSign} />
+          <KpiCard label="Publicidad" value={fmtUSD(publicidadAno)} icon={DollarSign} sensitive />
+          <KpiCard label="Comisiones + Helper" value={fmtUSD(adquisicionAno)} icon={DollarSign} sensitive />
+          <KpiCard label="Costo de adquisición total" value={fmtUSD(costoAdquisicionTotal)} icon={DollarSign} sensitive />
           <KpiCard
             label="CAC"
             value={cac != null ? fmtUSD(cac) : 'Sin datos'}
             sub={`${nuevosClientes} cliente${nuevosClientes !== 1 ? 's' : ''} nuevo${nuevosClientes !== 1 ? 's' : ''} (YTD)`}
             icon={Target}
+            sensitive={cac != null}
           />
         </div>
       </div>
@@ -280,7 +296,7 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
       <Card className="bg-card border-border/50">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-            Estructura de costos — {activeYear}
+            Estructura de costos — {currentYear}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
@@ -296,13 +312,13 @@ export default function TabMetricas({ activeMonth, periodBounds, incomes, expens
               {estructuraCostos.map(({ cat, monto, pct }) => (
                 <TableRow key={cat}>
                   <TableCell className="text-sm font-medium">{cat}</TableCell>
-                  <TableCell className="text-sm text-right">{fmtUSD(monto)}</TableCell>
+                  <TableCell className="text-sm text-right"><SensitiveAmount>{fmtUSD(monto)}</SensitiveAmount></TableCell>
                   <TableCell className="text-sm text-right text-muted-foreground">{fmtPct(pct)}</TableCell>
                 </TableRow>
               ))}
               <TableRow className="border-t-2 bg-secondary/20 font-semibold">
-                <TableCell>Total egresos {activeYear}</TableCell>
-                <TableCell className="text-right">{fmtUSD(egresosAno)}</TableCell>
+                <TableCell>Total egresos {currentYear}</TableCell>
+                <TableCell className="text-right"><SensitiveAmount>{fmtUSD(egresosAno)}</SensitiveAmount></TableCell>
                 <TableCell className="text-right text-muted-foreground">100%</TableCell>
               </TableRow>
             </TableBody>

@@ -17,6 +17,7 @@ import { es } from 'date-fns/locale';
 import { EXPENSE_COST_TYPES } from '@/features/finanzas/lib/types';
 import type { ExpenseCostType } from '@/features/finanzas/lib/types';
 import type { ExpenseCategoryBucket } from '@/features/finanzas/lib/categorize';
+import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
 // The 6 canonical buckets from categorize.ts — used here directly as the
@@ -145,17 +146,26 @@ function AddEgresoDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
+export default function TabEgresos({ periodBounds, expenses, refetch }: FinanzasTabProps) {
   const [adding, setAdding] = useState(false);
+  const { periodStart, periodEnd } = periodBounds;
 
-  const sorted = useMemo(
-    () => [...expenses].sort((a, b) => b.date.localeCompare(a.date)),
-    [expenses],
+  // "Todo" (el default) resuelve a periodStart='2000-01-01', o sea que en la
+  // práctica no filtra nada — pero queda cableado para cuando se elija
+  // cualquier otro período.
+  const filtered = useMemo(
+    () => expenses.filter((e) => e.date >= periodStart && e.date <= periodEnd),
+    [expenses, periodStart, periodEnd],
   );
 
-  const totalCF = useMemo(() => expenses.filter((e) => e.cost_type === 'CF').reduce((s, e) => s + Number(e.amount), 0), [expenses]);
-  const totalCV = useMemo(() => expenses.filter((e) => e.cost_type === 'CV').reduce((s, e) => s + Number(e.amount), 0), [expenses]);
-  const totalGeneral = useMemo(() => expenses.reduce((s, e) => s + Number(e.amount), 0), [expenses]);
+  const sorted = useMemo(
+    () => [...filtered].sort((a, b) => b.date.localeCompare(a.date)),
+    [filtered],
+  );
+
+  const totalCF = useMemo(() => filtered.filter((e) => e.cost_type === 'CF').reduce((s, e) => s + Number(e.amount), 0), [filtered]);
+  const totalCV = useMemo(() => filtered.filter((e) => e.cost_type === 'CV').reduce((s, e) => s + Number(e.amount), 0), [filtered]);
+  const totalGeneral = useMemo(() => filtered.reduce((s, e) => s + Number(e.amount), 0), [filtered]);
 
   async function handleDelete(id: string) {
     if (!window.confirm('¿Eliminar este egreso? Esta acción no se puede deshacer.')) return;
@@ -176,7 +186,7 @@ export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
               <p className="text-xs text-muted-foreground">Costos Fijos (CF)</p>
               <TrendingDown className="h-4 w-4 text-info" />
             </div>
-            <p className="text-xl font-bold text-destructive">{fmtUSD(totalCF)}</p>
+            <p className="text-xl font-bold text-destructive"><SensitiveAmount>{fmtUSD(totalCF)}</SensitiveAmount></p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -185,7 +195,7 @@ export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
               <p className="text-xs text-muted-foreground">Costos Variables (CV)</p>
               <TrendingDown className="h-4 w-4 text-warning" />
             </div>
-            <p className="text-xl font-bold text-destructive">{fmtUSD(totalCV)}</p>
+            <p className="text-xl font-bold text-destructive"><SensitiveAmount>{fmtUSD(totalCV)}</SensitiveAmount></p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -194,7 +204,7 @@ export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
               <p className="text-xs text-muted-foreground">Total general</p>
               <DollarSign className="h-4 w-4 text-destructive" />
             </div>
-            <p className="text-xl font-bold text-destructive">{fmtUSD(totalGeneral)}</p>
+            <p className="text-xl font-bold text-destructive"><SensitiveAmount>{fmtUSD(totalGeneral)}</SensitiveAmount></p>
           </CardContent>
         </Card>
       </div>
@@ -204,7 +214,7 @@ export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Egresos ({expenses.length})
+              Egresos ({filtered.length})
             </CardTitle>
             <Button size="sm" onClick={() => setAdding(true)} className="bg-primary h-7 text-xs px-2 ml-auto">
               <Plus className="h-3 w-3 mr-1" />Agregar Egreso
@@ -233,7 +243,7 @@ export default function TabEgresos({ expenses, refetch }: FinanzasTabProps) {
                   </TableCell>
                   <TableCell>{categoryBadge(e.category)}</TableCell>
                   <TableCell>{costTypeBadge(e.cost_type)}</TableCell>
-                  <TableCell className="text-sm text-right font-medium text-destructive">{fmtUSD(Number(e.amount))}</TableCell>
+                  <TableCell className="text-sm text-right font-medium text-destructive"><SensitiveAmount>{fmtUSD(Number(e.amount))}</SensitiveAmount></TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => handleDelete(e.id)}>
                       <Trash2 className="h-3 w-3" />
