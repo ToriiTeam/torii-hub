@@ -162,7 +162,7 @@ export default function ExecutiveDashboard() {
           )
         ) : (
           toriiData && vslFunnelData && (
-            <VslFunnelView toriiData={toriiData} vslFunnelData={vslFunnelData} nuevoToriiOnly={nuevoToriiOnly} />
+            <VslFunnelView metrics={toriiData} vslFunnelData={vslFunnelData} nuevoToriiOnly={nuevoToriiOnly} />
           )
         )
       ) : (

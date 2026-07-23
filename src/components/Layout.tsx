@@ -58,7 +58,7 @@ interface LayoutProps {
 
 // Auditor role sees exactly these 2 sections — see App.tsx, which also
 // makes every other route unreachable for them, not just hidden here.
-const AUDITOR_NAV_HREFS = ['/meta-ads', '/vsl-tracking'];
+const AUDITOR_NAV_HREFS = ['/dashboard', '/meta-ads', '/vsl-tracking'];
 
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut, isAuditor } = useAuth();

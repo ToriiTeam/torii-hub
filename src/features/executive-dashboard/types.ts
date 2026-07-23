@@ -137,3 +137,14 @@ export interface ToriiData {
   healthInstallments: ClientInstallmentRow[];
   healthReservas: number;
 }
+
+// Exactly what VslFunnelView.tsx reads — a narrow slice so the auditor
+// route can supply it from its own lean fetch (fetchAuditorVslFunnel.ts,
+// which never touches clients/incomes/expenses/client_installments/
+// delivery_phases) instead of full ToriiData. ToriiData satisfies this
+// structurally, so the regular Executive Dashboard flow needs no change.
+export interface VslFunnelMetrics {
+  ads: Pick<AdsMetrics, 'inversion' | 'impresiones' | 'clics' | 'cpc' | 'ctr' | 'cpm'>;
+  closing: Pick<ClosingMetrics, 'reuniones' | 'asistieron' | 'cierres' | 'noCierres'>;
+  qualifiedAdsCalls: number;
+}

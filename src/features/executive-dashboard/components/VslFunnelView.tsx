@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { MetricInfo, type MetricInfoProps } from './shared/MetricInfo';
 import { calcCostoPorLlamadaCalificada } from '../lib/businessHealth';
-import type { ToriiData } from '../types';
+import type { VslFunnelMetrics } from '../types';
 import type { VslFunnelData } from '../lib/fetchVslFunnel';
 
 function fmtMoney(v: number): string {
@@ -37,22 +37,22 @@ function MiniKpi({ label, value, sub, info }: { label: string; value: string; su
 }
 
 interface VslFunnelViewProps {
-  toriiData: ToriiData;
+  metrics: VslFunnelMetrics;
   vslFunnelData: VslFunnelData;
   nuevoToriiOnly: boolean;
 }
 
 const LANDING_SCOPE = "landing_id = 'torii-principal'";
 
-export function VslFunnelView({ toriiData, vslFunnelData, nuevoToriiOnly }: VslFunnelViewProps) {
-  const { ads, closing } = toriiData;
+export function VslFunnelView({ metrics, vslFunnelData, nuevoToriiOnly }: VslFunnelViewProps) {
+  const { ads, closing } = metrics;
   const v = vslFunnelData;
 
   const adsScope = nuevoToriiOnly
     ? "Piso 'Nuevo Torii': 2026-06-01 en adelante"
     : 'Sin filtro adicional — usa el período seleccionado arriba';
 
-  const cpbc = calcCostoPorLlamadaCalificada(ads.inversion, toriiData.qualifiedAdsCalls);
+  const cpbc = calcCostoPorLlamadaCalificada(ads.inversion, metrics.qualifiedAdsCalls);
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

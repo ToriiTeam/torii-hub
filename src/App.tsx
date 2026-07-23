@@ -18,6 +18,7 @@ import VslTracking from "@/pages/VslTracking";
 import MaquinaCierres from "@/pages/MaquinaCierres";
 import MetaAds from "@/pages/MetaAds";
 import ContenidoOrganico from "@/pages/ContenidoOrganico";
+import AuditorVslFunnel from "@/pages/AuditorVslFunnel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,18 +41,20 @@ function AppContent() {
     return <Login />;
   }
 
-  // Auditor role: exactly 2 routes exist for this user, nothing else — not
+  // Auditor role: exactly 3 routes exist for this user, nothing else — not
   // just hidden from the sidebar, genuinely unreachable. Any other path
-  // (typed by hand, an old bookmark, whatever) redirects to /meta-ads.
+  // (typed by hand, an old bookmark, whatever) redirects to /dashboard,
+  // the default landing.
   if (isAuditor) {
     return (
       <Routes>
         <Route path="*" element={
           <Layout>
             <Routes>
+              <Route path="/dashboard" element={<AuditorVslFunnel />} />
               <Route path="/meta-ads" element={<MetaAds />} />
               <Route path="/vsl-tracking" element={<VslTracking />} />
-              <Route path="*" element={<Navigate to="/meta-ads" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>
         } />
