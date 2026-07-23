@@ -6,7 +6,7 @@ function fmtDate(d: Date): string {
 
 // Mirrors presetToRange() in supabase/functions/meta-ads-proxy/index.ts —
 // kept in sync manually since one runs in Deno and the other in the browser.
-function presetToRange(preset: DatePreset): { since: string; until: string } {
+export function presetToRange(preset: DatePreset): { since: string; until: string } {
   const today = new Date()
   const d = (n: number) => { const r = new Date(today); r.setDate(today.getDate() - n); return r }
   switch (preset) {
@@ -25,6 +25,15 @@ function presetToRange(preset: DatePreset): { since: string; until: string } {
     }
     default: return { since: fmtDate(d(6)), until: fmtDate(today) }
   }
+}
+
+// Resolves the currently-selected range to concrete (since, until) dates —
+// custom range wins when set, otherwise the preset is expanded.
+export function currentPeriodRange(
+  preset: DatePreset,
+  customRange: { since: string; until: string } | null,
+): { since: string; until: string } {
+  return customRange ?? presetToRange(preset)
 }
 
 // Computes the previous period of equal duration, ending the day before the

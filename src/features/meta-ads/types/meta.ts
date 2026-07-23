@@ -123,25 +123,41 @@ export function extractInitiateCheckout(row: InsightRow): number {
   )
 }
 
-export function extractLeads(row: InsightRow): number {
+// "Resultados" — not a fixed action type. Meta doesn't expose "what this
+// campaign is optimizing for" as a structured field, only campaign_objective
+// (a broad category like OUTCOME_LEADS) plus whatever actually happened in
+// `actions`. Confirmed against real data (2026-07-22): campaigns running
+// native Meta lead forms report 'lead' directly, but campaigns sending
+// traffic to an external landing with a pixel (e.g. torii-principal, an
+// OUTCOME_LEADS campaign tracking bookings) report 'offsite_conversion.
+// fb_pixel_custom' instead — extractLeads() used to return 0 for those.
+// fb_pixel_custom is a generic bucket (any custom pixel event, not
+// necessarily just one) — if an account ever fires two distinct custom
+// events on the same campaign this would sum them indistinguishably; no
+// such case seen in the accounts checked.
+export function extractResultado(row: InsightRow): number {
   return (
     extractAction(row.actions, 'lead') ||
+    extractAction(row.actions, 'onsite_conversion.lead_grouped') ||
     extractAction(row.actions, 'offsite_conversion.fb_pixel_lead') ||
-    extractAction(row.actions, 'omni_lead')
+    extractAction(row.actions, 'omni_lead') ||
+    extractAction(row.actions, 'offsite_conversion.fb_pixel_custom')
   )
 }
 
-export function extractCostPerLead(row: InsightRow): number {
+export function extractCostoPorResultadoRaw(row: InsightRow): number {
   return (
     extractAction(row.cost_per_action_type, 'lead') ||
+    extractAction(row.cost_per_action_type, 'onsite_conversion.lead_grouped') ||
     extractAction(row.cost_per_action_type, 'offsite_conversion.fb_pixel_lead') ||
-    extractAction(row.cost_per_action_type, 'omni_lead')
+    extractAction(row.cost_per_action_type, 'omni_lead') ||
+    extractAction(row.cost_per_action_type, 'offsite_conversion.fb_pixel_custom')
   )
 }
 
-export function extractCpl(row: InsightRow): number | null {
-  const cpl = extractCostPerLead(row)
-  return cpl > 0 ? cpl : null
+export function extractCostoPorResultado(row: InsightRow): number | null {
+  const cost = extractCostoPorResultadoRaw(row)
+  return cost > 0 ? cost : null
 }
 
 export function extractMessages(row: InsightRow): number {
@@ -179,7 +195,7 @@ function classifyObjective(row: InsightRow): PrimaryResult['objective'] {
   if (obj.includes('AWARENESS') || obj.includes('REACH') || obj === 'BRAND_AWARENESS') return 'awareness'
 
   if (extractPurchases(row) > 0) return 'sales'
-  if (extractLeads(row) > 0) return 'leads'
+  if (extractResultado(row) > 0) return 'leads'
   if (extractMessages(row) > 0) return 'messages'
 
   return 'other'
@@ -200,8 +216,8 @@ export function getPrimaryResult(row: InsightRow): PrimaryResult {
     case 'leads':
       return {
         objective,
-        value: extractLeads(row),
-        cost: extractCostPerLead(row),
+        value: extractResultado(row),
+        cost: extractCostoPorResultadoRaw(row),
         label: 'Leads',
         costLabel: 'Costo/Lead',
       }

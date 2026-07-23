@@ -6,7 +6,7 @@ import { useMetaApi } from '../../hooks/useMetaApi'
 import { auditRows, entityIdsWithSeverity, getHealthSummary } from '../../lib/auditEngine'
 import type { AuditSeverity } from '../../types/audit'
 import type { InsightRow } from '../../types/meta'
-import { extractLeads, extractCpl, extractLinkClicks } from '../../types/meta'
+import { extractResultado, extractCostoPorResultado, extractLinkClicks } from '../../types/meta'
 import { DataTable } from '../common/DataTable'
 import type { Column, FilterConfig } from '../common/DataTable'
 import { SkeletonTable } from '../common/SkeletonLoader'
@@ -68,17 +68,17 @@ const columns: Column<AdSetRow>[] = [
     sortValue: (r) => parseFloat(r.cpm || '0'),
   },
   {
-    key: 'leads', label: 'Leads',
-    render: (r) => extractLeads(r).toString(),
-    sortValue: (r) => extractLeads(r),
+    key: 'resultados', label: 'Resultados',
+    render: (r) => extractResultado(r).toString(),
+    sortValue: (r) => extractResultado(r),
   },
   {
-    key: 'cpl', label: 'CPL',
+    key: 'costo_resultado', label: 'Costo/Resultado',
     render: (r) => {
-      const cpl = extractCpl(r)
-      return cpl != null ? <SensitiveNumber value={cpl} format="currency" /> : '—'
+      const costo = extractCostoPorResultado(r)
+      return costo != null ? <SensitiveNumber value={costo} format="currency" /> : '—'
     },
-    sortValue: (r) => extractCpl(r) ?? 999999,
+    sortValue: (r) => extractCostoPorResultado(r) ?? 999999,
   },
 ]
 

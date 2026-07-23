@@ -1,5 +1,5 @@
 import { supabase } from '../../../integrations/supabase/client';
-import { extractLeads, extractLinkClicks, getPrimaryResult, type InsightRow } from '../types/meta';
+import { extractResultado, extractLinkClicks, getPrimaryResult, type InsightRow } from '../types/meta';
 
 // Shape of each row returned by meta-ads-proxy's 'campaigns_daily' type —
 // same base metrics as InsightRow, plus date_start/date_stop since this is
@@ -73,11 +73,11 @@ async function upsertCampaignsDaily(rows: DailyCampaignRow[], clientId: string |
     .map((row) => {
       const campanaId = campanaIdByCampaignId.get(row.campaign_id);
       if (!campanaId) return null;
-      // extractLeads/getPrimaryResult only read the base-metric fields
+      // extractResultado/getPrimaryResult only read the base-metric fields
       // (actions, cost_per_action_type, campaign_objective, etc.) that this
       // row shape already has — safe to treat as an InsightRow for this.
       const insightRow = row as unknown as InsightRow;
-      const leads = extractLeads(insightRow);
+      const leads = extractResultado(insightRow);
       const result = getPrimaryResult(insightRow);
       return {
         campana_id: campanaId,

@@ -32,7 +32,7 @@ const AccountContext = createContext<AccountContextType>({
 // match. Only clients.country === 'Spain' maps to the 'spain' market;
 // everything else (Mexico, Colombia, unmatched, or null) defaults to LATAM,
 // per spec.
-function matchClientToAccount(accountName: string, clients: { id: string; name: string | null; country: string | null }[]) {
+export function matchClientToAccount(accountName: string, clients: { id: string; name: string | null; country: string | null }[]) {
   const normalizedAccount = accountName.trim().toLowerCase()
   return clients.filter((c) => {
     const clientName = (c.name || '').trim().toLowerCase()
@@ -45,7 +45,7 @@ function matchClientToAccount(accountName: string, clients: { id: string; name: 
 // `clients` at all) — checked before the dynamic clients match, and always
 // wins over it. Keys are lowercased/trimmed for the same loose comparison
 // used against clients.name.
-const HARDCODED_ACCOUNT_MARKETS: Record<string, Market> = {
+export const HARDCODED_ACCOUNT_MARKETS: Record<string, Market> = {
   'benjamin rivero': 'latam',
   'lm social constructions': 'latam',
   'cafepatrimonial': 'latam',
@@ -53,7 +53,7 @@ const HARDCODED_ACCOUNT_MARKETS: Record<string, Market> = {
   'nutrición agustina rivero': 'latam',
 }
 
-function matchHardcodedAccount(accountName: string): Market | null {
+export function matchHardcodedAccount(accountName: string): Market | null {
   return HARDCODED_ACCOUNT_MARKETS[accountName.trim().toLowerCase()] ?? null
 }
 

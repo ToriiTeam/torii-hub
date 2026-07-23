@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../ui/
 import { useSelection } from '../../context/SelectionContext'
 import { useAccount } from '../../context/AccountContext'
 import { useDateRange } from '../../context/DateRangeContext'
+import { currentPeriodRange } from '../../lib/dateRange'
 import { useTimeseries } from '../../hooks/useTimeseries'
 import { useMetaApi } from '../../hooks/useMetaApi'
 import { getMetricConfig, METRIC_OPTIONS } from '../../config/metrics'
@@ -43,8 +44,9 @@ interface DetailPanelBodyProps {
 // of needing a useEffect to manually reset stale comparison state whenever
 // the user opens a different row.
 function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
-  const { buildParams } = useDateRange()
-  const { market } = useAccount()
+  const { buildParams, datePreset, customRange } = useDateRange()
+  const { market, selectedAccount } = useAccount()
+  const cpbcRange = currentPeriodRange(datePreset, customRange)
   const [metric, setMetric] = useState('spend')
   const [compareMetric, setCompareMetric] = useState(NONE_METRIC)
   const [compareEntityId, setCompareEntityId] = useState(NONE_ENTITY)
@@ -106,7 +108,7 @@ function DetailPanelBody({ row, level, accountId }: DetailPanelBodyProps) {
 
       <section className="detail-section">
         <h3 className="detail-section-title">KPIs del período</h3>
-        <SummaryKPIs row={row} />
+        <SummaryKPIs row={row} accountName={selectedAccount?.name} since={cpbcRange.since} until={cpbcRange.until} />
       </section>
 
       <section className="detail-section">

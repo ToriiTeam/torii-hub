@@ -1,5 +1,5 @@
 import type { InsightRow } from '../types/meta'
-import { extractRoas, extractCpl, getPrimaryResult } from '../types/meta'
+import { extractRoas, extractCostoPorResultado, getPrimaryResult } from '../types/meta'
 import type { AuditRecommendation, AuditSeverity, HealthStatus, HealthSummary, Market } from '../types/audit'
 import { AUDIT_THRESHOLDS as T, getMarketThresholds } from '../types/audit'
 
@@ -66,7 +66,7 @@ export function auditRows(rows: InsightRow[], level: EntityLevel, market: Market
     const ctr = parseFloat(row.ctr) || 0
     const cpc = parseFloat(row.cpc) || 0
     const cpm = parseFloat(row.cpm) || 0
-    const cpl = extractCpl(row)
+    const costoPorResultado = extractCostoPorResultado(row)
     const frequency = parseFloat(row.frequency) || 0
     const id = getId(row, level)
 
@@ -136,15 +136,15 @@ export function auditRows(rows: InsightRow[], level: EntityLevel, market: Market
       })
     }
 
-    if (cpl != null && cpl > M.CPL_WARNING && spend > 100) {
-      const sev: AuditSeverity = cpl > M.CPL_CRITICAL ? 'critical' : 'warning'
+    if (costoPorResultado != null && costoPorResultado > M.CPL_WARNING && spend > 100) {
+      const sev: AuditSeverity = costoPorResultado > M.CPL_CRITICAL ? 'critical' : 'warning'
       recs.push({
         id: `cpl-high-${id}`, severity: sev,
         entityId: id, entityName: name, entityLevel: level,
-        title: 'CPL elevado',
-        description: `CPL de $${cpl.toFixed(2)}, por encima del umbral de ${sev === 'critical' ? 'crítico' : 'alerta'} para este mercado ($${(sev === 'critical' ? M.CPL_CRITICAL : M.CPL_WARNING).toFixed(2)}).`,
-        action: 'Revisa segmentación, oferta y landing page. El costo por lead está por encima de lo sostenible.',
-        metric: 'CPL', metricValue: cpl,
+        title: 'Costo/Resultado elevado',
+        description: `Costo/Resultado de $${costoPorResultado.toFixed(2)}, por encima del umbral de ${sev === 'critical' ? 'crítico' : 'alerta'} para este mercado ($${(sev === 'critical' ? M.CPL_CRITICAL : M.CPL_WARNING).toFixed(2)}).`,
+        action: 'Revisa segmentación, oferta y landing page. El costo por resultado está por encima de lo sostenible.',
+        metric: 'Costo/Resultado', metricValue: costoPorResultado,
       })
     }
 
