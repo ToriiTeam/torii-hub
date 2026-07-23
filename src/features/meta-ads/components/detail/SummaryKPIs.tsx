@@ -1,5 +1,5 @@
 import type { InsightRow } from '../../types/meta'
-import { extractLeads, extractCpl, extractRoas } from '../../types/meta'
+import { extractLeads, extractLinkClicks, extractCpl, extractRoas } from '../../types/meta'
 import { SensitiveNumber } from '../common/SensitiveNumber'
 
 interface SummaryKPIsProps {
@@ -11,10 +11,13 @@ export function SummaryKPIs({ row }: SummaryKPIsProps) {
 
   const spend     = parseFloat(row.spend || '0')
   const impressions = parseInt(row.impressions || '0', 10)
-  const clicks    = parseInt(row.clicks || '0', 10)
+  // "Clics" KPI shows link clicks (matches Ads Manager's default Clicks
+  // column). CTR keeps using all clicks, same as Meta's own `ctr` field.
+  const totalClicks = parseInt(row.clicks || '0', 10)
+  const clicks    = extractLinkClicks(row)
   const leads     = extractLeads(row)
   const cpl       = extractCpl(row) ?? (leads > 0 ? spend / leads : null)
-  const ctr       = clicks > 0 && impressions > 0 ? (clicks / impressions) * 100 : parseFloat(row.ctr || '0')
+  const ctr       = totalClicks > 0 && impressions > 0 ? (totalClicks / impressions) * 100 : parseFloat(row.ctr || '0')
   const cpm       = parseFloat(row.cpm || '0')
   const roas      = extractRoas(row)
 

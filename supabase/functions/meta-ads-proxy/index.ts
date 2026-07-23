@@ -51,6 +51,13 @@ async function fetchAllPages(url: string, maxPages = 5): Promise<unknown[]> {
 const BASE_FIELDS = 'spend,impressions,reach,frequency,clicks,ctr,cpc,cpm,actions,cost_per_action_type,purchase_roas'
 const AD_FIELDS   = `${BASE_FIELDS},quality_ranking,engagement_rate_ranking,conversion_rate_ranking`
 
+// Pins the attribution window for every actions-derived field (actions,
+// cost_per_action_type) so leads/link_clicks match a fixed, known window
+// instead of drifting with each account's own default — Ads Manager's
+// visible columns can use a different default per account, which was
+// causing our numbers to mismatch it.
+const ATTRIBUTION_WINDOWS = JSON.stringify(['7d_click'])
+
 function insightsNested(fields: string, datePreset?: string, since?: string, until?: string): string {
   if (since && until) {
     // Meta syntax: insights.time_range({"since":"...","until":"..."}){fields}
@@ -266,6 +273,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const u = new URL(`${META_BASE}/${actId(account_id)}/campaigns`)
         u.searchParams.set('fields', `id,name,effective_status,status,objective,${nested}`)
         u.searchParams.set('limit', '100')
+        u.searchParams.set('action_attribution_windows', ATTRIBUTION_WINDOWS)
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
         return json({ data: items.map(transformCampaign) })
@@ -281,6 +289,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const u = new URL(`${META_BASE}/${actId(account_id)}/campaigns`)
         u.searchParams.set('fields', `id,name,effective_status,status,objective,${nested}`)
         u.searchParams.set('limit', '100')
+        u.searchParams.set('action_attribution_windows', ATTRIBUTION_WINDOWS)
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
         return json({ data: items.flatMap(transformCampaignDaily) })
@@ -293,6 +302,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const u = new URL(`${META_BASE}/${actId(account_id)}/adsets`)
         u.searchParams.set('fields', `id,name,effective_status,status,campaign_id,campaign{name},optimization_goal,destination_type,${nested}`)
         u.searchParams.set('limit', '200')
+        u.searchParams.set('action_attribution_windows', ATTRIBUTION_WINDOWS)
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
         return json({ data: items.map(transformAdset) })
@@ -305,6 +315,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const u = new URL(`${META_BASE}/${actId(account_id)}/ads`)
         u.searchParams.set('fields', `id,name,effective_status,status,adset_id,adset{name,campaign_id,campaign{name}},${nested}`)
         u.searchParams.set('limit', '200')
+        u.searchParams.set('action_attribution_windows', ATTRIBUTION_WINDOWS)
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
         return json({ data: items.map(transformAd) })
@@ -327,6 +338,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           const u = new URL(`${META_BASE}/${resolvedId}/insights`)
           u.searchParams.set('fields', fields)
           u.searchParams.set('time_increment', '1')
+          u.searchParams.set('action_attribution_windows', ATTRIBUTION_WINDOWS)
           for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v)
           u.searchParams.set('access_token', token)
           return u.toString()

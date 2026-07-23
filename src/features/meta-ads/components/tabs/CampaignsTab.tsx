@@ -6,7 +6,7 @@ import { useMetaApi } from '../../hooks/useMetaApi'
 import { auditRows, entityIdsWithSeverity, getHealthSummary } from '../../lib/auditEngine'
 import type { AuditSeverity } from '../../types/audit'
 import type { InsightRow } from '../../types/meta'
-import { extractLeads, extractCpl } from '../../types/meta'
+import { extractLeads, extractCpl, extractLinkClicks } from '../../types/meta'
 import { DataTable } from '../common/DataTable'
 import type { Column } from '../common/DataTable'
 import { SkeletonTable } from '../common/SkeletonLoader'
@@ -57,8 +57,8 @@ const columns: Column<CampaignRow>[] = [
   },
   {
     key: 'clicks', label: 'Clics', priority: 'low',
-    render: (r) => parseInt(r.clicks || '0', 10).toLocaleString('es-MX'),
-    sortValue: (r) => parseInt(r.clicks || '0', 10),
+    render: (r) => extractLinkClicks(r).toLocaleString('es-MX'),
+    sortValue: (r) => extractLinkClicks(r),
   },
   {
     key: 'ctr', label: 'CTR',

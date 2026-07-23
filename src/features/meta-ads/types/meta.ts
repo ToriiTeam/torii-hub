@@ -99,6 +99,14 @@ export function extractRoas(row: InsightRow): number {
   return 0
 }
 
+// Meta's Ads Manager default "Clicks" column is actually link clicks
+// (tracked, attribution-windowed) — not the raw `clicks` field, which counts
+// every click on the ad (likes, comments, etc.) and reads higher. Already
+// present in `actions` since we always request that field.
+export function extractLinkClicks(row: InsightRow): number {
+  return extractAction(row.actions, 'link_click')
+}
+
 export function extractAddToCart(row: InsightRow): number {
   return (
     extractAction(row.actions, 'add_to_cart') ||

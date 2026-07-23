@@ -1,5 +1,5 @@
 import type { TimeseriesInsightRow } from '../types/meta'
-import { extractPurchases, extractCostPerPurchase, extractRoas, extractPurchaseValue } from '../types/meta'
+import { extractPurchases, extractCostPerPurchase, extractRoas, extractPurchaseValue, extractLinkClicks } from '../types/meta'
 
 export type MetricFormat = 'currency' | 'number' | 'compact' | 'percent' | 'roas'
 
@@ -40,7 +40,7 @@ export const METRIC_OPTIONS: MetricConfig[] = [
   },
   {
     key: 'clicks', label: 'Clicks', group: 'Volumen',
-    getValue: (row) => parseFloat(row.clicks) || 0,
+    getValue: (row) => extractLinkClicks(row),
     format: 'number', color: 'var(--accent-purple)',
   },
   {

@@ -10,12 +10,13 @@ import { useTimeseries } from '../../hooks/useTimeseries'
 import { useMetaApi } from '../../hooks/useMetaApi'
 import { aggregateRows } from '../../lib/aggregateRows'
 import { previousPeriod } from '../../lib/dateRange'
-import { extractLeads, extractCpl } from '../../types/meta'
+import { extractLeads, extractCpl, extractLinkClicks } from '../../types/meta'
 import type { InsightRow } from '../../types/meta'
 
 function extractValue(row: InsightRow, key: string): number {
-  if (key === 'leads') return extractLeads(row)
-  if (key === 'cpl')   return extractCpl(row) ?? 0
+  if (key === 'leads')  return extractLeads(row)
+  if (key === 'cpl')    return extractCpl(row) ?? 0
+  if (key === 'clicks') return extractLinkClicks(row)
   const v = (row as Record<string, unknown>)[key]
   if (typeof v === 'string') return parseFloat(v) || 0
   if (typeof v === 'number') return v
