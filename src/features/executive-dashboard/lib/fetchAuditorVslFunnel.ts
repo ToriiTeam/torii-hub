@@ -64,6 +64,14 @@ export async function fetchAuditorVslFunnelData(since: string, until: string): P
     fetchVslFunnelData(since, until),
   ]);
 
+  // AuditorVslFunnel.tsx always runs with Nuevo Torii ON (no toggle for this
+  // role) — mirrors fetchToriiData.ts's funnelRows filter for that same
+  // state, which excludes LinkedIn-sourced calls (the old funnel) from
+  // Agendas/Llamadas efectivas/Cierres/No Cierres. Missing this made the
+  // auditor's Agendas count 3 LinkedIn rows the admin view (Nuevo Torii ON)
+  // already excludes — 10 vs. the correct 7.
+  const funnelRows = callRows.filter((r) => fuenteOf(r) !== 'LinkedIn');
+
   // Same definition as fetchToriiData.ts's qualifiedAdsCalls — denominator
   // for CPBC (calcCostoPorLlamadaCalificada).
   const qualifiedAdsCalls = callRows.filter((r) => fuenteOf(r) === 'ADS' && r.se_presento && r.califico).length;
@@ -71,7 +79,7 @@ export async function fetchAuditorVslFunnelData(since: string, until: string): P
   return {
     metrics: {
       ads: summarizeAds(adsRows),
-      closing: summarizeClosing(callRows),
+      closing: summarizeClosing(funnelRows),
       qualifiedAdsCalls,
     },
     vslFunnelData,
