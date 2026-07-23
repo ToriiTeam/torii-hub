@@ -931,57 +931,57 @@ export type Database = {
       }
       client_csb: {
         Row: {
-          angulo_principal: string | null
+          brief_document: string | null
           client_id: string | null
+          cliente: Json
+          constraints: Json
           created_at: string | null
           csl_content: string | null
           drive_csl_id: string | null
-          garantia: string | null
-          hipotesis_activa: string | null
-          icp: string | null
+          estado_actual: Json
+          estado_deseado: Json
           id: string
-          mercado: string | null
-          notas: string | null
-          objecion_principal: string | null
-          oferta: string | null
-          precio: number | null
-          propuesta_de_valor: string | null
+          identidad_estrategica: Json
+          inteligencia: Json
+          revisado: boolean
+          riesgos: Json
+          sintesis: Json
           updated_at: string | null
         }
         Insert: {
-          angulo_principal?: string | null
+          brief_document?: string | null
           client_id?: string | null
+          cliente?: Json
+          constraints?: Json
           created_at?: string | null
           csl_content?: string | null
           drive_csl_id?: string | null
-          garantia?: string | null
-          hipotesis_activa?: string | null
-          icp?: string | null
+          estado_actual?: Json
+          estado_deseado?: Json
           id?: string
-          mercado?: string | null
-          notas?: string | null
-          objecion_principal?: string | null
-          oferta?: string | null
-          precio?: number | null
-          propuesta_de_valor?: string | null
+          identidad_estrategica?: Json
+          inteligencia?: Json
+          revisado?: boolean
+          riesgos?: Json
+          sintesis?: Json
           updated_at?: string | null
         }
         Update: {
-          angulo_principal?: string | null
+          brief_document?: string | null
           client_id?: string | null
+          cliente?: Json
+          constraints?: Json
           created_at?: string | null
           csl_content?: string | null
           drive_csl_id?: string | null
-          garantia?: string | null
-          hipotesis_activa?: string | null
-          icp?: string | null
+          estado_actual?: Json
+          estado_deseado?: Json
           id?: string
-          mercado?: string | null
-          notas?: string | null
-          objecion_principal?: string | null
-          oferta?: string | null
-          precio?: number | null
-          propuesta_de_valor?: string | null
+          identidad_estrategica?: Json
+          inteligencia?: Json
+          revisado?: boolean
+          riesgos?: Json
+          sintesis?: Json
           updated_at?: string | null
         }
         Relationships: [
@@ -1325,6 +1325,47 @@ export type Database = {
           },
         ]
       }
+      client_onboarding_responses: {
+        Row: {
+          campo: string
+          client_id: string
+          created_at: string
+          fuente: string
+          id: string
+          orden: number | null
+          synced_at: string
+          valor: string | null
+        }
+        Insert: {
+          campo: string
+          client_id: string
+          created_at?: string
+          fuente: string
+          id?: string
+          orden?: number | null
+          synced_at?: string
+          valor?: string | null
+        }
+        Update: {
+          campo?: string
+          client_id?: string
+          created_at?: string
+          fuente?: string
+          id?: string
+          orden?: number | null
+          synced_at?: string
+          valor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_onboarding_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_phases: {
         Row: {
           client_id: string | null
@@ -1553,6 +1594,7 @@ export type Database = {
       clients: {
         Row: {
           canal: string | null
+          canal_captacion: string | null
           contract_days: number | null
           country: string | null
           created_at: string
@@ -1568,6 +1610,7 @@ export type Database = {
           name: string
           next_due_date: string | null
           notes: string | null
+          oferta: string | null
           offer_type: Database["public"]["Enums"]["offer_type"] | null
           paid_installments: number | null
           payment_type: Database["public"]["Enums"]["payment_type"] | null
@@ -1588,6 +1631,7 @@ export type Database = {
         }
         Insert: {
           canal?: string | null
+          canal_captacion?: string | null
           contract_days?: number | null
           country?: string | null
           created_at?: string
@@ -1603,6 +1647,7 @@ export type Database = {
           name: string
           next_due_date?: string | null
           notes?: string | null
+          oferta?: string | null
           offer_type?: Database["public"]["Enums"]["offer_type"] | null
           paid_installments?: number | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -1623,6 +1668,7 @@ export type Database = {
         }
         Update: {
           canal?: string | null
+          canal_captacion?: string | null
           contract_days?: number | null
           country?: string | null
           created_at?: string
@@ -1638,6 +1684,7 @@ export type Database = {
           name?: string
           next_due_date?: string | null
           notes?: string | null
+          oferta?: string | null
           offer_type?: Database["public"]["Enums"]["offer_type"] | null
           paid_installments?: number | null
           payment_type?: Database["public"]["Enums"]["payment_type"] | null
@@ -1825,6 +1872,412 @@ export type Database = {
           name?: string
           notes?: string | null
           stage?: Database["public"]["Enums"]["closer_stage"] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_calendar: {
+        Row: {
+          channel: string
+          channel_fields: Json
+          client_id: string | null
+          con_ask: boolean
+          created_at: string
+          descripcion: string | null
+          estado: string
+          fase: string | null
+          fecha_programada: string | null
+          hipotesis_id: string | null
+          id: string
+          lead_magnet: string | null
+          mecanismo_id: string | null
+          pilar_id: string | null
+          semana: string | null
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          channel_fields?: Json
+          client_id?: string | null
+          con_ask?: boolean
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fase?: string | null
+          fecha_programada?: string | null
+          hipotesis_id?: string | null
+          id?: string
+          lead_magnet?: string | null
+          mecanismo_id?: string | null
+          pilar_id?: string | null
+          semana?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          channel_fields?: Json
+          client_id?: string | null
+          con_ask?: boolean
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fase?: string | null
+          fecha_programada?: string | null
+          hipotesis_id?: string | null
+          id?: string
+          lead_magnet?: string | null
+          mecanismo_id?: string | null
+          pilar_id?: string | null
+          semana?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_calendar_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_hipotesis_id_fkey"
+            columns: ["hipotesis_id"]
+            isOneToOne: false
+            referencedRelation: "content_hypotheses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_mecanismo_id_fkey"
+            columns: ["mecanismo_id"]
+            isOneToOne: false
+            referencedRelation: "content_mechanisms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_pilar_id_fkey"
+            columns: ["pilar_id"]
+            isOneToOne: false
+            referencedRelation: "content_pillars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_hypotheses: {
+        Row: {
+          aprendizaje: string | null
+          baseline: number | null
+          channel: string | null
+          client_id: string | null
+          created_at: string
+          decision: string | null
+          fase: string | null
+          hipotesis_texto: string | null
+          id: string
+          mecanismo_id: string | null
+          metrica_objetivo: string | null
+          piezas_vinculadas: string | null
+          pilar_id: string | null
+          prediccion: number | null
+          proxima_hipotesis_id: string | null
+          resultado_real: number | null
+          semana: string | null
+          updated_at: string
+          veredicto: string | null
+        }
+        Insert: {
+          aprendizaje?: string | null
+          baseline?: number | null
+          channel?: string | null
+          client_id?: string | null
+          created_at?: string
+          decision?: string | null
+          fase?: string | null
+          hipotesis_texto?: string | null
+          id?: string
+          mecanismo_id?: string | null
+          metrica_objetivo?: string | null
+          piezas_vinculadas?: string | null
+          pilar_id?: string | null
+          prediccion?: number | null
+          proxima_hipotesis_id?: string | null
+          resultado_real?: number | null
+          semana?: string | null
+          updated_at?: string
+          veredicto?: string | null
+        }
+        Update: {
+          aprendizaje?: string | null
+          baseline?: number | null
+          channel?: string | null
+          client_id?: string | null
+          created_at?: string
+          decision?: string | null
+          fase?: string | null
+          hipotesis_texto?: string | null
+          id?: string
+          mecanismo_id?: string | null
+          metrica_objetivo?: string | null
+          piezas_vinculadas?: string | null
+          pilar_id?: string | null
+          prediccion?: number | null
+          proxima_hipotesis_id?: string | null
+          resultado_real?: number | null
+          semana?: string | null
+          updated_at?: string
+          veredicto?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_hypotheses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_hypotheses_mecanismo_id_fkey"
+            columns: ["mecanismo_id"]
+            isOneToOne: false
+            referencedRelation: "content_mechanisms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_hypotheses_pilar_id_fkey"
+            columns: ["pilar_id"]
+            isOneToOne: false
+            referencedRelation: "content_pillars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_hypotheses_proxima_hipotesis_id_fkey"
+            columns: ["proxima_hipotesis_id"]
+            isOneToOne: false
+            referencedRelation: "content_hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_mechanisms: {
+        Row: {
+          created_at: string
+          cuando_usarlo: string | null
+          ejemplo: string | null
+          id: string
+          nombre: string
+          que_es: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cuando_usarlo?: string | null
+          ejemplo?: string | null
+          id?: string
+          nombre: string
+          que_es?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cuando_usarlo?: string | null
+          ejemplo?: string | null
+          id?: string
+          nombre?: string
+          que_es?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_metrics_tanda: {
+        Row: {
+          alcance: number
+          channel: string
+          cierres: number
+          client_id: string | null
+          comentarios_keyword: number
+          coste: number
+          created_at: string
+          dms_iniciados: number
+          fase: string | null
+          id: string
+          interacciones: number
+          leads_capturados: number
+          llamadas: number
+          piezas_publicadas: number
+          reservas: number
+          semana: string
+          updated_at: string
+        }
+        Insert: {
+          alcance?: number
+          channel: string
+          cierres?: number
+          client_id?: string | null
+          comentarios_keyword?: number
+          coste?: number
+          created_at?: string
+          dms_iniciados?: number
+          fase?: string | null
+          id?: string
+          interacciones?: number
+          leads_capturados?: number
+          llamadas?: number
+          piezas_publicadas?: number
+          reservas?: number
+          semana: string
+          updated_at?: string
+        }
+        Update: {
+          alcance?: number
+          channel?: string
+          cierres?: number
+          client_id?: string | null
+          comentarios_keyword?: number
+          coste?: number
+          created_at?: string
+          dms_iniciados?: number
+          fase?: string | null
+          id?: string
+          interacciones?: number
+          leads_capturados?: number
+          llamadas?: number
+          piezas_publicadas?: number
+          reservas?: number
+          semana?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_metrics_tanda_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_phase_gates: {
+        Row: {
+          channel: string | null
+          client_id: string | null
+          created_at: string
+          current_value: number | null
+          direction: string
+          from_phase: string | null
+          id: string
+          metric_name: string
+          note: string | null
+          status: string
+          threshold_value: number
+          to_phase: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel?: string | null
+          client_id?: string | null
+          created_at?: string
+          current_value?: number | null
+          direction: string
+          from_phase?: string | null
+          id?: string
+          metric_name: string
+          note?: string | null
+          status?: string
+          threshold_value: number
+          to_phase?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string | null
+          client_id?: string | null
+          created_at?: string
+          current_value?: number | null
+          direction?: string
+          from_phase?: string | null
+          id?: string
+          metric_name?: string
+          note?: string | null
+          status?: string
+          threshold_value?: number
+          to_phase?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_phase_gates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_phase_status: {
+        Row: {
+          channel: string
+          client_id: string | null
+          current_phase: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          client_id?: string | null
+          current_phase?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          client_id?: string | null
+          current_phase?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_phase_status_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_pillars: {
+        Row: {
+          angulo: string | null
+          created_at: string
+          error_a_evitar: string | null
+          id: string
+          mejores_mecanismos: Json
+          nombre: string
+          para_que: string | null
+          prueba_de_que_aplica: string | null
+          updated_at: string
+        }
+        Insert: {
+          angulo?: string | null
+          created_at?: string
+          error_a_evitar?: string | null
+          id?: string
+          mejores_mecanismos?: Json
+          nombre: string
+          para_que?: string | null
+          prueba_de_que_aplica?: string | null
+          updated_at?: string
+        }
+        Update: {
+          angulo?: string | null
+          created_at?: string
+          error_a_evitar?: string | null
+          id?: string
+          mejores_mecanismos?: Json
+          nombre?: string
+          para_que?: string | null
+          prueba_de_que_aplica?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2427,6 +2880,7 @@ export type Database = {
           aprendizaje: string | null
           client_id: string | null
           created_at: string | null
+          creative_node_id: string | null
           fecha_cierre: string | null
           fecha_inicio: string | null
           hipotesis: string | null
@@ -2440,6 +2894,7 @@ export type Database = {
           aprendizaje?: string | null
           client_id?: string | null
           created_at?: string | null
+          creative_node_id?: string | null
           fecha_cierre?: string | null
           fecha_inicio?: string | null
           hipotesis?: string | null
@@ -2453,6 +2908,7 @@ export type Database = {
           aprendizaje?: string | null
           client_id?: string | null
           created_at?: string | null
+          creative_node_id?: string | null
           fecha_cierre?: string | null
           fecha_inicio?: string | null
           hipotesis?: string | null
@@ -2474,6 +2930,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hypothesis_history_creative_node_id_fkey"
+            columns: ["creative_node_id"]
+            isOneToOne: false
+            referencedRelation: "creative_nodes"
             referencedColumns: ["id"]
           },
         ]
