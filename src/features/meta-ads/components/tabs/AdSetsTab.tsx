@@ -6,7 +6,7 @@ import { useMetaApi } from '../../hooks/useMetaApi'
 import { auditRows, entityIdsWithSeverity, getHealthSummary } from '../../lib/auditEngine'
 import type { AuditSeverity } from '../../types/audit'
 import type { InsightRow } from '../../types/meta'
-import { extractResultado, extractCostoPorResultado, extractLinkClicks } from '../../types/meta'
+import { extractResultado, extractCostoPorResultado, extractLinkClicks, extractLinkCtr } from '../../types/meta'
 import { DataTable } from '../common/DataTable'
 import type { Column, FilterConfig } from '../common/DataTable'
 import { SkeletonTable } from '../common/SkeletonLoader'
@@ -61,6 +61,11 @@ const columns: Column<AdSetRow>[] = [
     key: 'ctr', label: 'CTR',
     render: (r) => `${parseFloat(r.ctr || '0').toFixed(2)}%`,
     sortValue: (r) => parseFloat(r.ctr || '0'),
+  },
+  {
+    key: 'ctr_enlace', label: 'CTR (enlace)', priority: 'low',
+    render: (r) => `${extractLinkCtr(r).toFixed(2)}%`,
+    sortValue: (r) => extractLinkCtr(r),
   },
   {
     key: 'cpm', label: 'CPM', priority: 'low',

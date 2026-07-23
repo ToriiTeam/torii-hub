@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { InsightRow } from '../../types/meta'
-import { extractResultado, extractLinkClicks, extractRoas } from '../../types/meta'
+import { extractResultado, extractLinkClicks, extractLinkCtr, extractRoas } from '../../types/meta'
 import { fetchCpbc } from '../../lib/fetchCpbc'
 import { SensitiveNumber } from '../common/SensitiveNumber'
 
@@ -46,6 +46,7 @@ export function SummaryKPIs({ row, accountName, since, until }: SummaryKPIsProps
   const clicks    = extractLinkClicks(row)
   const resultados = extractResultado(row)
   const ctr       = totalClicks > 0 && impressions > 0 ? (totalClicks / impressions) * 100 : parseFloat(row.ctr || '0')
+  const ctrEnlace = extractLinkCtr(row)
   const cpm       = parseFloat(row.cpm || '0')
   const roas      = extractRoas(row)
 
@@ -54,6 +55,7 @@ export function SummaryKPIs({ row, accountName, since, until }: SummaryKPIsProps
     { label: 'Impresiones',  value: impressions, format: 'compact' as const },
     { label: 'Clics',        value: clicks,      format: 'compact' as const },
     { label: 'CTR',          value: ctr,         format: 'percent' as const },
+    { label: 'CTR (enlace)', value: ctrEnlace,   format: 'percent' as const },
     { label: 'CPM',          value: cpm,         format: 'currency' as const, sensitive: true },
     { label: 'Resultados',   value: resultados,  format: 'number' as const },
     ...(cpbc != null ? [{ label: 'CPBC', value: cpbc, format: 'currency' as const, sensitive: true }] : []),

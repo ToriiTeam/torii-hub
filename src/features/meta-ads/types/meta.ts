@@ -107,6 +107,17 @@ export function extractLinkClicks(row: InsightRow): number {
   return extractAction(row.actions, 'link_click')
 }
 
+// "CTR (enlace)" — Ads Manager's default CTR column (link_clicks/impressions),
+// distinct from `row.ctr` (Meta's raw field, based on ALL clicks). Computed
+// on the fly, not stored — same criterion as extractLinkClicks: show both
+// side by side rather than replace, since existing thresholds/consumers of
+// `row.ctr` are calibrated against the all-clicks definition.
+export function extractLinkCtr(row: InsightRow): number {
+  const impressions = parseFloat(row.impressions) || 0
+  if (impressions <= 0) return 0
+  return (extractLinkClicks(row) / impressions) * 100
+}
+
 export function extractAddToCart(row: InsightRow): number {
   return (
     extractAction(row.actions, 'add_to_cart') ||
