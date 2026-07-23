@@ -25,7 +25,19 @@ export interface PeriodRangeResult {
 // No real data predates this project — used as "since" for the "Todo"
 // preset instead of leaving the lower bound open, so every fetch function
 // keeps its existing (since, until) string signature.
-const ALL_TIME_SINCE = '2000-01-01';
+export const ALL_TIME_SINCE = '2000-01-01';
+
+// Single date floor for the "Nuevo Torii" toggle in ExecutiveDashboard —
+// applied identically to every query that view makes (ads_metricas_diarias,
+// client_closer_calls, incomes, expenses, clients), no per-card exceptions.
+// Earlier iterations tried a second funnel-specific floor and then
+// categorical filters (clients.oferta, fuente != 'LinkedIn') — both were
+// explicitly reverted in favor of this single, uniform mechanism.
+export const NUEVO_TORII_SINCE = '2026-06-01';
+
+export function clampToNuevoTorii(since: string, until: string): { since: string; until: string } {
+  return { since: since < NUEVO_TORII_SINCE ? NUEVO_TORII_SINCE : since, until };
+}
 
 const PRESET_DAYS: Record<'7d' | '30d' | '90d', number> = { '7d': 7, '30d': 30, '90d': 90 };
 const PRESET_LABELS: Record<PresetKey, string> = {
@@ -67,6 +79,17 @@ export function getPeriodRange(input: PeriodInput): PeriodRangeResult {
   }
   const days = PRESET_DAYS[input.preset];
   return { since: fmt(subDays(today, days - 1)), until: fmt(today), label: PRESET_LABELS[input.preset], isShortPeriod: days <= 31 };
+}
+
+// Short suffix for KPI card labels like "Ingresos totales {suffix}" — needs
+// to read naturally regardless of which period mode is active, since those
+// labels used to hardcode "del mes" even when the selected period was a
+// 7d/30d/90d preset or a custom range.
+export function periodSuffixLabel(input: Pick<PeriodInput, 'periodType' | 'preset'>): string {
+  if (input.periodType === 'month') return 'del mes';
+  if (input.periodType === 'custom') return 'del rango seleccionado';
+  if (input.preset === 'all') return 'del período';
+  return `de los últimos ${PRESET_DAYS[input.preset]}d`;
 }
 
 // Previous period of equal length, ending the day before the current one

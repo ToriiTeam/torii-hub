@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PortfolioView } from '@/features/executive-dashboard/components/PortfolioView';
 import { ClientView } from '@/features/executive-dashboard/components/ClientView';
@@ -8,7 +12,7 @@ import { PeriodSelector } from '@/features/executive-dashboard/components/shared
 import { fetchPortfolioData } from '@/features/executive-dashboard/lib/fetchPortfolioData';
 import { fetchClientData } from '@/features/executive-dashboard/lib/fetchClientData';
 import { fetchToriiData } from '@/features/executive-dashboard/lib/fetchToriiData';
-import { getPeriodRange, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
+import { getPeriodRange, periodSuffixLabel, clampToNuevoTorii, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
 import type { PortfolioData, ClientDetailData, ToriiData } from '@/features/executive-dashboard/types';
 
 const ALL_CLIENTS = 'all';
@@ -24,14 +28,26 @@ function navMonth(year: number, month: number, dir: 'prev' | 'next'): { year: nu
 export default function ExecutiveDashboard() {
   const now = new Date();
   const [clients, setClients] = useState<ClientOption[]>([]);
-  const [selectedClient, setSelectedClient] = useState<string>(ALL_CLIENTS);
+  const [selectedClient, setSelectedClient] = useState<string>(TORII);
 
   const [periodType, setPeriodType] = useState<PeriodType>('preset');
-  const [preset, setPreset] = useState<PresetKey>('30d');
+  const [preset, setPreset] = useState<PresetKey>('all');
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [customSince, setCustomSince] = useState(() => now.toISOString().slice(0, 10));
   const [customUntil, setCustomUntil] = useState(() => now.toISOString().slice(0, 10));
+
+  // "Nuevo Torii" toggle — independent of the period selector. When ON, the
+  // effective (since, until) fed to EVERY query in fetchToriiData.ts
+  // (ads_metricas_diarias, client_closer_calls, incomes, expenses, clients)
+  // is clamped to NUEVO_TORII_SINCE (2026-06-01) — a single mechanism, no
+  // per-card exceptions, no client/oferta/fuente filtering. Earlier
+  // iterations tried categorical filters and a second funnel-specific date
+  // floor; both were explicitly reverted back to this single clamp. Only
+  // relevant to the Torii view, but declared here (not ToriiView-local
+  // state) since it lives in the shared header next to the period
+  // selector, same pattern as selectedClient/period state.
+  const [nuevoToriiOnly, setNuevoToriiOnly] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
@@ -39,6 +55,7 @@ export default function ExecutiveDashboard() {
   const [toriiData, setToriiData] = useState<ToriiData | null>(null);
 
   const range = getPeriodRange({ periodType, preset, year, month, customSince, customUntil });
+  const toriiRange = nuevoToriiOnly ? { ...range, ...clampToNuevoTorii(range.since, range.until) } : range;
 
   useEffect(() => {
     supabase.from('clients').select('id, name').order('name').then(({ data }) => setClients(data ?? []));
@@ -52,7 +69,7 @@ export default function ExecutiveDashboard() {
     const load = selectedClient === ALL_CLIENTS
       ? fetchPortfolioData(since, until).then((data) => { if (!cancelled) { setPortfolioData(data); setClientData(null); setToriiData(null); } })
       : selectedClient === TORII
-      ? fetchToriiData(since, until).then((data) => { if (!cancelled) { setToriiData(data); setPortfolioData(null); setClientData(null); } })
+      ? fetchToriiData(toriiRange.since, toriiRange.until, nuevoToriiOnly).then((data) => { if (!cancelled) { setToriiData(data); setPortfolioData(null); setClientData(null); } })
       : fetchClientData(selectedClient, since, until, isShortPeriod).then((data) => { if (!cancelled) { setClientData(data); setPortfolioData(null); setToriiData(null); } });
 
     load
@@ -61,7 +78,7 @@ export default function ExecutiveDashboard() {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClient, periodType, preset, year, month, customSince, customUntil]);
+  }, [selectedClient, periodType, preset, year, month, customSince, customUntil, nuevoToriiOnly]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -70,6 +87,22 @@ export default function ExecutiveDashboard() {
           <h1 className="text-2xl font-bold">Dashboard Ejecutivo</h1>
           <p className="text-sm text-muted-foreground">Vista consolidada de ads, closing, revenue y VSL por cliente</p>
         </div>
+        {selectedClient === TORII && (
+          <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 h-9">
+            <Label htmlFor="nuevo-torii-toggle" className="text-sm cursor-pointer">
+              {nuevoToriiOnly ? 'Nuevo Torii' : 'Viejo Torii'}
+            </Label>
+            <Switch id="nuevo-torii-toggle" checked={nuevoToriiOnly} onCheckedChange={setNuevoToriiOnly} />
+            <UiTooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Recalcula TODAS las cards de esta vista usando solo datos desde el 01/06/2026 en adelante — un único piso de fecha, sin excepciones por card. Se combina con el período seleccionado arriba (se usa el más restrictivo de los dos).
+              </TooltipContent>
+            </UiTooltip>
+          </div>
+        )}
         <Select value={selectedClient} onValueChange={setSelectedClient}>
           <SelectTrigger className="w-52 h-9 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -99,7 +132,15 @@ export default function ExecutiveDashboard() {
       ) : selectedClient === ALL_CLIENTS ? (
         portfolioData && <PortfolioView data={portfolioData} />
       ) : selectedClient === TORII ? (
-        toriiData && <ToriiView data={toriiData} />
+        toriiData && (
+          <ToriiView
+            data={toriiData}
+            periodSuffix={periodSuffixLabel({ periodType, preset })}
+            periodStart={toriiRange.since}
+            periodEnd={toriiRange.until}
+            nuevoToriiOnly={nuevoToriiOnly}
+          />
+        )
       ) : (
         clientData && <ClientView data={clientData} />
       )}
