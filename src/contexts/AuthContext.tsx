@@ -19,6 +19,9 @@ interface AuthContextType {
   signUp: (email: string, password: string, name?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  // Scoped-access role — see supabase/migrations/20260723130000. Undefined
+  // until resolved so callers can distinguish "still checking" from "no".
+  isAuditor: boolean | undefined;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuditor, setIsAuditor] = useState<boolean | undefined>(undefined);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -35,12 +39,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    
+
     if (error) {
       console.error('Error fetching profile:', error);
       return null;
     }
     return data;
+  };
+
+  const fetchIsAuditor = async (userId: string) => {
+    const { data, error } = await supabase.rpc('has_role', { _user_id: userId, _role: 'auditor' });
+    if (error) {
+      console.error('Error checking auditor role:', error);
+      return false;
+    }
+    return !!data;
   };
 
   useEffect(() => {
@@ -49,14 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         // Defer profile fetch to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id).then(setProfile);
+            fetchIsAuditor(session.user.id).then(setIsAuditor);
           }, 0);
         } else {
           setProfile(null);
+          setIsAuditor(undefined);
         }
       }
     );
@@ -65,9 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchProfile(session.user.id).then(setProfile);
+        fetchIsAuditor(session.user.id).then(setIsAuditor);
       }
       setIsLoading(false);
     });
@@ -104,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setIsAuditor(undefined);
   };
 
   return (
@@ -117,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         isAuthenticated: !!session,
+        isAuditor,
       }}
     >
       {children}

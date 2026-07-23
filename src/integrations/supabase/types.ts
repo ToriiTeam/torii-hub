@@ -5334,7 +5334,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "auditor"
       availability_status: "disponible" | "ocupado" | "ausente" | "vacaciones"
       call_status:
         | "pendiente"
@@ -5506,7 +5506,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "auditor"],
       availability_status: ["disponible", "ocupado", "ausente", "vacaciones"],
       call_status: [
         "pendiente",

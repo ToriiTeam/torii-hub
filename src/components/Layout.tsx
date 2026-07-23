@@ -56,14 +56,23 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+// Auditor role sees exactly these 2 sections — see App.tsx, which also
+// makes every other route unreachable for them, not just hidden here.
+const AUDITOR_NAV_HREFS = ['/meta-ads', '/vsl-tracking'];
+
 export default function Layout({ children }: LayoutProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isAuditor } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  const visibleNavigation = isAuditor
+    ? navigation.filter((item) => AUDITOR_NAV_HREFS.includes(item.href))
+    : navigation;
+
   useEffect(() => {
+    if (isAuditor) return; // auditor has no Tareas access — nothing to notify about
     fetchTasks();
     
     // Subscribe to real-time updates
@@ -136,7 +145,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const NavItems = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="space-y-1 px-2">
-      {navigation.map((item) => {
+      {visibleNavigation.map((item) => {
         const isActive = location.pathname === item.href;
         return (
           <NavLink
@@ -246,7 +255,8 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Notifications */}
+            {/* Notifications — tied to Tareas, which auditor can't see */}
+            {!isAuditor && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
@@ -286,6 +296,7 @@ export default function Layout({ children }: LayoutProps) {
                 </ScrollArea>
               </PopoverContent>
             </Popover>
+            )}
 
             {/* Logout */}
             <Button

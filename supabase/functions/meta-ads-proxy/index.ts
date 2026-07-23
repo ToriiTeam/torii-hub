@@ -1,9 +1,67 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
 const META_BASE = 'https://graph.facebook.com/v25.0'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+// The only Meta ad account an 'auditor'-role user is allowed to touch —
+// matches ads_campanas.ad_account_id for LM Social Constructions (confirmed
+// against synced data; see 20260723130000_auditor_rls_policies.sql). RLS on
+// ads_campanas/ads_metricas_diarias covers what's stored in our own DB, but
+// this function talks to Meta's Graph API directly with a shared token, so
+// it needs its own account_id check — Postgres RLS has no say over that.
+const AUDITOR_ALLOWED_ACCOUNT_ID = '1151443753506231'
+
+// Resolves whether the caller (from the request's JWT) has the 'auditor'
+// role. Returns false — i.e. unrestricted, same as any other staff account
+// — for anonymous callers, missing/invalid JWTs, or if the role lookup
+// itself fails (network hiccup to the Auth/DB service). That fail-open
+// choice is deliberate: failing closed here would take the whole proxy
+// down for every regular user on any transient Supabase hiccup, to guard
+// against a narrow edge case (an actual auditor briefly regaining access to
+// other Meta accounts during that same hiccup). Postgres RLS on
+// ads_campanas/ads_metricas_diarias is unaffected either way — it's
+// enforced independently of this check.
+async function callerIsAuditor(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) return false
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Validates the JWT (signature + expiry) and recovers the caller's user
+    // id — don't trust an unverified decode of the token payload.
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: { user } } = await callerClient.auth.getUser()
+    if (!user) return false
+
+    // user_roles' own RLS only lets a user read their own rows, which would
+    // work here too (the caller's JWT is attached) — service role is used
+    // instead to make the check independent of that policy ever changing.
+    const adminClient = createClient(supabaseUrl, serviceRoleKey)
+    const { data, error } = await adminClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'auditor')
+      .maybeSingle()
+
+    return !error && !!data
+  } catch {
+    return false
+  }
+}
+
+function normalizeAccountId(id: string): string {
+  return id.startsWith('act_') ? id.slice(4) : id
 }
 
 // ─── Response helpers ─────────────────────────────────────────────────────────
@@ -254,6 +312,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const { type, account_id, entity_id, level, date_preset, since, until, compare } = body
 
+  const isAuditor = await callerIsAuditor(req)
+
+  // Every case below either takes an explicit account_id, or (accounts,
+  // timeseries at account level) an equivalent account identifier — checked
+  // against AUDITOR_ALLOWED_ACCOUNT_ID for auditor callers before any Meta
+  // call is made. NOTE: 'timeseries' at campaign/adset/ad level takes an
+  // entity_id instead, which this function has no way to resolve to an
+  // account without an extra Meta lookup — a known, documented gap, not
+  // covered by this check.
+  if (isAuditor && account_id && normalizeAccountId(account_id) !== AUDITOR_ALLOWED_ACCOUNT_ID) {
+    return json({ error: 'Forbidden: auditor role is scoped to a single ad account' }, 403)
+  }
+  if (isAuditor && type === 'timeseries' && level === 'account' && entity_id && normalizeAccountId(entity_id) !== AUDITOR_ALLOWED_ACCOUNT_ID) {
+    return json({ error: 'Forbidden: auditor role is scoped to a single ad account' }, 403)
+  }
+
   try {
     switch (type) {
 
@@ -263,7 +337,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         u.searchParams.set('fields', 'id,name,account_id,account_status,currency,timezone_name,balance,amount_spent')
         u.searchParams.set('access_token', token)
         const items = await fetchAllPages(u.toString()) as Raw[]
-        return json({ data: items.map(transformAccount) })
+        const accounts = items.map(transformAccount)
+        // Auditor never sees that other accounts exist, not even their names.
+        const visible = isAuditor
+          ? accounts.filter((a) => normalizeAccountId(String(a.account_id ?? '')) === AUDITOR_ALLOWED_ACCOUNT_ID)
+          : accounts
+        return json({ data: visible })
       }
 
       // ── /{account_id}/campaigns ─────────────────────────────────────────────

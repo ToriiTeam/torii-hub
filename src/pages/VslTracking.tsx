@@ -6,6 +6,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
 import { PlayCircle, MousePointerClick, TrendingDown, TrendingUp, Users, CheckCircle2, Eye, Info, AlertTriangle } from 'lucide-react';
 import { startOfWeek, format, parseISO, differenceInCalendarDays } from 'date-fns';
@@ -440,10 +441,14 @@ function UtmBreakdownTable({ rows, labelHeader, truncateLabel, showCampaignColum
 }
 
 export default function VslTracking() {
+  const { isAuditor } = useAuth();
   const [events, setEvents] = useState<VslEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRangeKey, setDateRangeKey] = useState<typeof DATE_RANGES[number]['key']>('30');
-  const [landingId, setLandingId] = useState(ALL_LANDINGS);
+  // Auditor role is RLS-scoped to landing_id='torii-principal' rows only —
+  // "todas las landings" would just render as if the others don't exist,
+  // so start (and lock) the filter on the one landing they can actually see.
+  const [landingId, setLandingId] = useState(isAuditor ? 'torii-principal' : ALL_LANDINGS);
   const [utmCampaign, setUtmCampaign] = useState(ALL_CAMPAIGNS);
   const [trendGranularity, setTrendGranularity] = useState<'day' | 'week'>('day');
 
@@ -636,17 +641,23 @@ export default function VslTracking() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <Select value={landingId} onValueChange={setLandingId}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Landing" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_LANDINGS}>Todas las landings</SelectItem>
-            {LANDING_OPTIONS.map(l => (
-              <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isAuditor ? (
+          <div className="w-[220px] flex items-center px-3 h-9 rounded-md border border-input bg-secondary/50 text-sm">
+            {LANDING_OPTIONS.find(l => l.id === 'torii-principal')?.label ?? 'Torii — Principal'}
+          </div>
+        ) : (
+          <Select value={landingId} onValueChange={setLandingId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Landing" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_LANDINGS}>Todas las landings</SelectItem>
+              {LANDING_OPTIONS.map(l => (
+                <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select value={utmCampaign} onValueChange={setUtmCampaign}>
           <SelectTrigger className="w-[220px]">

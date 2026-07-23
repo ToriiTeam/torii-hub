@@ -1,6 +1,7 @@
 import { useAccount } from '../../context/AccountContext'
 import { useSensitiveData } from '../../context/SensitiveDataContext'
 import { useDateRange } from '../../context/DateRangeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { DateRangePicker } from '../common/DateRangePicker'
 import { CompareSelector } from '../common/CompareSelector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
@@ -9,6 +10,7 @@ export function Header() {
   const { accounts, selectedAccount, setSelectedAccount, loading, error } = useAccount()
   const { isHidden, toggle } = useSensitiveData()
   const { datePreset } = useDateRange()
+  const { isAuditor } = useAuth()
   void datePreset
 
   return (
@@ -22,6 +24,11 @@ export function Header() {
             <span style={{ fontSize: 12, color: '#fc8181' }} title={error}>
               Error al cargar cuentas
             </span>
+          ) : isAuditor ? (
+            // Locked to the one account the auditor role is scoped to
+            // (meta-ads-proxy already only ever returns this one account
+            // for them) — a plain label, not a disabled-looking dropdown.
+            <span className="header-account-locked">{selectedAccount?.name ?? 'LM Social Constructions'}</span>
           ) : (
             <Select
               value={selectedAccount?.account_id ?? ''}
