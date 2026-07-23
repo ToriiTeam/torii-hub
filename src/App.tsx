@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
 import ExecutiveDashboard from "@/pages/ExecutiveDashboard";
 import Tareas from "@/pages/Tareas";
 import Finanzas from "@/pages/Finanzas";
@@ -18,6 +17,7 @@ import Reportes from "@/pages/Reportes";
 import VslTracking from "@/pages/VslTracking";
 import MaquinaCierres from "@/pages/MaquinaCierres";
 import MetaAds from "@/pages/MetaAds";
+import ContenidoOrganico from "@/pages/ContenidoOrganico";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,7 +42,7 @@ function AppContent() {
       <Route path="*" element={
         <Layout>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<ExecutiveDashboard />} />
             <Route path="/dashboard" element={<ExecutiveDashboard />} />
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/clientes/:id" element={<ClienteDetalle />} />
@@ -54,6 +54,7 @@ function AppContent() {
             <Route path="/maquina-cierres" element={<MaquinaCierres />} />
             <Route path="/tareas" element={<Tareas />} />
             <Route path="/meta-ads" element={<MetaAds />} />
+            <Route path="/contenido" element={<ContenidoOrganico />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

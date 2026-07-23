@@ -3,12 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TIPO_LABELS } from '@/features/creative-tree/types';
-import type { CreativeTipo } from '@/features/creative-tree/types';
+import type { CreativeNode, CreativeTipo } from '@/features/creative-tree/types';
 import { createNode, setNodeMediaUrl } from '@/features/creative-tree/lib/creativeNodesRepo';
+import { findAngleIdForRootNode, findRootNodeId, createHypothesisEntry } from '@/features/creative-tree/lib/hypothesisHistoryRepo';
 import { IMAGE_ACCEPT, uploadCreativeImage } from '@/features/creative-tree/lib/media';
 
 const TIPOS = Object.keys(TIPO_LABELS) as CreativeTipo[];
@@ -17,13 +19,15 @@ type MediaMode = 'link' | 'imagen';
 interface Props {
   clientId: string;
   parentId: string | null;
+  nodes: CreativeNode[];
   onClose: () => void;
   onCreated: () => void;
 }
 
-export function NewChildDialog({ clientId, parentId, onClose, onCreated }: Props) {
+export function NewChildDialog({ clientId, parentId, nodes, onClose, onCreated }: Props) {
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<CreativeTipo>('video');
+  const [hipotesis, setHipotesis] = useState('');
   const [mediaMode, setMediaMode] = useState<MediaMode>('link');
   const [mediaLink, setMediaLink] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -42,13 +46,38 @@ export function NewChildDialog({ clientId, parentId, onClose, onCreated }: Props
     if (!nombre.trim()) { toast.error('El nombre es requerido'); return; }
     setSaving(true);
     try {
-      const node = await createNode({ client_id: clientId, parent_id: parentId, nombre: nombre.trim(), tipo });
+      const node = await createNode({
+        client_id: clientId, parent_id: parentId, nombre: nombre.trim(), tipo,
+        hipotesis: hipotesis.trim() || null,
+      });
 
       if (mediaMode === 'link' && mediaLink.trim()) {
         await setNodeMediaUrl(node.id, mediaLink.trim());
       } else if (mediaMode === 'imagen' && mediaFile) {
         const url = await uploadCreativeImage(clientId, node.id, mediaFile);
         await setNodeMediaUrl(node.id, url);
+      }
+
+      // Only iterations (parentId != null) with an actual hypothesis get a
+      // hypothesis_history row — a root "ángulo base" node, or a child
+      // created without a hypothesis, has nothing worth tracking yet.
+      if (parentId && hipotesis.trim()) {
+        try {
+          const rootId = findRootNodeId(nodes, parentId);
+          const angleId = await findAngleIdForRootNode(rootId);
+          await createHypothesisEntry({
+            client_id: clientId,
+            creative_node_id: node.id,
+            angle_id: angleId,
+            hipotesis: hipotesis.trim(),
+            fecha_inicio: new Date().toISOString().slice(0, 10),
+          });
+        } catch (err) {
+          // The node itself was already created successfully — a failure
+          // here shouldn't look like the whole action failed, just warn.
+          console.error('[NewChildDialog] hypothesis_history insert failed:', err);
+          toast.error('El nodo se creó, pero no se pudo registrar la hipótesis en el historial');
+        }
       }
 
       toast.success(parentId ? 'Iteración creada' : 'Ángulo base creado');
@@ -87,6 +116,16 @@ export function NewChildDialog({ clientId, parentId, onClose, onCreated }: Props
                 {TIPOS.map((t) => <SelectItem key={t} value={t}>{TIPO_LABELS[t]}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label>Hipótesis (opcional)</Label>
+            <Textarea
+              value={hipotesis}
+              onChange={(e) => setHipotesis(e.target.value)}
+              className="bg-secondary/50 mt-1 resize-none"
+              rows={2}
+              placeholder="Qué estamos testeando con este cambio y por qué creemos que va a funcionar..."
+            />
           </div>
           <div>
             <Label>Media (opcional)</Label>

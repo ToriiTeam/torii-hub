@@ -1,3 +1,7 @@
+import type { Income, Expense } from '@/features/finanzas/lib/types';
+import type { ClientInstallmentRow } from '@/components/finanzas/types';
+import type { ClientHealthRow } from './lib/businessHealth';
+
 export interface ClientBase {
   id: string;
   name: string;
@@ -7,6 +11,11 @@ export interface ClientBase {
   renewal_risk: string | null;
   mrr: number | null;
   start_date: string | null;
+  // How Torii itself acquired this client (not the client's own marketing
+  // channel). Carried here so a future portfolio-wide ROAS calc can filter
+  // to canal_captacion === 'Meta Ads' — never assume a client with no value
+  // set came from ads.
+  canal_captacion: string | null;
 }
 
 export interface AdsMetrics {
@@ -100,11 +109,28 @@ export interface ClientDetailData {
 // incomes/expenses. Reuses PortfolioData for the "health overview" table
 // (same comparative view shown under "Todos los clientes").
 export interface ToriiData {
-  closing: ClosingMetrics;
+  closing: ClosingMetrics; // already excludes fuente='LinkedIn' rows — see fetchToriiData.ts
   ads: AdsMetrics;
   incomesTotal: number; // unfiltered — includes capital contributions, unlike portfolioMrr
   expensesTotal: number;
   netProfit: number;
   portfolioMrr: number;
   portfolio: PortfolioData;
+  // count(client_closer_calls) where owner_type='torii', fuente='ADS',
+  // se_presento=true, califico=true — denominator for "Costo por llamada
+  // calificada".
+  qualifiedAdsCalls: number;
+  // count(client_closer_calls) where owner_type='torii', fuente='ADS',
+  // cerro=true — CAC's denominator ("clientes cerrados vía ADS").
+  closedViaAds: number;
+
+  // Raw period-scoped rows for the "Salud del Negocio" block — kept as full
+  // arrays (not pre-aggregated) so businessHealth.ts / financeCalc.ts can
+  // apply their own status/type/category filters, same "fetch once,
+  // compute client-side" pattern as Finanzas.
+  healthIncomes: Income[];
+  healthExpenses: Expense[];
+  healthClients: ClientHealthRow[];
+  healthInstallments: ClientInstallmentRow[];
+  healthReservas: number;
 }

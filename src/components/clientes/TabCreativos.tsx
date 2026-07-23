@@ -49,12 +49,19 @@ const STAGES = [
   { value: 'lanzado',     label: 'Lanzado' },
 ];
 
+// Unified vocabulary (ResultadoEstado from creative-tree/types.ts) — this
+// table used to have its own 4th value 'sin_datos', now retired (0 real
+// rows ever used it, and a null resultado already means the same thing —
+// see the "Sin datos" fallback below, which is a display-only label, not a
+// stored enum value anymore).
 const resultadoStyle: Record<string, { badge: string; label: string }> = {
-  ganador:   { badge: 'bg-success/20 text-success',             label: 'Ganador' },
-  perdedor:  { badge: 'bg-destructive/20 text-destructive',     label: 'Perdedor' },
-  en_test:   { badge: 'bg-warning/20 text-warning',             label: 'En test' },
-  sin_datos: { badge: 'bg-secondary text-muted-foreground',     label: 'Sin datos' },
+  ganador:    { badge: 'bg-success/20 text-success',         label: 'Ganador' },
+  perdedor:   { badge: 'bg-destructive/20 text-destructive', label: 'Perdedor' },
+  en_test:    { badge: 'bg-warning/20 text-warning',         label: 'En test' },
+  inconcluso: { badge: 'bg-info/20 text-info',               label: 'Inconcluso' },
+  pausado:    { badge: 'bg-secondary text-muted-foreground', label: 'Pausado' },
 };
+const SIN_DATOS_STYLE = { badge: 'bg-secondary text-muted-foreground', label: 'Sin datos' };
 
 const scriptEstadoStyle: Record<string, { badge: string; label: string }> = {
   borrador: { badge: 'bg-secondary text-muted-foreground',  label: 'Borrador' },
@@ -284,8 +291,7 @@ function AngleCard({ angle, stageIdx, scripts, onChangeStage, onRefresh }: Angle
     setMoving(false);
   };
 
-  const resultado = angle.resultado ?? 'sin_datos';
-  const resultStyle = resultadoStyle[resultado] ?? resultadoStyle['sin_datos'];
+  const resultStyle = angle.resultado ? (resultadoStyle[angle.resultado] ?? SIN_DATOS_STYLE) : SIN_DATOS_STYLE;
 
   return (
     <Card className="bg-card border-border/50 hover:border-primary/20 transition-colors">

@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Undo2, Redo2 } from 'lucide-react';
 import { PeriodSelector } from '@/features/executive-dashboard/components/shared/PeriodSelector';
 import { getPeriodRange, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
 import { SensitiveDataProvider, useSensitiveData } from '@/features/meta-ads/context/SensitiveDataContext';
 import { getPeriodBounds } from '@/features/finanzas/lib/periodBounds';
+import { useFinanzasHistory } from '@/features/finanzas/lib/useFinanzasHistory';
 import type { CashOpeningBalance, Debt, Expense, FinanceTargets, Income } from '@/features/finanzas/lib/types';
 import type { ClientRow, InstallmentWithClient } from '@/components/finanzas/types';
 import TabDashboard from '@/components/finanzas/TabDashboard';
@@ -95,6 +96,25 @@ function FinanzasContent() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const { canUndo, canRedo, busy: historyBusy, pushHistory, undo, redo } = useFinanzasHistory(fetchData);
+
+  // Ctrl+Z / Ctrl+Shift+Z anywhere on the Finanzas page, except while
+  // focus is inside a text input/textarea/contentEditable — there,
+  // Ctrl+Z should do the browser's native text-undo instead of hijacking
+  // it for the finance history stack.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+      e.preventDefault();
+      if (e.shiftKey) { redo(); } else { undo(); }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo, redo]);
+
   const periodInput = { periodType, preset, year, month, customSince, customUntil };
   const periodBounds = useMemo(() => getPeriodBounds(periodInput), [periodType, preset, year, month, customSince, customUntil]);
   const monthLabel = useMemo(() => getPeriodRange(periodInput).label, [periodType, preset, year, month, customSince, customUntil]);
@@ -112,6 +132,7 @@ function FinanzasContent() {
     openingBalance,
     loading,
     refetch: fetchData,
+    pushHistory,
   };
 
   return (
@@ -128,17 +149,27 @@ function FinanzasContent() {
         </Button>
       </div>
 
-      <PeriodSelector
-        periodType={periodType}
-        preset={preset}
-        monthLabel={monthLabel}
-        customSince={customSince}
-        customUntil={customUntil}
-        onPresetChange={(p) => { setPeriodType('preset'); setPreset(p); }}
-        onModeChange={setPeriodType}
-        onNavMonth={(dir) => { const n = navMonth(year, month, dir); setYear(n.year); setMonth(n.month); }}
-        onCustomChange={(since, until) => { setCustomSince(since); setCustomUntil(until); }}
-      />
+      <div className="flex items-center gap-2 flex-wrap">
+        <PeriodSelector
+          periodType={periodType}
+          preset={preset}
+          monthLabel={monthLabel}
+          customSince={customSince}
+          customUntil={customUntil}
+          onPresetChange={(p) => { setPeriodType('preset'); setPreset(p); }}
+          onModeChange={setPeriodType}
+          onNavMonth={(dir) => { const n = navMonth(year, month, dir); setYear(n.year); setMonth(n.month); }}
+          onCustomChange={(since, until) => { setCustomSince(since); setCustomUntil(until); }}
+        />
+        <div className="flex items-center gap-1 ml-auto">
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={!canUndo || historyBusy} onClick={undo} title="Deshacer (Ctrl+Z)">
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={!canRedo || historyBusy} onClick={redo} title="Rehacer (Ctrl+Shift+Z)">
+            <Redo2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* ── Tabs ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

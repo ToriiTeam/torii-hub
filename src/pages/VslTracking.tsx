@@ -7,8 +7,9 @@ import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/componen
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
-import { PlayCircle, MousePointerClick, TrendingDown, TrendingUp, Users, CheckCircle2, Eye, Info } from 'lucide-react';
-import { startOfWeek, format } from 'date-fns';
+import { PlayCircle, MousePointerClick, TrendingDown, TrendingUp, Users, CheckCircle2, Eye, Info, AlertTriangle } from 'lucide-react';
+import { startOfWeek, format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
 
@@ -107,6 +108,16 @@ const DATE_RANGES = [
 ] as const;
 
 const FORM_SUBMIT_NOTE = 'Solo cuenta leads que calificaron en el formulario y completaron el booking. Los no calificados no generan este evento.';
+
+// Root cause confirmed and fixed: torii-principal had the tracking Custom
+// Code pasted into both the landing AND the TKP page, double-firing
+// VSL_Form_Submit with a timing issue that dropped session_id on one of the
+// two. The TKP block was removed; a fresh test booking on 2026-07-13
+// confirmed a single VSL_Form_Submit row with session_id populated. Every
+// orphan (session_id null) row on record is dated on or before 2026-07-12 —
+// this is a fixed cutoff, not a guess (see the conversation that diagnosed
+// it), unlike the "no clean cutoff" case this replaces.
+const FORM_SUBMIT_BUG_FIXED_ON = '2026-07-13';
 
 // Small info icon with a hover tooltip, for clarifying a metric's exact
 // definition inline without cluttering the label.
@@ -440,6 +451,25 @@ export default function VslTracking() {
     loadData();
   }, [dateRangeKey]);
 
+  // Earliest event ever recorded for the selected landing — deliberately
+  // independent of dateRangeKey (a "últimos 7 días" filter would otherwise
+  // make every landing look 7 days old). Answers "how many days of data am
+  // I looking at", which matters most for small samples.
+  const [trackingSince, setTrackingSince] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEarliest() {
+      let query = supabase.from('vsl_events').select('created_at').order('created_at', { ascending: true }).limit(1);
+      if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
+      const { data, error } = await query;
+      if (cancelled) return;
+      if (error) { console.error('Error loading earliest VSL event:', error); setTrackingSince(null); return; }
+      setTrackingSince(data?.[0]?.created_at ?? null);
+    }
+    loadEarliest();
+    return () => { cancelled = true; };
+  }, [landingId]);
+
   async function loadData() {
     setLoading(true);
     try {
@@ -492,6 +522,14 @@ export default function VslTracking() {
     () => buildPercentBreakdown(sessionSummaries, s => s.ctaClicks),
     [sessionSummaries],
   );
+  // Total individual VSL_CTA_Click events (not deduplicated by session) —
+  // shown alongside the breakdown to make explicit that it can exceed the
+  // "Visitantes que clickearon CTA" KPI above when someone clicks more than
+  // once.
+  const ctaClicksTotal = useMemo(
+    () => sessionSummaries.reduce((sum, s) => sum + s.ctaClicks.length, 0),
+    [sessionSummaries],
+  );
   const submitBreakdown = useMemo(
     () => buildPercentBreakdown(sessionSummaries, s => (s.formSubmitPercent !== null ? [s.formSubmitPercent] : [])),
     [sessionSummaries],
@@ -533,12 +571,34 @@ export default function VslTracking() {
 
   const ctaStage = conversionFunnel.find(f => f.key === 'cta');
   const submitStage = conversionFunnel.find(f => f.key === 'submit');
-  const formSubmitCount = submitStage?.count ?? 0;
+  const attributedFormSubmits = submitStage?.count ?? 0;
+
+  // Defensive workaround for a now-fixed bug in the (external, not in this
+  // repo) tracking script: torii-principal had its Custom Code pasted into
+  // both the landing and the TKP page, and one of the two double-fired
+  // VSL_Form_Submit without a session_id — see FORM_SUBMIT_BUG_FIXED_ON.
+  // buildSessionSummaries's `if (!e.session_id) continue` silently dropped
+  // those, undercounting the one KPI that matters most. Those events can't
+  // be attributed to a session (no funnel placement, no conversion-rate
+  // denominator), but they ARE real completed forms, so the raw total below
+  // counts them anyway. Everything session-based (conversionFunnel, the
+  // pipeline's "submit" stage/bar, dropOffPct) stays untouched and keeps
+  // using attributedFormSubmits only. Kept even after the fix, since the 5
+  // historical orphan rows (2026-07-02 → 2026-07-12) are permanent —
+  // they can't be retroactively attributed to a session.
+  const orphanFormSubmits = useMemo(
+    () => filteredEvents.filter(e => e.event_name === 'VSL_Form_Submit' && !e.session_id).length,
+    [filteredEvents],
+  );
+  const formSubmitCount = attributedFormSubmits + orphanFormSubmits;
+
   // VSL_Form_Submit is the real conversion signal (fired from the thank-you
-  // page after booking), more reliable than the CTA click.
-  const realConversionRate = totalSessions ? round1((formSubmitCount / totalSessions) * 100) : 0;
+  // page after booking), more reliable than the CTA click. Rates stay
+  // session-based (attributedFormSubmits) — a rate "of visitors"/"of CTA
+  // clicks" only makes sense for submits actually tied to one.
+  const realConversionRate = totalSessions ? round1((attributedFormSubmits / totalSessions) * 100) : 0;
   const formCompletionRate = ctaStage && ctaStage.count > 0
-    ? round1((formSubmitCount / ctaStage.count) * 100)
+    ? round1((attributedFormSubmits / ctaStage.count) * 100)
     : null;
 
   // Average % of the VIDEO watched at the moment of the last tab-switch —
@@ -618,6 +678,29 @@ export default function VslTracking() {
         </div>
       ) : (
         <>
+          {/* Context for how many days of data the KPIs below represent —
+              independent of the date-range filter on purpose, see the
+              trackingSince effect above. Matters most for small samples. */}
+          <p className="text-xs text-muted-foreground">
+            {trackingSince
+              ? `Trackeando desde ${format(parseISO(trackingSince), 'd MMM yyyy')} (${differenceInCalendarDays(new Date(), parseISO(trackingSince))} días de datos)`
+              : 'Sin eventos registrados todavía para esta landing'}
+          </p>
+
+          {/* Flag for the now-fixed tracking-script bug (session_id null on
+              VSL_Form_Submit) — see orphanFormSubmits/FORM_SUBMIT_BUG_FIXED_ON
+              above. Still shown because the historical orphan rows are
+              permanent, but worded as resolved rather than "go investigate" —
+              new VSL_Form_Submit rows from the fix date on all carry a real
+              session_id, so this count won't grow anymore. Not hardcoded to
+              torii-principal — shows for whatever landing(s) are in view. */}
+          {orphanFormSubmits > 0 && (
+            <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              ⚠️ {orphanFormSubmits} formulario{orphanFormSubmits !== 1 ? 's' : ''} anterior{orphanFormSubmits !== 1 ? 'es' : ''} al {format(parseISO(FORM_SUBMIT_BUG_FIXED_ON), 'd-MMM-yyyy', { locale: es })} no se {orphanFormSubmits !== 1 ? 'pudieron' : 'pudo'} atribuir a una sesión (bug de tracking ya corregido).
+            </div>
+          )}
+
           {/* Top KPI row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
             <Card className="bg-card border-border/50">
@@ -656,7 +739,10 @@ export default function VslTracking() {
               <CardContent className="p-4">
                 <MousePointerClick className="h-6 w-6 text-primary" />
                 <p className="text-2xl font-bold mt-3">{(ctaStage?.count ?? 0).toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">Click en CTA</p>
+                <p className="text-xs text-muted-foreground">
+                  Visitantes que clickearon CTA
+                  <InfoNote text="Sesiones únicas con al menos un click en el CTA. Si alguien clickeó más de una vez, cuenta una sola vez acá — ver el desglose 'Clicks en CTA por % visto' para el total de clicks." />
+                </p>
               </CardContent>
             </Card>
 
@@ -853,6 +939,12 @@ export default function VslTracking() {
                   Clicks en CTA por % visto
                 </CardTitle>
                 <CardDescription>¿En qué momento del video clickea la gente?</CardDescription>
+                {ctaClicksTotal > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {ctaClicksTotal.toLocaleString()} clics totales
+                    {ctaClicksTotal !== (ctaStage?.count ?? 0) && ' (algunos visitantes clickearon más de una vez)'}
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 {ctaBreakdown.map(bucket => (

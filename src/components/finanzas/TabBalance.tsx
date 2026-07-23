@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { calcCajaActual, calcDeuda, calcPatrimonioNeto, calcPorCobrar } from '@/features/finanzas/lib/financeCalc';
-import type { Income } from '@/features/finanzas/lib/types';
+import type { Debt, Income } from '@/features/finanzas/lib/types';
 import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
 
@@ -63,21 +63,22 @@ function estadoBadge(status: string | null) {
 
 // ─── AddDebtDialog ──────────────────────────────────────────────────────────
 
-function AddDebtDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddDebtDialog({ onClose, onSaved, pushHistory }: { onClose: () => void; onSaved: () => void; pushHistory: FinanzasTabProps['pushHistory'] }) {
   const [form, setForm] = useState({ creditor: '', amount: '', due_date: '', note: '' });
   const [saving, setSaving] = useState(false);
 
   async function save() {
     if (!form.creditor.trim() || !form.amount) { toast.error('Acreedor y monto son requeridos'); return; }
     setSaving(true);
-    const { error } = await supabase.from('debts').insert({
+    const { data, error } = await supabase.from('debts').insert({
       creditor: form.creditor.trim(),
       amount: parseFloat(form.amount),
       due_date: form.due_date || null,
       note: form.note || null,
-    });
+    }).select().single();
     setSaving(false);
-    if (error) { toast.error('Error al guardar la deuda'); return; }
+    if (error || !data) { toast.error('Error al guardar la deuda'); return; }
+    pushHistory({ table: 'debts', op: 'insert', before: null, after: data, label: `deuda con ${data.creditor} $${fmtUSD(Number(data.amount))} agregada` });
     toast.success('Deuda registrada');
     onSaved(); onClose();
   }
@@ -119,7 +120,7 @@ function AddDebtDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () 
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabBalance({ incomes, expenses, clients, debts, openingBalance, refetch }: FinanzasTabProps) {
+export default function TabBalance({ incomes, expenses, clients, debts, openingBalance, refetch, pushHistory }: FinanzasTabProps) {
   const [savingBalance, setSavingBalance] = useState(false);
   const [balanceInput, setBalanceInput] = useState(openingBalance ? String(openingBalance.amount) : '0');
   const [addingDebt, setAddingDebt] = useState(false);
@@ -154,24 +155,38 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
     const amount = parseFloat(balanceInput);
     if (Number.isNaN(amount)) { toast.error('Monto inválido'); return; }
     setSavingBalance(true);
-    const { error } = openingBalance?.id
-      ? await supabase.from('cash_opening_balance').update({ amount }).eq('id', openingBalance.id)
-      : await supabase.from('cash_opening_balance').insert({ amount, as_of_date: format(new Date(), 'yyyy-MM-dd') });
-    setSavingBalance(false);
-    if (error) { toast.error('Error al guardar el saldo inicial'); return; }
+    if (openingBalance?.id) {
+      const { data, error } = await supabase.from('cash_opening_balance').update({ amount }).eq('id', openingBalance.id).select().single();
+      setSavingBalance(false);
+      if (error || !data) { toast.error('Error al guardar el saldo inicial'); return; }
+      pushHistory({ table: 'cash_opening_balance', op: 'update', before: openingBalance, after: data, label: `saldo inicial actualizado a $${fmtUSD(amount)}` });
+    } else {
+      const { data, error } = await supabase.from('cash_opening_balance').insert({ amount, as_of_date: format(new Date(), 'yyyy-MM-dd') }).select().single();
+      setSavingBalance(false);
+      if (error || !data) { toast.error('Error al guardar el saldo inicial'); return; }
+      pushHistory({ table: 'cash_opening_balance', op: 'insert', before: null, after: data, label: `saldo inicial creado en $${fmtUSD(amount)}` });
+    }
     toast.success('Saldo inicial guardado');
     refetch();
   }
 
-  async function toggleDebtPaid(id: string, paid: boolean) {
-    const { error } = await supabase.from('debts').update({ paid }).eq('id', id);
+  async function toggleDebtPaid(debt: Debt, paid: boolean) {
+    const { error } = await supabase.from('debts').update({ paid }).eq('id', debt.id);
     if (error) { toast.error('Error al actualizar la deuda'); return; }
+    pushHistory({
+      table: 'debts',
+      op: 'update',
+      before: debt,
+      after: { ...debt, paid },
+      label: `deuda con ${debt.creditor} $${fmtUSD(Number(debt.amount))} marcada como ${paid ? 'pagada' : 'no pagada'}`,
+    });
     refetch();
   }
 
-  async function deleteDebt(id: string) {
-    const { error } = await supabase.from('debts').delete().eq('id', id);
+  async function deleteDebt(debt: Debt) {
+    const { error } = await supabase.from('debts').delete().eq('id', debt.id);
     if (error) { toast.error('Error al eliminar la deuda'); return; }
+    pushHistory({ table: 'debts', op: 'delete', before: debt, after: null, label: `deuda con ${debt.creditor} $${fmtUSD(Number(debt.amount))} eliminada` });
     toast.success('Deuda eliminada');
     refetch();
   }
@@ -304,10 +319,10 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
                   <TableCell className="text-sm text-right font-medium"><SensitiveAmount>{fmtUSD(Number(d.amount))}</SensitiveAmount></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{fmtDate(d.due_date)}</TableCell>
                   <TableCell className="text-center">
-                    <Switch checked={d.paid} onCheckedChange={(v) => toggleDebtPaid(d.id, v)} />
+                    <Switch checked={d.paid} onCheckedChange={(v) => toggleDebtPaid(d, v)} />
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => deleteDebt(d.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => deleteDebt(d)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </TableCell>
@@ -327,7 +342,7 @@ export default function TabBalance({ incomes, expenses, clients, debts, openingB
       </Card>
 
       {addingDebt && (
-        <AddDebtDialog onClose={() => setAddingDebt(false)} onSaved={refetch} />
+        <AddDebtDialog onClose={() => setAddingDebt(false)} onSaved={refetch} pushHistory={pushHistory} />
       )}
     </div>
   );

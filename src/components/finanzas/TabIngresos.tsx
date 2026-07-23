@@ -51,8 +51,8 @@ function estadoTriggerClass(status: string | null): string {
 
 // ─── AddIncomeDialog ──────────────────────────────────────────────────────
 
-function AddIncomeDialog({ clients, onClose, onSaved }: {
-  clients: ClientRow[]; onClose: () => void; onSaved: () => void;
+function AddIncomeDialog({ clients, onClose, onSaved, pushHistory }: {
+  clients: ClientRow[]; onClose: () => void; onSaved: () => void; pushHistory: FinanzasTabProps['pushHistory'];
 }) {
   const [form, setForm] = useState({
     source: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'), due_date: '',
@@ -69,7 +69,7 @@ function AddIncomeDialog({ clients, onClose, onSaved }: {
   async function save() {
     if (!form.source.trim() || !form.amount) { toast.error('Cliente/Fuente y monto son requeridos'); return; }
     setSaving(true);
-    const { error } = await supabase.from('incomes').insert({
+    const { data, error } = await supabase.from('incomes').insert({
       source: form.source.trim(),
       amount: parseFloat(form.amount),
       date: form.date,
@@ -82,9 +82,10 @@ function AddIncomeDialog({ clients, onClose, onSaved }: {
       fee_percent: form.fee_percent ? parseFloat(form.fee_percent) : null,
       client_id: form.client_id === NONE ? null : form.client_id,
       notes: form.notes || null,
-    });
+    }).select().single();
     setSaving(false);
-    if (error) { toast.error('Error al guardar el ingreso'); return; }
+    if (error || !data) { toast.error('Error al guardar el ingreso'); return; }
+    pushHistory({ table: 'incomes', op: 'insert', before: null, after: data, label: `ingreso de ${data.source} $${fmtUSD(Number(data.amount))} agregado` });
     toast.success('Ingreso registrado');
     onSaved(); onClose();
   }
@@ -172,7 +173,7 @@ function AddIncomeDialog({ clients, onClose, onSaved }: {
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabIngresos({ periodBounds, incomes, clients, refetch }: FinanzasTabProps) {
+export default function TabIngresos({ periodBounds, incomes, clients, refetch, pushHistory }: FinanzasTabProps) {
   const [adding, setAdding] = useState(false);
   const { periodStart, periodEnd } = periodBounds;
 
@@ -198,14 +199,23 @@ export default function TabIngresos({ periodBounds, incomes, clients, refetch }:
   async function handleStatusChange(income: Income, newStatus: string) {
     const { error } = await supabase.from('incomes').update({ status: newStatus }).eq('id', income.id);
     if (error) { toast.error('Error al actualizar el estado'); return; }
+    pushHistory({
+      table: 'incomes',
+      op: 'update',
+      before: income,
+      after: { ...income, status: newStatus },
+      label: `ingreso de ${income.source} $${fmtUSD(Number(income.amount))}: estado → ${newStatus}`,
+    });
     toast.success('Estado actualizado');
     refetch();
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm('¿Eliminar este ingreso? Esta acción no se puede deshacer.')) return;
-    const { error } = await supabase.from('incomes').delete().eq('id', id);
+  // No window.confirm here — deletes are immediate now that they're
+  // reversible via the global undo stack (← button / Ctrl+Z).
+  async function handleDelete(income: Income) {
+    const { error } = await supabase.from('incomes').delete().eq('id', income.id);
     if (error) { toast.error('Error al eliminar'); return; }
+    pushHistory({ table: 'incomes', op: 'delete', before: income, after: null, label: `ingreso de ${income.source} $${fmtUSD(Number(income.amount))} eliminado` });
     toast.success('Ingreso eliminado');
     refetch();
   }
@@ -294,7 +304,7 @@ export default function TabIngresos({ periodBounds, incomes, clients, refetch }:
                     <Badge className={cn('text-xs border-0', tipoBadgeClass(i.type))}>{i.type ?? '—'}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => handleDelete(i.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => handleDelete(i)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </TableCell>
@@ -309,7 +319,7 @@ export default function TabIngresos({ periodBounds, incomes, clients, refetch }:
       </Card>
 
       {adding && (
-        <AddIncomeDialog clients={clients} onClose={() => setAdding(false)} onSaved={refetch} />
+        <AddIncomeDialog clients={clients} onClose={() => setAdding(false)} onSaved={refetch} pushHistory={pushHistory} />
       )}
     </div>
   );

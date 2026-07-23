@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingUp, Users, Handshake, Target, ChevronDown, ChevronUp } from 'lucide-react';
 import { HEALTH_CONFIG, cpbcSemaphoreClass, cpbcTargetFor } from '../lib/clientHealth';
+import { MetricInfo, type MetricInfoProps } from './shared/MetricInfo';
 import type { PortfolioClientRow, PortfolioData } from '../types';
 
 function fmtMoney(v: number | null): string {
@@ -17,6 +18,16 @@ function fmtMoney(v: number | null): string {
 function fmtPct(v: number | null): string {
   return v == null ? '—' : `${Math.round(v * 100)}%`;
 }
+function fmtN(v: number): string {
+  return v.toLocaleString();
+}
+
+// These KPIs are about each client account's OWN ads/closing/revenue
+// (owner_type='client'), unrelated to Torii's own funnel — the "Nuevo
+// Torii" toggle (which only scopes Torii's own money/funnel cards, see
+// ToriiView.tsx) doesn't touch this view at all, whether embedded there or
+// shown standalone as "Todos los clientes". Always just the selected period.
+const SCOPE_LABEL = 'Sin filtro adicional — usa el período seleccionado arriba';
 
 type SortKey = 'name' | 'inversion' | 'leads' | 'cpl' | 'reuniones' | 'showRate' | 'calificados' | 'cierres' | 'closeRate' | 'revenue' | 'cpbc' | 'cac' | 'roi';
 
@@ -58,9 +69,15 @@ const CHART_COLORS = ['#e5182b', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#0
 
 interface PortfolioViewProps {
   data: PortfolioData;
+  // False when this view is re-embedded inside ToriiView's "Resumen del
+  // portfolio" section — that page already shows Torii's own revenue in
+  // its own KPI row above, so repeating it here would just be the same
+  // number twice. Defaults to true for this component's standalone use as
+  // the "Todos los clientes" top-level view.
+  showToriiRevenue?: boolean;
 }
 
-export function PortfolioView({ data }: PortfolioViewProps) {
+export function PortfolioView({ data, showToriiRevenue = true }: PortfolioViewProps) {
   const { rows, totalMrr, monthlyClosesTrend } = data;
   const [sortKey, setSortKey] = useState<SortKey>('inversion');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -72,10 +89,13 @@ export function PortfolioView({ data }: PortfolioViewProps) {
   const totalLeads = rows.reduce((s, r) => s + r.ads.leads, 0);
   const totalReuniones = rows.reduce((s, r) => s + r.closing.reuniones, 0);
   const totalCierres = rows.reduce((s, r) => s + r.closing.cierres, 0);
-  const cpbcValues = rows.map((r) => r.cpbc).filter((v): v is number => v != null);
-  const avgCpbc = cpbcValues.length ? cpbcValues.reduce((s, v) => s + v, 0) / cpbcValues.length : null;
-  const roiValues = rows.map((r) => r.revenue.roi).filter((v): v is number => v != null);
-  const avgRoi = roiValues.length ? roiValues.reduce((s, v) => s + v, 0) / roiValues.length : null;
+  // Pooled across the portfolio: sum numerators and denominators
+  // separately, then divide once — NOT an average of each client's own
+  // ratio, which would let a low-volume client's ratio weigh the same as
+  // a high-volume one. Same fix already applied to content_metrics_tanda.
+  const totalRevenue = rows.reduce((s, r) => s + (r.revenue.revenue ?? 0), 0);
+  const avgCpbc = totalReuniones ? totalInversion / totalReuniones : null;
+  const avgRoi = totalInversion ? totalRevenue / totalInversion : null;
 
   const sortedRows = useMemo(() => {
     const copy = [...rows];
@@ -97,14 +117,75 @@ export function PortfolioView({ data }: PortfolioViewProps) {
   const cpbcData = rows.map((r) => ({ name: r.client.name, cpbc: r.cpbc ?? 0, target: cpbcTargetFor(r.client.country) }));
   const avgTarget = rows.length ? rows.reduce((s, r) => s + cpbcTargetFor(r.client.country), 0) / rows.length : 30;
 
-  const kpis = [
-    { label: 'Revenue de Torii', value: fmtMoney(totalMrr), icon: DollarSign, sub: 'ventas propias, closer calls', className: totalMrr > 0 ? 'text-success' : undefined },
-    { label: 'Inversión en ads del mes', value: fmtMoney(totalInversion), icon: TrendingUp, sub: null },
-    { label: 'Leads generados', value: totalLeads.toLocaleString(), icon: Users, sub: null },
-    { label: 'Reuniones agendadas', value: totalReuniones.toLocaleString(), icon: Handshake, sub: null },
-    { label: 'Cierres', value: totalCierres.toLocaleString(), icon: Handshake, sub: null },
-    { label: 'CPBC promedio', value: fmtMoney(avgCpbc), icon: Target, sub: null },
-    { label: 'ROI promedio', value: avgRoi != null ? `${avgRoi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp, sub: null, className: avgRoi != null && avgRoi > 0 ? 'text-success' : undefined },
+  const kpis: { label: string; value: string; icon: typeof DollarSign; sub: string | null; className?: string; info: MetricInfoProps }[] = [
+    ...(showToriiRevenue
+      ? [{
+          label: 'Revenue de Torii', value: fmtMoney(totalMrr), icon: DollarSign,
+          sub: 'ventas propias, closer calls', className: totalMrr > 0 ? 'text-success' : undefined,
+          info: {
+            formula: "Suma de client_closer_calls.precio donde owner_type='torii' y cerro=true, dentro del rango de fecha aplicado.",
+            source: 'client_closer_calls',
+            scopeLabel: SCOPE_LABEL,
+          },
+        }]
+      : []),
+    {
+      label: 'Inversión en ads (Portfolio)', value: fmtMoney(totalInversion), icon: TrendingUp, sub: null,
+      info: {
+        formula: 'Suma de ads.inversion de cada cliente de cartera (ads_metricas_diarias con ads_campanas.client_id no nulo), dentro del rango de fecha aplicado.',
+        source: 'ads_metricas_diarias + ads_campanas',
+        scopeLabel: SCOPE_LABEL,
+      },
+    },
+    {
+      label: 'Leads generados', value: fmtN(totalLeads), icon: Users, sub: null,
+      info: {
+        formula: 'Suma de ads.leads de cada cliente de cartera, dentro del rango de fecha aplicado.',
+        source: 'ads_metricas_diarias + ads_campanas',
+        scopeLabel: SCOPE_LABEL,
+      },
+    },
+    {
+      label: 'Reuniones agendadas', value: fmtN(totalReuniones), icon: Handshake, sub: null,
+      info: {
+        formula: "Suma de reuniones por cliente: filas de client_closer_calls donde owner_type='client' (el funnel de CADA cliente, no el propio de Torii), dentro del rango de fecha aplicado.",
+        source: 'client_closer_calls',
+        scopeLabel: SCOPE_LABEL,
+      },
+    },
+    {
+      label: 'Cierres (Portfolio)', value: fmtN(totalCierres), icon: Handshake, sub: null,
+      info: {
+        formula: "Suma de cierres por cliente: filas de client_closer_calls donde owner_type='client' y cerro=true, dentro del rango de fecha aplicado.",
+        source: 'client_closer_calls',
+        scopeLabel: SCOPE_LABEL,
+      },
+    },
+    {
+      label: 'CPBC promedio', value: fmtMoney(avgCpbc), icon: Target, sub: null,
+      info: {
+        formula: 'Inversión total del portfolio / Reuniones totales del portfolio (pooled: suma/suma, no promedio de cada cliente).',
+        source: 'ads_metricas_diarias + client_closer_calls',
+        scopeLabel: SCOPE_LABEL,
+        breakdown: [
+          { label: 'Inversión total', value: fmtMoney(totalInversion) },
+          { label: 'Reuniones totales', value: fmtN(totalReuniones) },
+        ],
+      },
+    },
+    {
+      label: 'ROI promedio', value: avgRoi != null ? `${avgRoi.toFixed(1)}x` : 'Sin datos', icon: TrendingUp, sub: null,
+      className: avgRoi != null && avgRoi > 0 ? 'text-success' : undefined,
+      info: {
+        formula: 'Revenue total del portfolio / Inversión total del portfolio (pooled: suma/suma). Revenue = comisión de Torii (comision_estimada, o precio si no está cargada) en client_closer_calls con cerro=true.',
+        source: 'client_closer_calls + ads_metricas_diarias',
+        scopeLabel: SCOPE_LABEL,
+        breakdown: [
+          { label: 'Revenue total', value: fmtMoney(totalRevenue) },
+          { label: 'Inversión total', value: fmtMoney(totalInversion) },
+        ],
+      },
+    },
   ];
 
   return (
@@ -117,7 +198,10 @@ export function PortfolioView({ data }: PortfolioViewProps) {
               <CardContent className="p-4 text-center">
                 <Icon className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
                 <p className={`text-lg font-bold ${k.className ?? ''}`}>{k.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{k.label}</p>
+                <div className="flex items-center justify-center gap-1 mt-0.5">
+                  <p className="text-xs text-muted-foreground">{k.label}</p>
+                  <MetricInfo {...k.info} />
+                </div>
                 {k.sub && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{k.sub}</p>}
               </CardContent>
             </Card>

@@ -47,7 +47,7 @@ export default function CreativeTree({ clientId }: Props) {
       setRawNodes(nodes);
     } catch (err) {
       console.error('[CreativeTree] failed to load nodes:', err);
-      toast.error('Error al cargar el árbol de creativos');
+      toast.error('Error al cargar el árbol de iteraciones');
     } finally {
       setLoading(false);
     }
@@ -186,6 +186,7 @@ export default function CreativeTree({ clientId }: Props) {
         <NewChildDialog
           clientId={clientId}
           parentId={newChildParentId ?? null}
+          nodes={rawNodes}
           onClose={() => setNewChildParentId(undefined)}
           onCreated={async () => {
             setNewChildParentId(undefined);

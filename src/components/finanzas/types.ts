@@ -2,6 +2,7 @@ import type { Database } from '@/integrations/supabase/types';
 import type { PeriodType, PresetKey } from '@/features/executive-dashboard/lib/periodRange';
 import type { PeriodBounds } from '@/features/finanzas/lib/periodBounds';
 import type { CashOpeningBalance, Debt, Expense, FinanceTargets, Income } from '@/features/finanzas/lib/types';
+import type { FinanzasHistoryEntry } from '@/features/finanzas/lib/useFinanzasHistory';
 
 // Not part of Paso A's domain types (those only covered
 // Income/Expense/Debt/FinanceTargets/CashOpeningBalance) — added here since
@@ -40,4 +41,9 @@ export interface FinanzasTabProps {
 
   loading: boolean;
   refetch: () => Promise<void>;
+  // Records a completed mutation onto the global undo/redo stack — call
+  // this AFTER a successful insert/update/delete, never before, since
+  // before/after must reflect what's actually in the DB. See
+  // useFinanzasHistory.ts.
+  pushHistory: (entry: FinanzasHistoryEntry) => void;
 }

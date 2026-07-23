@@ -67,7 +67,7 @@ interface TargetsForm {
   new_clients_ytd: string;
 }
 
-export default function TabMetricas({ periodBounds, incomes, expenses, financeTargets, refetch }: FinanzasTabProps) {
+export default function TabMetricas({ periodBounds, incomes, expenses, financeTargets, refetch, pushHistory }: FinanzasTabProps) {
   const { periodStart, periodEnd, yearStart, yearEnd, currentYear } = periodBounds;
 
   // ── 1. Rentabilidad (año calendario completo, NO YTD-hasta-mes) ─────────
@@ -193,11 +193,17 @@ export default function TabMetricas({ periodBounds, incomes, expenses, financeTa
       new_clients_ytd: newClientsYtd,
       updated_at: new Date().toISOString(),
     };
-    const { error } = financeTargets?.id
-      ? await supabase.from('finance_targets').update(payload).eq('id', financeTargets.id)
-      : await supabase.from('finance_targets').insert(payload);
-    setSaving(false);
-    if (error) { toast.error('Error al guardar los objetivos'); return; }
+    if (financeTargets?.id) {
+      const { data, error } = await supabase.from('finance_targets').update(payload).eq('id', financeTargets.id).select().single();
+      setSaving(false);
+      if (error || !data) { toast.error('Error al guardar los objetivos'); return; }
+      pushHistory({ table: 'finance_targets', op: 'update', before: financeTargets, after: data, label: 'objetivos financieros actualizados' });
+    } else {
+      const { data, error } = await supabase.from('finance_targets').insert(payload).select().single();
+      setSaving(false);
+      if (error || !data) { toast.error('Error al guardar los objetivos'); return; }
+      pushHistory({ table: 'finance_targets', op: 'insert', before: null, after: data, label: 'objetivos financieros creados' });
+    }
     toast.success('Objetivos guardados');
     refetch();
   }

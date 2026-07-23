@@ -141,6 +141,23 @@ function fuenteOf(c: Call): string {
   return c.fuente || c.utm_source || 'Sin fuente';
 }
 
+// closer is free text on the call row (CloserField lets someone type a
+// custom name via "Otro"), compared against closers.name from a separate
+// table — trim/casing/accent drift between the two silently returned 0
+// rows before this normalized instead of erroring.
+function normalizeCloserName(name: string): string {
+  // NFD splits accented letters into base + combining-mark codepoints
+  // (U+0300-U+036F); dropping chars in that range strips the accent while
+  // leaving the base letter, e.g. "á" -> "a".
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .split('')
+    .filter((ch) => { const code = ch.charCodeAt(0); return code < 0x0300 || code > 0x036f; })
+    .join('');
+}
+
 // ─── FunnelCard ───────────────────────────────────────────────────────────────
 
 function FunnelCard({ total, asistieron, calificados, cerrados }: {
@@ -491,6 +508,11 @@ const EMPTY_NEW: NewForm = {
   fuente: '', setter_agendo: '', nicho: '', closer: NONE, ad_id: '',
 };
 
+// Business default: Torii's own calls (owner_type='torii') default to
+// Lucho, not "Sin asignar" — client-owned calls still start blank since
+// there's no single default closer across all clients.
+const TORII_DEFAULT_CLOSER = 'Lucho';
+
 // ─── Shared form field wrappers ───────────────────────────────────────────────
 // Defined at module scope (not inside the dialogs) on purpose: a component
 // declared inline in a parent's render body is a NEW function reference on
@@ -565,7 +587,10 @@ function CloserField({ value, onChange, closers }: { value: string; onChange: (v
 function NewCallDialog({ closers, owner, onClose, onSaved }: {
   closers: CloserRow[]; owner: OwnerKey; onClose: () => void; onSaved: () => void;
 }) {
-  const [f, setF] = useState<NewForm>(EMPTY_NEW);
+  const [f, setF] = useState<NewForm>(() => ({
+    ...EMPTY_NEW,
+    closer: owner === 'torii' && closers.some(c => c.name === TORII_DEFAULT_CLOSER) ? TORII_DEFAULT_CLOSER : NONE,
+  }));
   const [saving, setSaving] = useState(false);
 
   function upd(k: keyof NewForm, v: string) { setF(p => ({ ...p, [k]: v })); }
@@ -1206,6 +1231,8 @@ const ALWAYS_VISIBLE_KEYS = new Set(['lead_name']);
 const DEFAULT_VISIBLE_KEYS = new Set([
   'lead_name', 'fecha_llamada', 'closer', 'se_presento', 'califico', 'cerro',
   'precio', 'comision_estimada', 'producto', 'next_followup_date',
+  // Added to bring the default closer to the old Google Sheets' column set.
+  'fuente', 'setter_agendo', 'num_cuotas', 'pago_en_llamada', 'loss_reason',
 ]);
 
 // Column visibility is remembered per owner mode — Torii and client rows
@@ -1321,7 +1348,7 @@ export default function Closers() {
   // CRM tab filters (on top of viewCalls)
   const nichoLC = filterNicho.toLowerCase();
   const tableCalls = viewCalls.filter(c => {
-    if (filterCloser !== 'all' && (c.closer ?? '') !== filterCloser) return false;
+    if (filterCloser !== 'all' && normalizeCloserName(c.closer ?? '') !== normalizeCloserName(filterCloser)) return false;
     if (filterFuente !== 'all' && fuenteOf(c) !== filterFuente) return false;
     if (nichoLC && !(c.nicho ?? '').toLowerCase().includes(nichoLC)) return false;
     if (filterCalifico === 'yes' && !c.califico) return false;

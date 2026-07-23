@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { EXPENSE_COST_TYPES } from '@/features/finanzas/lib/types';
-import type { ExpenseCostType } from '@/features/finanzas/lib/types';
+import type { Expense, ExpenseCostType } from '@/features/finanzas/lib/types';
 import type { ExpenseCategoryBucket } from '@/features/finanzas/lib/categorize';
 import { SensitiveAmount } from './SensitiveAmount';
 import type { FinanzasTabProps } from './types';
@@ -65,7 +65,7 @@ function fmtDate(d: string | null): string {
 
 // ─── AddEgresoDialog ──────────────────────────────────────────────────────
 
-function AddEgresoDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddEgresoDialog({ onClose, onSaved, pushHistory }: { onClose: () => void; onSaved: () => void; pushHistory: FinanzasTabProps['pushHistory'] }) {
   const [form, setForm] = useState({
     name: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'),
     category: 'Otros' as ExpenseCategoryBucket, cost_type: 'CV' as ExpenseCostType, description: '',
@@ -79,16 +79,17 @@ function AddEgresoDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
   async function save() {
     if (!form.name.trim() || !form.amount) { toast.error('Concepto y monto son requeridos'); return; }
     setSaving(true);
-    const { error } = await supabase.from('expenses').insert({
+    const { data, error } = await supabase.from('expenses').insert({
       name: form.name.trim(),
       amount: parseFloat(form.amount),
       date: form.date,
       category: form.category,
       cost_type: form.cost_type,
       description: form.description || null,
-    });
+    }).select().single();
     setSaving(false);
-    if (error) { toast.error('Error al guardar el egreso'); return; }
+    if (error || !data) { toast.error('Error al guardar el egreso'); return; }
+    pushHistory({ table: 'expenses', op: 'insert', before: null, after: data, label: `egreso "${data.name}" $${fmtUSD(Number(data.amount))} agregado` });
     toast.success('Egreso registrado');
     onSaved(); onClose();
   }
@@ -146,7 +147,7 @@ function AddEgresoDialog({ onClose, onSaved }: { onClose: () => void; onSaved: (
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabEgresos({ periodBounds, expenses, refetch }: FinanzasTabProps) {
+export default function TabEgresos({ periodBounds, expenses, refetch, pushHistory }: FinanzasTabProps) {
   const [adding, setAdding] = useState(false);
   const { periodStart, periodEnd } = periodBounds;
 
@@ -167,10 +168,11 @@ export default function TabEgresos({ periodBounds, expenses, refetch }: Finanzas
   const totalCV = useMemo(() => filtered.filter((e) => e.cost_type === 'CV').reduce((s, e) => s + Number(e.amount), 0), [filtered]);
   const totalGeneral = useMemo(() => filtered.reduce((s, e) => s + Number(e.amount), 0), [filtered]);
 
-  async function handleDelete(id: string) {
+  async function handleDelete(expense: Expense) {
     if (!window.confirm('¿Eliminar este egreso? Esta acción no se puede deshacer.')) return;
-    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    const { error } = await supabase.from('expenses').delete().eq('id', expense.id);
     if (error) { toast.error('Error al eliminar'); return; }
+    pushHistory({ table: 'expenses', op: 'delete', before: expense, after: null, label: `egreso "${expense.name}" $${fmtUSD(Number(expense.amount))} eliminado` });
     toast.success('Egreso eliminado');
     refetch();
   }
@@ -245,7 +247,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch }: Finanzas
                   <TableCell>{costTypeBadge(e.cost_type)}</TableCell>
                   <TableCell className="text-sm text-right font-medium text-destructive"><SensitiveAmount>{fmtUSD(Number(e.amount))}</SensitiveAmount></TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => handleDelete(e.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={() => handleDelete(e)}>
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </TableCell>
@@ -260,7 +262,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch }: Finanzas
       </Card>
 
       {adding && (
-        <AddEgresoDialog onClose={() => setAdding(false)} onSaved={refetch} />
+        <AddEgresoDialog onClose={() => setAdding(false)} onSaved={refetch} pushHistory={pushHistory} />
       )}
     </div>
   );

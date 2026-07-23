@@ -16,6 +16,7 @@ export interface NewNodeInput {
   parent_id: string | null;
   nombre: string;
   tipo: CreativeTipo;
+  hipotesis?: string | null;
   position_x?: number;
   position_y?: number;
 }
@@ -28,6 +29,7 @@ export async function createNode(input: NewNodeInput): Promise<CreativeNode> {
       parent_id: input.parent_id,
       nombre: input.nombre,
       tipo: input.tipo,
+      hipotesis: input.hipotesis ?? null,
       position_x: input.position_x ?? 0,
       position_y: input.position_y ?? 0,
     })

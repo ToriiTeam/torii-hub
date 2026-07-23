@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, isToday, isTomorrow, isPast, addDays, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
-  LayoutDashboard,
   CheckSquare,
   DollarSign,
   PhoneCall,
@@ -28,6 +27,7 @@ import {
   Video,
   ShoppingCart,
   Gauge,
+  Sprout,
 } from 'lucide-react';
 
 interface Task {
@@ -39,7 +39,6 @@ interface Task {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Dashboard Ejecutivo', href: '/dashboard', icon: Gauge },
   { name: 'Clientes', href: '/clientes', icon: Users },
   { name: 'Setting', href: '/setters', icon: PhoneCall },
@@ -50,6 +49,7 @@ const navigation = [
   { name: 'Máquina de Cierres', href: '/maquina-cierres', icon: ShoppingCart },
   { name: 'Tareas', href: '/tareas', icon: CheckSquare },
   { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
+  { name: 'Contenido Orgánico', href: '/contenido', icon: Sprout },
 ];
 
 interface LayoutProps {

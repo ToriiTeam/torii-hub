@@ -10,7 +10,7 @@ const EMPTY_CLOSING: ClosingMetrics = { reuniones: 0, asistieron: 0, calificados
 async function fetchClients(): Promise<ClientBase[]> {
   const { data, error } = await supabase
     .from('clients')
-    .select('id, name, country, renewal_risk, mrr, start_date')
+    .select('id, name, country, renewal_risk, mrr, start_date, canal_captacion')
     .order('name');
   if (error) throw error;
   const clients = data ?? [];
@@ -119,7 +119,7 @@ async function fetchClosingByClient(since: string, until: string): Promise<Map<s
 // owner_type='torii' rows carry no client_id, and the full deal price is
 // Torii's revenue since there's no client to split commission with.
 // Replaces the old incomes-table read, which is always empty.
-async function fetchToriiRevenue(since: string, until: string): Promise<number> {
+export async function fetchToriiRevenue(since: string, until: string): Promise<number> {
   const { data, error } = await supabase
     .from('client_closer_calls')
     .select('precio')

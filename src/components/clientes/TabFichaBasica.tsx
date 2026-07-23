@@ -24,6 +24,19 @@ interface Installment {
 
 const PAYMENT_TYPES = ['Upfront', 'Mensual', 'Cuotas'] as const;
 
+// Mirrors the CHECK constraint on clients.canal_captacion exactly — how
+// Torii itself acquired this client, not the client's own marketing
+// channel (that's the pre-existing free-text `canal` field below).
+const CANAL_CAPTACION_OPTIONS = [
+  'Meta Ads', 'Referido', 'LinkedIn orgánico', 'Instagram orgánico', 'YouTube', 'Outbound/Setters', 'Otro',
+] as const;
+// Mirrors the CHECK constraint on clients.oferta — which productized
+// service Torii delivers to this client, independent of canal_captacion
+// above (how they were acquired). E.g. a client can be closed via LinkedIn
+// outbound calls but still buy the Meta Ads Leadgen service.
+const OFERTA_OPTIONS = ['LinkedIn Outbound', 'Meta Ads Leadgen'] as const;
+const NONE = 'none';
+
 function fmtDate(dateStr: string | null | undefined) {
   if (!dateStr) return '—';
   try {
@@ -50,6 +63,8 @@ interface FormState {
   phone: string;
   country: string;
   canal: string;
+  canal_captacion: string;
+  oferta: string;
   start_date: string;
   payment_type: string;
   total_installments: string;
@@ -64,6 +79,8 @@ function toForm(client: Client): FormState {
     phone: client.phone ?? '',
     country: client.country ?? '',
     canal: client.canal ?? '',
+    canal_captacion: client.canal_captacion ?? NONE,
+    oferta: client.oferta ?? NONE,
     start_date: client.start_date ?? '',
     payment_type: client.payment_type ?? '',
     total_installments: client.total_installments?.toString() ?? '',
@@ -114,6 +131,8 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
         phone: form.phone || null,
         country: form.country || null,
         canal: form.canal || null,
+        canal_captacion: form.canal_captacion === NONE ? null : form.canal_captacion,
+        oferta: form.oferta === NONE ? null : form.oferta,
         start_date: form.start_date || null,
         payment_type: form.payment_type || null,
         total_installments: form.total_installments ? parseInt(form.total_installments) : null,
@@ -181,6 +200,28 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
             </Field>
             <Field label="Canal">
               {editing ? <Input value={form.canal} onChange={(e) => upd('canal', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{client.canal || '—'}</Value>}
+            </Field>
+            <Field label="Canal de captación (cómo llegó a Torii)">
+              {editing ? (
+                <Select value={form.canal_captacion} onValueChange={(v) => upd('canal_captacion', v)}>
+                  <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue placeholder="Sin definir" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Sin definir</SelectItem>
+                    {CANAL_CAPTACION_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : <Value>{client.canal_captacion || '—'}</Value>}
+            </Field>
+            <Field label="Oferta (servicio vendido)">
+              {editing ? (
+                <Select value={form.oferta} onValueChange={(v) => upd('oferta', v)}>
+                  <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue placeholder="Sin definir" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Sin definir</SelectItem>
+                    {OFERTA_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : <Value>{client.oferta || '—'}</Value>}
             </Field>
             <Field label="Fecha de inicio">
               {editing ? <Input type="date" value={form.start_date} onChange={(e) => upd('start_date', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{fmtDate(client.start_date)}</Value>}

@@ -14,7 +14,7 @@ import TabCSL from '@/components/clientes/TabCSL';
 import CreativeTree from '@/components/clientes/creative-tree/CreativeTree';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import TabAngulos from '@/components/clientes/TabAngulos';
-import TabHipotesis from '@/components/clientes/TabHipotesis';
+import TabOnboarding from '@/components/clientes/TabOnboarding';
 
 export interface Client {
   id: string;
@@ -35,6 +35,8 @@ export interface Client {
   platform_fee: number;
   country?: string;
   canal?: string;
+  canal_captacion?: string;
+  oferta?: string;
   notes?: string;
   mrr?: number;
   renewal_risk?: string;
@@ -63,12 +65,12 @@ const statusLabels: Record<string, string> = {
 const TABS = [
   { value: 'ficha', label: 'Ficha Operativa' },
   { value: 'basica', label: 'Ficha Básica' },
+  { value: 'onboarding', label: 'Onboarding' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
-  { value: 'arbol', label: 'Árbol de Creativos' },
+  { value: 'arbol', label: 'Árbol de Iteraciones' },
   { value: 'angulos', label: 'Ángulos' },
   { value: 'creativos', label: 'Creativos' },
-  { value: 'hipotesis', label: 'Hipótesis' },
 ];
 
 export default function ClienteDetalle() {
@@ -159,6 +161,10 @@ export default function ClienteDetalle() {
           <TabFichaBasica client={client} onClientUpdate={fetchClient} />
         </TabsContent>
 
+        <TabsContent value="onboarding">
+          <TabOnboarding clientId={client.id} />
+        </TabsContent>
+
         <TabsContent value="csb">
           <TabCSB clientId={client.id} />
         </TabsContent>
@@ -177,10 +183,6 @@ export default function ClienteDetalle() {
 
         <TabsContent value="creativos">
           <TabCreativos clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="hipotesis">
-          <TabHipotesis clientId={client.id} />
         </TabsContent>
       </Tabs>
     </div>
