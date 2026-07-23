@@ -111,8 +111,8 @@ export function VslFunnelView({ toriiData, vslFunnelData, nuevoToriiOnly }: VslF
       />
 
       <MiniKpi
-        label="Agendas" value={fmtN(v.agendas)}
-        info={{ formula: 'Sesiones con VSL_Form_Submit + agendas huérfanas sin session_id (bug de doble-disparo de la TKP, corregido el 2026-07-13).', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        label="Agendas" value={fmtN(closing.reuniones)}
+        info={{ formula: "Total de filas en client_closer_calls (owner_type='torii') — una fila existe apenas se agenda la llamada en GHL, independiente de si después se_presento fue true o false.", source: 'client_closer_calls', scopeLabel: adsScope }}
       />
       <MiniKpi
         label="Llamadas efectivas" value={fmtN(closing.asistieron)}

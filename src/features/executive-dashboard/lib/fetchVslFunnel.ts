@@ -19,7 +19,6 @@ interface SessionSummary {
   hasP75: boolean;
   hasP100: boolean;
   hasCta: boolean;
-  hasFormSubmit: boolean;
   hasAbandon: boolean;
 }
 
@@ -29,7 +28,7 @@ function buildSessionSummaries(events: VslEventRow[]): Map<string, SessionSummar
     if (!e.session_id) continue;
     let s = map.get(e.session_id);
     if (!s) {
-      s = { hasPlay: false, hasP25: false, hasP50: false, hasP75: false, hasP100: false, hasCta: false, hasFormSubmit: false, hasAbandon: false };
+      s = { hasPlay: false, hasP25: false, hasP50: false, hasP75: false, hasP100: false, hasCta: false, hasAbandon: false };
       map.set(e.session_id, s);
     }
     if (e.event_name === 'VSL_Play') s.hasPlay = true;
@@ -38,7 +37,6 @@ function buildSessionSummaries(events: VslEventRow[]): Map<string, SessionSummar
     if (e.event_name === 'VSL_Progress_75') s.hasP75 = true;
     if (e.event_name === 'VSL_Progress_100') s.hasP100 = true;
     if (e.event_name === 'VSL_CTA_Click') s.hasCta = true;
-    if (e.event_name === 'VSL_Form_Submit') s.hasFormSubmit = true;
     if (e.event_name === 'VSL_Abandon') s.hasAbandon = true;
   }
   return map;
@@ -52,10 +50,6 @@ export interface VslFunnelData {
   p100: number;
   ctaClicks: number;
   abandonos: number;
-  // attributedFormSubmits (session-based) + orphanFormSubmits (rows with no
-  // session_id, from the pre-2026-07-13 TKP double-fire bug) — same formula
-  // VslTracking.tsx uses for its headline "Agendas" KPI.
-  agendas: number;
 }
 
 export async function fetchVslFunnelData(since: string, until: string): Promise<VslFunnelData> {
@@ -70,9 +64,6 @@ export async function fetchVslFunnelData(since: string, until: string): Promise<
   const events = (data ?? []) as VslEventRow[];
   const sessions = Array.from(buildSessionSummaries(events).values());
 
-  const orphanFormSubmits = events.filter((e) => e.event_name === 'VSL_Form_Submit' && !e.session_id).length;
-  const attributedFormSubmits = sessions.filter((s) => s.hasFormSubmit).length;
-
   return {
     plays: sessions.filter((s) => s.hasPlay).length,
     p25: sessions.filter((s) => s.hasP25).length,
@@ -81,6 +72,5 @@ export async function fetchVslFunnelData(since: string, until: string): Promise<
     p100: sessions.filter((s) => s.hasP100).length,
     ctaClicks: sessions.filter((s) => s.hasCta).length,
     abandonos: sessions.filter((s) => s.hasAbandon).length,
-    agendas: attributedFormSubmits + orphanFormSubmits,
   };
 }
