@@ -27,11 +27,15 @@ const LANDING_OPTIONS = [
 
 // Video progress milestones, in order. Each is a distinct event_name that
 // Torii's VSL tracking script fires at most once per session_id.
+// Labels feed VIDEO_DEPTH_STAGES below (the cumulative "reached X% or more"
+// funnel) — the "+" makes that explicit in the UI, since two consecutive
+// stages can otherwise show the same count and look like a bug when really
+// nobody dropped off between them.
 const VIDEO_MILESTONES = [
   { key: 'play', label: 'Play', eventName: 'VSL_Play' },
-  { key: 'p25', label: '25%', eventName: 'VSL_Progress_25' },
-  { key: 'p50', label: '50%', eventName: 'VSL_Progress_50' },
-  { key: 'p75', label: '75%', eventName: 'VSL_Progress_75' },
+  { key: 'p25', label: '25%+', eventName: 'VSL_Progress_25' },
+  { key: 'p50', label: '50%+', eventName: 'VSL_Progress_50' },
+  { key: 'p75', label: '75%+', eventName: 'VSL_Progress_75' },
   { key: 'p100', label: '100%', eventName: 'VSL_Progress_100' },
 ] as const;
 
@@ -905,7 +909,9 @@ export default function VslTracking() {
                 <PlayCircle className="h-5 w-5 text-primary" />
                 Profundidad de visualización del video
               </CardTitle>
-              <CardDescription>De quienes dieron play, cuánto del video vieron</CardDescription>
+              <CardDescription>
+                De quienes dieron play, cuánto del video vieron — acumulativo: cada etapa incluye a quienes llegaron hasta ahí o más lejos, no es exclusivo por etapa.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {videoFunnel.map(stage => (

@@ -34,6 +34,9 @@ export interface ClosingMetrics {
   asistieron: number;
   calificados: number;
   cierres: number;
+  // se_presento=true AND cerro=false — distinct from (reuniones - cierres),
+  // which would also include no-shows.
+  noCierres: number;
   showRate: number | null;
   closeRate: number | null;
   lossReasons: { reason: string; count: number }[];

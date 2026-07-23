@@ -85,6 +85,7 @@ export function summarizeClosing(rows: RawClosingRow[]): ClosingMetrics {
   const asistieron = rows.filter((r) => r.se_presento).length;
   const calificados = rows.filter((r) => r.califico).length;
   const cierres = rows.filter((r) => r.cerro).length;
+  const noCierres = rows.filter((r) => r.se_presento && !r.cerro).length;
 
   const lossMap = new Map<string, number>();
   const closerMap = new Map<string, { cierres: number; reuniones: number }>();
@@ -98,7 +99,7 @@ export function summarizeClosing(rows: RawClosingRow[]): ClosingMetrics {
   }
 
   return {
-    reuniones, asistieron, calificados, cierres,
+    reuniones, asistieron, calificados, cierres, noCierres,
     showRate: safeDiv(asistieron, reuniones),
     closeRate: safeDiv(cierres, calificados),
     lossReasons: Array.from(lossMap.entries()).map(([reason, count]) => ({ reason, count })),

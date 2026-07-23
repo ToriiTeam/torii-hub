@@ -1,5 +1,5 @@
 import { supabase } from '../../../integrations/supabase/client';
-import { extractLeads, getPrimaryResult, type InsightRow } from '../types/meta';
+import { extractLeads, extractLinkClicks, getPrimaryResult, type InsightRow } from '../types/meta';
 
 // Shape of each row returned by meta-ads-proxy's 'campaigns_daily' type —
 // same base metrics as InsightRow, plus date_start/date_stop since this is
@@ -85,7 +85,11 @@ async function upsertCampaignsDaily(rows: DailyCampaignRow[], clientId: string |
         inversion: parseFloat(row.spend) || 0,
         impresiones: parseInt(row.impressions, 10) || 0,
         alcance: parseInt(row.reach, 10) || 0,
-        clics: parseInt(row.clicks, 10) || 0,
+        // Link clicks, not raw `clicks` (all clicks incl. likes/comments) —
+        // same fix as meta-ads-proxy's attribution-window change, applied
+        // here so ads_metricas_diarias.clics (read by the Executive
+        // Dashboard) matches what /meta-ads shows instead of over-counting.
+        clics: extractLinkClicks(insightRow),
         ctr: parseFloat(row.ctr) || 0,
         cpc: parseFloat(row.cpc) || 0,
         cpm: parseFloat(row.cpm) || 0,
