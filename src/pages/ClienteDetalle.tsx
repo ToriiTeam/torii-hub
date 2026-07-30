@@ -15,6 +15,7 @@ import CreativeTree from '@/components/clientes/creative-tree/CreativeTree';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import TabAngulos from '@/components/clientes/TabAngulos';
 import TabOnboarding from '@/components/clientes/TabOnboarding';
+import TabPortalCliente from '@/components/clientes/TabPortalCliente';
 
 export interface Client {
   id: string;
@@ -46,6 +47,7 @@ export interface Client {
   days_in_phase?: number;
   motivo_cancelacion?: string;
   fecha_cancelacion?: string;
+  profile_id?: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -66,6 +68,7 @@ const TABS = [
   { value: 'ficha', label: 'Ficha Operativa' },
   { value: 'basica', label: 'Ficha Básica' },
   { value: 'onboarding', label: 'Onboarding' },
+  { value: 'portal', label: 'Portal' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
   { value: 'arbol', label: 'Árbol de Iteraciones' },
@@ -163,6 +166,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="onboarding">
           <TabOnboarding clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="portal">
+          <TabPortalCliente client={client} onClientUpdate={fetchClient} />
         </TabsContent>
 
         <TabsContent value="csb">
