@@ -16,6 +16,7 @@ import TabCreativos from '@/components/clientes/TabCreativos';
 import TabAngulos from '@/components/clientes/TabAngulos';
 import TabOnboarding from '@/components/clientes/TabOnboarding';
 import TabPortalCliente from '@/components/clientes/TabPortalCliente';
+import TabVideosDocs from '@/components/clientes/TabVideosDocs';
 
 export interface Client {
   id: string;
@@ -69,6 +70,7 @@ const TABS = [
   { value: 'basica', label: 'Ficha Básica' },
   { value: 'onboarding', label: 'Onboarding' },
   { value: 'portal', label: 'Portal' },
+  { value: 'videos-docs', label: 'Videos y Docs' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },
   { value: 'arbol', label: 'Árbol de Iteraciones' },
@@ -170,6 +172,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="portal">
           <TabPortalCliente client={client} onClientUpdate={fetchClient} />
+        </TabsContent>
+
+        <TabsContent value="videos-docs">
+          <TabVideosDocs clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="csb">
