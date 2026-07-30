@@ -30,22 +30,23 @@ import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartToolt
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Call = Database['public']['Tables']['client_closer_calls']['Row'];
-type OwnerKey = 'torii' | 'adolfo' | 'raul';
+// 'torii' (fixed) or a real client_id — see the TORII sentinel below.
+type OwnerKey = string;
 
 interface CloserRow { id: string; name: string; }
+interface ClientOption { id: string; name: string; }
 
 // ─── Owner selector ─────────────────────────────────────────────────────────
 
-const OWNERS: { key: OwnerKey; label: string; clientId: string | null }[] = [
-  { key: 'torii',  label: 'Torii',          clientId: null },
-  { key: 'adolfo', label: 'Adolfo Blasco',  clientId: 'c71488f4-0f94-4850-9a96-bc97fbaf5171' },
-  { key: 'raul',   label: 'Raul Galindo',   clientId: 'fcc225d1-555a-4d9c-abb9-b823d48b6516' },
-];
+// Torii's own funnel is a fixed special case, not "just another client" —
+// it has no client_id and sells directly (see revenueOf/isTorii below).
+// Every other OwnerKey value is a real clients.id, fetched dynamically
+// instead of hardcoded (was a fixed 3-entry array before).
+const TORII: OwnerKey = 'torii';
 
 function matchesOwner(c: Call, owner: OwnerKey): boolean {
-  if (owner === 'torii') return c.owner_type === 'torii';
-  const o = OWNERS.find(x => x.key === owner)!;
-  return c.client_id === o.clientId;
+  if (owner === TORII) return c.owner_type === 'torii';
+  return c.client_id === owner;
 }
 
 function revenueOf(c: Call): number {
@@ -589,7 +590,7 @@ function NewCallDialog({ closers, owner, onClose, onSaved }: {
 }) {
   const [f, setF] = useState<NewForm>(() => ({
     ...EMPTY_NEW,
-    closer: owner === 'torii' && closers.some(c => c.name === TORII_DEFAULT_CLOSER) ? TORII_DEFAULT_CLOSER : NONE,
+    closer: owner === TORII && closers.some(c => c.name === TORII_DEFAULT_CLOSER) ? TORII_DEFAULT_CLOSER : NONE,
   }));
   const [saving, setSaving] = useState(false);
 
@@ -598,7 +599,6 @@ function NewCallDialog({ closers, owner, onClose, onSaved }: {
   async function save() {
     if (!f.lead_name.trim()) { toast.error('El nombre del lead es requerido'); return; }
     setSaving(true);
-    const ownerDef = OWNERS.find(o => o.key === owner)!;
     const { error } = await supabase.from('client_closer_calls').insert({
       lead_name:      f.lead_name.trim(),
       lead_email:     f.lead_email     || null,
@@ -610,8 +610,8 @@ function NewCallDialog({ closers, owner, onClose, onSaved }: {
       nicho:          f.nicho          || null,
       closer:         f.closer === NONE ? null : f.closer || null,
       ad_id:          f.ad_id          || null,
-      owner_type:     owner === 'torii' ? 'torii' : 'client',
-      client_id:      ownerDef.clientId,
+      owner_type:     owner === TORII ? 'torii' : 'client',
+      client_id:      owner === TORII ? null : owner,
       se_presento:    false,
       califico:       false,
       cerro:          false,
@@ -745,10 +745,10 @@ function DetailDialog({ call, closers, owner, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   // Torii's own funnel (owner_type='torii') sells a fixed-price product
   // directly, so it has no client-commission or lead-qualification fields;
-  // client-run calls (Adolfo/Raul/etc.) sell on Torii's behalf for a
+  // client-run calls (any real client) sell on Torii's behalf for a
   // commission and track a fuller lead profile. Same distinction as
   // matchesOwner()/revenueOf() above.
-  const isTorii = owner === 'torii';
+  const isTorii = owner === TORII;
 
   function upd<K extends keyof DForm>(k: K, v: DForm[K]) {
     setF(prev => ({ ...prev, [k]: v }));
@@ -1236,10 +1236,10 @@ const DEFAULT_VISIBLE_KEYS = new Set([
 ]);
 
 // Column visibility is remembered per owner mode — Torii and client rows
-// show different columns, so "adolfo" and "raul" share one "client" slot
+// show different columns, so every real client shares one "client" slot
 // (their column sets are identical) while Torii gets its own.
 function columnsStorageKey(owner: OwnerKey): string {
-  return owner === 'torii' ? 'closing_visible_columns_torii' : 'closing_visible_columns_client';
+  return owner === TORII ? 'closing_visible_columns_torii' : 'closing_visible_columns_client';
 }
 
 function loadVisibleColumns(owner: OwnerKey): Set<string> {
@@ -1257,9 +1257,10 @@ function loadVisibleColumns(owner: OwnerKey): Set<string> {
 export default function Closers() {
   const [calls, setCalls]     = useState<Call[]>([]);
   const [closers, setClosers] = useState<CloserRow[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [owner, setOwner]   = useState<OwnerKey>('torii');
+  const [owner, setOwner]   = useState<OwnerKey>(TORII);
   const now = new Date();
   const [year, setYear]     = useState(now.getFullYear());
   const [month, setMonth]   = useState(now.getMonth() + 1);
@@ -1274,7 +1275,7 @@ export default function Closers() {
   const [filterNicho, setFilterNicho]   = useState('');
   const [filterCalifico, setFilterCalifico] = useState('all');
   const [filterCerro, setFilterCerro]   = useState('all');
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => loadVisibleColumns('torii'));
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => loadVisibleColumns(TORII));
 
   // Owner mode changed — swap in that mode's remembered column selection.
   useEffect(() => {
@@ -1286,16 +1287,32 @@ export default function Closers() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [cRes, callRes] = await Promise.all([
-      supabase.from('closers').select('id, name').order('name'),
-      supabase.from('client_closer_calls').select('*').order('fecha_llamada', { ascending: false }),
-    ]);
-    if (cRes.data) setClosers(cRes.data);
-    if (callRes.data) setCalls(callRes.data);
+    const { data } = await supabase.from('client_closer_calls').select('*').order('fecha_llamada', { ascending: false });
+    if (data) setCalls(data);
     setLoading(false);
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Active clients for the owner selector — replaces the old hardcoded
+  // 3-entry OWNERS array. Fetched once; Torii is a fixed sentinel, not
+  // part of this list.
+  useEffect(() => {
+    supabase.from('clients').select('id, name').eq('status', 'active').order('name')
+      .then(({ data }) => setClients(data ?? []));
+  }, []);
+
+  // Closer roster depends on which owner is selected: Torii's internal
+  // `closers` table, or that specific client's `client_closers` roster.
+  useEffect(() => {
+    if (owner === TORII) {
+      supabase.from('closers').select('id, name').order('name')
+        .then(({ data }) => setClosers(data ?? []));
+    } else {
+      supabase.from('client_closers').select('id, name').eq('client_id', owner).eq('active', true).order('name')
+        .then(({ data }) => setClosers(data ?? []));
+    }
+  }, [owner]);
 
   // Owner + selected month (or all-time) → feeds the Dashboard tab and is
   // the base for the CRM tab's own filters. inRange() treats a null since
@@ -1358,7 +1375,7 @@ export default function Closers() {
     return true;
   });
 
-  const activeColumnKeys = owner === 'torii' ? TORII_COLUMN_KEYS : CLIENT_COLUMN_KEYS;
+  const activeColumnKeys = owner === TORII ? TORII_COLUMN_KEYS : CLIENT_COLUMN_KEYS;
   const activeColumns = activeColumnKeys
     .filter(k => ALWAYS_VISIBLE_KEYS.has(k) || visibleColumns.has(k))
     .map(k => ({ key: k, ...CRM_COLUMNS[k] }));
@@ -1392,7 +1409,8 @@ export default function Closers() {
         <Select value={owner} onValueChange={v => setOwner(v as OwnerKey)}>
           <SelectTrigger className="w-44 h-8 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {OWNERS.map(o => <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>)}
+            <SelectItem value={TORII}>Torii</SelectItem>
+            {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
