@@ -52,6 +52,12 @@ export async function startToriiOS(clientId: string): Promise<void> {
   });
   if (error) throw error;
   await seedChecklist(clientId, fase);
+
+  try {
+    await syncPortalActivePhase(clientId, fase);
+  } catch (err) {
+    console.error('[phasesRepo] Portal active_phase_id sync failed:', err);
+  }
 }
 
 export function nextPhaseOf(fase: PhaseKey): PhaseKey | null {
