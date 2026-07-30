@@ -22,7 +22,14 @@ interface AuthContextType {
   // Scoped-access role — see supabase/migrations/20260723130000. Undefined
   // until resolved so callers can distinguish "still checking" from "no".
   isAuditor: boolean | undefined;
+  // Whether the authenticated user has ANY recognized Hub role
+  // (admin/moderator/auditor). 'client' and 'user' do not count — being
+  // authenticated with Supabase Auth is not enough to enter the Hub, since
+  // Auth is shared with torii-portal. Undefined until resolved.
+  hasAccess: boolean | undefined;
 }
+
+const HUB_ACCESS_ROLES = new Set(['admin', 'moderator', 'auditor']);
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuditor, setIsAuditor] = useState<boolean | undefined>(undefined);
+  const [hasAccess, setHasAccess] = useState<boolean | undefined>(undefined);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -47,13 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   };
 
-  const fetchIsAuditor = async (userId: string) => {
-    const { data, error } = await supabase.rpc('has_role', { _user_id: userId, _role: 'auditor' });
+  const fetchRoles = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
     if (error) {
-      console.error('Error checking auditor role:', error);
-      return false;
+      console.error('Error fetching roles:', error);
+      return [];
     }
-    return !!data;
+    return data.map(r => r.role as string);
   };
 
   useEffect(() => {
@@ -67,11 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id).then(setProfile);
-            fetchIsAuditor(session.user.id).then(setIsAuditor);
+            fetchRoles(session.user.id).then(roles => {
+              setIsAuditor(roles.includes('auditor'));
+              setHasAccess(roles.some(r => HUB_ACCESS_ROLES.has(r)));
+            });
           }, 0);
         } else {
           setProfile(null);
           setIsAuditor(undefined);
+          setHasAccess(undefined);
         }
       }
     );
@@ -83,7 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (session?.user) {
         fetchProfile(session.user.id).then(setProfile);
-        fetchIsAuditor(session.user.id).then(setIsAuditor);
+        fetchRoles(session.user.id).then(roles => {
+          setIsAuditor(roles.includes('auditor'));
+          setHasAccess(roles.some(r => HUB_ACCESS_ROLES.has(r)));
+        });
       }
       setIsLoading(false);
     });
@@ -121,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setIsAuditor(undefined);
+    setHasAccess(undefined);
   };
 
   return (
@@ -135,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         isAuthenticated: !!session,
         isAuditor,
+        hasAccess,
       }}
     >
       {children}

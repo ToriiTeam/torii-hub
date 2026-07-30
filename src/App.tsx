@@ -23,13 +23,33 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function AppContent() {
-  const { isAuthenticated, isLoading, isAuditor } = useAuth();
+function Unauthorized() {
+  const { signOut } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center space-y-4 max-w-sm px-4">
+        <h1 className="text-xl font-semibold">Acceso no autorizado</h1>
+        <p className="text-sm text-muted-foreground">
+          Tu cuenta no tiene un rol asignado en el Hub. Contactá a un administrador si creés que esto es un error.
+        </p>
+        <button
+          onClick={signOut}
+          className="text-sm underline text-muted-foreground hover:text-foreground"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
 
-  // isAuditor stays undefined until the has_role lookup resolves — wait for
-  // it too, otherwise an auditor would flash the full Hub (and its full
-  // sidebar) for a moment before being cut down to size.
-  if (isLoading || (isAuthenticated && isAuditor === undefined)) {
+function AppContent() {
+  const { isAuthenticated, isLoading, isAuditor, hasAccess } = useAuth();
+
+  // isAuditor/hasAccess stay undefined until the user_roles lookup
+  // resolves — wait for it too, otherwise a client or an auditor would
+  // flash the full Hub for a moment before being cut down to size.
+  if (isLoading || (isAuthenticated && hasAccess === undefined)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="h-8 w-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -39,6 +59,14 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return <Login />;
+  }
+
+  // Auth alone is not enough: Supabase Auth is shared with torii-portal, so
+  // a client logging into the Portal has a valid session here too. Only a
+  // recognized Hub role (admin/moderator/auditor) grants entry — 'client'
+  // and no-row-at-all both land here.
+  if (!hasAccess) {
+    return <Unauthorized />;
   }
 
   // Auditor role: exactly 3 routes exist for this user, nothing else — not
