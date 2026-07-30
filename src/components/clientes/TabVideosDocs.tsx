@@ -10,33 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Play, Plus, Edit2, Trash2, ExternalLink, FileText, FileType as FileTypeIcon, File as FileIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// ─── Embed helpers — ported 1:1 from torii-portal's ReportesPage.tsx ──────
-
-function getYoutubeId(url: string): string | null {
-  const match = url.match(
-    /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbedded)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
-  );
-  return match ? match[1] : null;
-}
-
-function getEmbedUrl(url: string): string {
-  if (url.includes('youtu')) {
-    const id = getYoutubeId(url);
-    if (id) return `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
-  }
-  if (url.includes('loom.com/share')) {
-    const match = url.match(/loom\.com\/share\/([a-zA-Z0-9]+)/);
-    if (match) return `https://www.loom.com/embed/${match[1]}?autoplay=1`;
-  }
-  return url;
-}
-
-function getDriveEmbedUrl(url: string): string {
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if (match) return `https://drive.google.com/file/d/${match[1]}/preview`;
-  return url;
-}
+import { getYoutubeId, getEmbedUrl, getDriveEmbedUrl } from '@/lib/embedUrl';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 

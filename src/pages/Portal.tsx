@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Globe } from 'lucide-react';
 import TabPortalCliente from '@/components/clientes/TabPortalCliente';
 import TabVideosDocs from '@/components/clientes/TabVideosDocs';
+import TabPortalCreativos from '@/components/clientes/TabPortalCreativos';
 import type { Client } from '@/pages/ClienteDetalle';
 
 interface ClientOption { id: string; name: string; }
@@ -102,7 +103,7 @@ export default function Portal() {
           </TabsContent>
 
           <TabsContent value="creativos">
-            <ComingSoon label="Creativos" />
+            <TabPortalCreativos clientId={client.id} />
           </TabsContent>
 
           <TabsContent value="ventas">
