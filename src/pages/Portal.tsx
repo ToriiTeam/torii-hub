@@ -7,6 +7,7 @@ import { Globe } from 'lucide-react';
 import TabPortalCliente from '@/components/clientes/TabPortalCliente';
 import TabVideosDocs from '@/components/clientes/TabVideosDocs';
 import TabPortalCreativos from '@/components/clientes/TabPortalCreativos';
+import TabPortalVentas from '@/components/clientes/TabPortalVentas';
 import type { Client } from '@/pages/ClienteDetalle';
 
 interface ClientOption { id: string; name: string; }
@@ -107,7 +108,7 @@ export default function Portal() {
           </TabsContent>
 
           <TabsContent value="ventas">
-            <ComingSoon label="Ventas" />
+            <TabPortalVentas clientId={client.id} />
           </TabsContent>
         </Tabs>
       )}
