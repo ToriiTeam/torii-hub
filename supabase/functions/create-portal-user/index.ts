@@ -46,12 +46,11 @@ async function callerIsStaffAdmin(req: Request): Promise<boolean> {
   }
 }
 
-function generateTempPassword(): string {
-  // 16 random bytes as base64url — well above Supabase's minimum length,
-  // no ambiguous characters to transcribe since it's copy-pasted, not typed.
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
-  return btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, '').slice(0, 20)
-}
+// Fixed shared password for every Portal client account — deliberate,
+// not a placeholder. See conversation history: confirmed against the
+// security tradeoff (one shared secret across all client accounts, no
+// forced rotation) before shipping.
+const PORTAL_PASSWORD = '234567'
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
@@ -83,11 +82,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (clientErr || !client) return json({ error: 'Cliente no encontrado' }, 404)
   if (client.profile_id) return json({ error: 'Este cliente ya tiene acceso al Portal creado' }, 400)
 
-  const password = generateTempPassword()
-
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
     email: body.email,
-    password,
+    password: PORTAL_PASSWORD,
     email_confirm: true,
   })
   if (createErr || !created.user) {
@@ -103,5 +100,5 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: `Usuario creado pero no se pudo vincular al cliente: ${updateErr.message}` }, 500)
   }
 
-  return json({ password })
+  return json({ success: true })
 })

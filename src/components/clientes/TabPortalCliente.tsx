@@ -6,8 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, Copy, KeyRound } from 'lucide-react';
+import { Check, KeyRound } from 'lucide-react';
 import type { Client } from '@/pages/ClienteDetalle';
+
+// Fixed shared password for every Portal client account — see
+// create-portal-user/index.ts for the same constant server-side.
+const PORTAL_PASSWORD = '234567';
 
 interface ClientPhase {
   id: string;
@@ -38,7 +42,7 @@ export default function TabPortalCliente({ client, onClientUpdate }: Props) {
 
   const [accessEmail, setAccessEmail] = useState(client.email || '');
   const [creatingAccess, setCreatingAccess] = useState(false);
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [accessCreated, setAccessCreated] = useState(false);
 
   const fetchPhases = useCallback(async () => {
     setLoading(true);
@@ -85,15 +89,9 @@ export default function TabPortalCliente({ client, onClientUpdate }: Props) {
       toast.error(data?.error || 'Error al crear el acceso');
       return;
     }
-    setTempPassword(data.password);
+    setAccessCreated(true);
     toast.success('Acceso creado');
     onClientUpdate();
-  }
-
-  function copyPassword() {
-    if (!tempPassword) return;
-    navigator.clipboard.writeText(tempPassword);
-    toast.success('Contraseña copiada');
   }
 
   return (
@@ -158,17 +156,12 @@ export default function TabPortalCliente({ client, onClientUpdate }: Props) {
             <div className="flex items-center gap-2 text-sm text-success">
               <Check className="h-4 w-4" />Este cliente ya tiene acceso al Portal creado.
             </div>
-          ) : tempPassword ? (
+          ) : accessCreated ? (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Comunicá esta contraseña al cliente ahora — no se va a volver a mostrar.
+                Comunicá esta contraseña al cliente:
               </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-sm bg-secondary/50 rounded-md px-3 py-2 font-mono">{tempPassword}</code>
-                <Button variant="outline" size="icon" onClick={copyPassword}>
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
+              <code className="block text-sm bg-secondary/50 rounded-md px-3 py-2 font-mono">{PORTAL_PASSWORD}</code>
             </div>
           ) : (
             <div className="flex items-end gap-2">
