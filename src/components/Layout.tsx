@@ -28,6 +28,7 @@ import {
   ShoppingCart,
   Gauge,
   Sprout,
+  Globe,
 } from 'lucide-react';
 
 interface Task {
@@ -50,6 +51,7 @@ const navigation = [
   { name: 'Tareas', href: '/tareas', icon: CheckSquare },
   { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
   { name: 'Contenido Orgánico', href: '/contenido', icon: Sprout },
+  { name: 'Portal', href: '/portal', icon: Globe },
 ];
 
 interface LayoutProps {
