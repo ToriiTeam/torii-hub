@@ -63,21 +63,23 @@ const NONE_VISIBLE: PhaseMetricVisibility = {
 };
 
 // Which metrics are relevant to show at each phase, per spec. Optimización/
-// Escalado/Maximización show everything ("todas las métricas anteriores +
+// Maximización show everything ("todas las métricas anteriores +
 // tendencia") — the "+ tendencia" part is satisfied by these phases
 // typically spanning a longer, more representative window (since/today can
 // be months by this point), not a separate trend chart.
+//
+// validacion_funnel merges the old testeo_mercado (cpbc/leads/ctr) and
+// testeo_funnel (cpbc/showRate/qualRate) cases — union of both, nothing
+// dropped, same reasoning as the PHASE_CHECKLISTS merge in types.ts.
 export function metricsVisibleForPhase(fase: PhaseKey): PhaseMetricVisibility {
   switch (fase) {
     case 'fundamentos':
-    case 'testeo_mercado':
       return { ...NONE_VISIBLE, cpbc: true, leads: true, ctr: true };
-    case 'testeo_funnel':
-      return { ...NONE_VISIBLE, cpbc: true, showRate: true, qualRate: true };
+    case 'validacion_funnel':
+      return { ...NONE_VISIBLE, cpbc: true, leads: true, ctr: true, showRate: true, qualRate: true };
     case 'validacion_ventas':
       return { ...NONE_VISIBLE, cierres: true, closeRate: true, revenue: true };
-    case 'optimizacion_sistema':
-    case 'escalado':
+    case 'optimizacion':
     case 'maximizacion':
       return { cpbc: true, leads: true, ctr: true, showRate: true, qualRate: true, cierres: true, closeRate: true, revenue: true };
     default:

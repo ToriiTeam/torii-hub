@@ -1,12 +1,9 @@
 export type PhaseKey =
   | 'onboarding'
-  | 'llamada_onboarding'
   | 'fundamentos'
-  | 'testeo_mercado'
-  | 'testeo_funnel'
+  | 'validacion_funnel'
   | 'validacion_ventas'
-  | 'optimizacion_sistema'
-  | 'escalado'
+  | 'optimizacion'
   | 'maximizacion';
 
 export interface DeliveryPhase {
@@ -35,65 +32,58 @@ export interface PhaseChecklistItem {
 
 export const PHASE_ORDER: PhaseKey[] = [
   'onboarding',
-  'llamada_onboarding',
   'fundamentos',
-  'testeo_mercado',
-  'testeo_funnel',
+  'validacion_funnel',
   'validacion_ventas',
-  'optimizacion_sistema',
-  'escalado',
+  'optimizacion',
   'maximizacion',
 ];
 
 export const PHASE_LABELS: Record<PhaseKey, string> = {
   onboarding: 'Onboarding',
-  llamada_onboarding: 'Llamada de Onboarding',
   fundamentos: 'Fundamentos',
-  testeo_mercado: 'Testeo de Mercado',
-  testeo_funnel: 'Testeo de Funnel',
+  validacion_funnel: 'Validación de Funnel',
   validacion_ventas: 'Validación de Ventas',
-  optimizacion_sistema: 'Optimización del Sistema',
-  escalado: 'Escalado',
+  optimizacion: 'Optimización',
   maximizacion: 'Maximización',
 };
 
 // Placeholder copy confirmed as an acceptable default by the user — edit
-// freely, these aren't derived from any external source of truth.
+// freely, these aren't derived from any external source of truth. Reuses
+// the same one-liners written into client_phases.phase_description (the
+// Portal-facing journey map) so the two systems describe each phase the
+// same way.
 export const PHASE_OBJECTIVES: Record<PhaseKey, string> = {
-  onboarding: 'Confirmar pago, contrato y accesos para arrancar sin fricciones.',
-  llamada_onboarding: 'Documentar la situación actual del cliente y acordar un plan de acción claro.',
-  fundamentos: 'Lanzar la arquitectura base de campañas, tracking y los primeros creativos.',
-  testeo_mercado: 'Encontrar el ángulo ganador probando mensajes, hooks, formularios y VSL.',
-  testeo_funnel: 'Estabilizar el CPBC objetivo y el proceso de setting/closing.',
-  validacion_ventas: 'Confirmar que el negocio cierra ventas de forma constante y predecible.',
-  optimizacion_sistema: 'Optimizar marketing, funnel, ventas y operaciones para sostener la rentabilidad.',
-  escalado: 'Escalar presupuesto y capacidad operativa duplicando lo que funciona.',
-  maximizacion: 'Consolidar el resultado final del cliente y planificar el próximo ciclo.',
+  onboarding: 'Arrancamos: alineamos expectativas y dejamos todo listo para construir.',
+  fundamentos: 'Construimos la base estratégica y técnica de tu sistema.',
+  validacion_funnel: 'Probamos anuncios y VSL hasta lograr agendas consistentes al costo objetivo.',
+  validacion_ventas: 'Mejoramos tu proceso de cierre con cada llamada real que llega.',
+  optimizacion: 'Con el sistema validado, buscamos multiplicar tu retorno.',
+  maximizacion: 'Maximizamos tus resultados con el sistema funcionando a pleno.',
 };
 
 // Default tiempo_objetivo_dias stamped on a phase when it's created —
 // placeholder values confirmed as acceptable by the user, editable per
 // client afterward via the `notas`/future edit UI, not hardcoded forever.
+// Merged phases (onboarding, validacion_funnel, optimizacion) sum the
+// days of the old phases they replace.
 export const PHASE_DEFAULT_DAYS: Record<PhaseKey, number> = {
-  onboarding: 3,
-  llamada_onboarding: 3,
+  onboarding: 6,
   fundamentos: 7,
-  testeo_mercado: 14,
-  testeo_funnel: 14,
+  validacion_funnel: 28,
   validacion_ventas: 30,
-  optimizacion_sistema: 30,
-  escalado: 30,
+  optimizacion: 60,
   maximizacion: 30,
 };
 
+// Merged phases concatenate the old phases' checklists — no items dropped,
+// same reasoning as the delivery_phases/client_phases merge.
 export const PHASE_CHECKLISTS: Record<PhaseKey, string[]> = {
   onboarding: [
     'Pago confirmado',
     'Contrato firmado',
     'Acceso a cuentas publicitarias',
     'Llamada de onboarding agendada',
-  ],
-  llamada_onboarding: [
     'Situación actual documentada',
     'Objetivos definidos',
     'Plan de acción acordado',
@@ -106,15 +96,13 @@ export const PHASE_CHECKLISTS: Record<PhaseKey, string[]> = {
     'Creativos iniciales producidos',
     'Primera campaña lanzada',
   ],
-  testeo_mercado: [
+  validacion_funnel: [
     'Testeo de ángulos (mínimo 3)',
     'Testeo de hooks',
     'Testeo de anuncios',
     'Testeo de formularios',
     'Testeo de VSL',
     'Ángulo ganador identificado',
-  ],
-  testeo_funnel: [
     '5 formularios calificados dentro del CPBC objetivo',
     'Proceso de setting optimizado',
     'Tasa de show-up > 60%',
@@ -128,15 +116,13 @@ export const PHASE_CHECKLISTS: Record<PhaseKey, string[]> = {
     'Tasa de cierre > 15%',
     'Revenue predecible',
   ],
-  optimizacion_sistema: [
+  optimizacion: [
     'Sistema de marketing optimizado',
     'Funnel optimizado',
     'Ventas optimizadas',
     'Operaciones optimizadas',
     'Métricas estables',
     'Rentabilidad confirmada',
-  ],
-  escalado: [
     'Escalado frontal iniciado',
     'Escalado vertical iniciado',
     'Duplicación de ganadores',
