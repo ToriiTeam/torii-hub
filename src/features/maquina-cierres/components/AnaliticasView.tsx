@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer } from 'recharts';
@@ -94,8 +96,14 @@ export function AnaliticasView() {
   const [loading, setLoading] = useState(true);
   const [dateRangeKey, setDateRangeKey] = useState<typeof DATE_RANGES[number]['key']>('30');
   const [trendGranularity, setTrendGranularity] = useState<'week' | 'month'>('week');
+  // Off by default — traffic with no utm_source is excluded from every KPI/
+  // funnel/breakdown, not deleted, just hidden. MC_Purchase/MC_Refund are
+  // real revenue events (Stripe checkout, hand-entered refunds — see
+  // countRefundSessions below), not traffic, so they're exempt: a real sale
+  // or refund shouldn't vanish from net revenue just because it lacks a UTM.
+  const [includeNoUtm, setIncludeNoUtm] = useState(false);
 
-  useEffect(() => { loadData(); }, [dateRangeKey]);
+  useEffect(() => { loadData(); }, [dateRangeKey, includeNoUtm]);
 
   async function loadData() {
     setLoading(true);
@@ -107,6 +115,9 @@ export function AnaliticasView() {
         .eq('business_line', BUSINESS_LINE)
         .eq('landing_id', LANDING_ID)
         .order('created_at', { ascending: true });
+      if (!includeNoUtm) {
+        query = query.or('utm_source.not.is.null,event_name.in.(MC_Purchase,MC_Refund)');
+      }
       if (range?.days != null) {
         const since = new Date();
         since.setDate(since.getDate() - range.days);
@@ -172,7 +183,13 @@ export function AnaliticasView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-3">
+        <div className="flex items-center gap-2 px-3 h-9 rounded-md border border-input bg-secondary/50">
+          <Switch id="mc-include-no-utm" checked={includeNoUtm} onCheckedChange={setIncludeNoUtm} />
+          <Label htmlFor="mc-include-no-utm" className="text-sm text-muted-foreground cursor-pointer whitespace-nowrap">
+            Incluir tráfico sin UTM
+          </Label>
+        </div>
         <Select value={dateRangeKey} onValueChange={(v) => setDateRangeKey(v as typeof dateRangeKey)}>
           <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
           <SelectContent>

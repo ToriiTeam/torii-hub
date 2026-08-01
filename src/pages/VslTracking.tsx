@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -455,10 +457,14 @@ export default function VslTracking() {
   const [landingId, setLandingId] = useState(isAuditor ? 'torii-principal' : ALL_LANDINGS);
   const [utmCampaign, setUtmCampaign] = useState(ALL_CAMPAIGNS);
   const [trendGranularity, setTrendGranularity] = useState<'day' | 'week'>('day');
+  // Off by default — traffic with no utm_source is excluded from every KPI/
+  // funnel/breakdown on this page, not deleted, just hidden. Toggle exists
+  // for debugging that traffic when needed.
+  const [includeNoUtm, setIncludeNoUtm] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [dateRangeKey]);
+  }, [dateRangeKey, includeNoUtm]);
 
   // Earliest event ever recorded for the selected landing — deliberately
   // independent of dateRangeKey (a "últimos 7 días" filter would otherwise
@@ -470,6 +476,7 @@ export default function VslTracking() {
     async function loadEarliest() {
       let query = supabase.from('vsl_events').select('created_at').order('created_at', { ascending: true }).limit(1);
       if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
+      if (!includeNoUtm) query = query.not('utm_source', 'is', null);
       const { data, error } = await query;
       if (cancelled) return;
       if (error) { console.error('Error loading earliest VSL event:', error); setTrackingSince(null); return; }
@@ -477,7 +484,7 @@ export default function VslTracking() {
     }
     loadEarliest();
     return () => { cancelled = true; };
-  }, [landingId]);
+  }, [landingId, includeNoUtm]);
 
   async function loadData() {
     setLoading(true);
@@ -487,6 +494,8 @@ export default function VslTracking() {
         .from('vsl_events')
         .select('*')
         .order('created_at', { ascending: true });
+
+      if (!includeNoUtm) query = query.not('utm_source', 'is', null);
 
       if (range?.days != null) {
         const since = new Date();
@@ -685,6 +694,13 @@ export default function VslTracking() {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 px-3 h-9 rounded-md border border-input bg-secondary/50">
+          <Switch id="include-no-utm" checked={includeNoUtm} onCheckedChange={setIncludeNoUtm} />
+          <Label htmlFor="include-no-utm" className="text-sm text-muted-foreground cursor-pointer whitespace-nowrap">
+            Incluir tráfico sin UTM
+          </Label>
+        </div>
       </div>
 
       {loading ? (

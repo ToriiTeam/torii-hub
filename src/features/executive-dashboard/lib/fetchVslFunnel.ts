@@ -57,6 +57,7 @@ export async function fetchVslFunnelData(since: string, until: string): Promise<
     .from('vsl_events')
     .select('event_name, session_id')
     .eq('landing_id', TORII_LANDING_ID)
+    .not('utm_source', 'is', null)
     .gte('created_at', since)
     .lte('created_at', `${until}T23:59:59`);
   if (error) throw error;

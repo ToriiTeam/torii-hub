@@ -171,6 +171,7 @@ async function fetchVslSummary(clientId: string, since: string, until: string): 
     .from('vsl_events')
     .select('event_name, session_id, percent')
     .eq('client_id', clientId)
+    .not('utm_source', 'is', null)
     .gte('created_at', since)
     .lte('created_at', until);
   if (error) throw error;
