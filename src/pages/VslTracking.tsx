@@ -23,6 +23,9 @@ const ALL_CAMPAIGNS = 'all';
 // show up as all-zeros) even before its first event lands.
 const LANDING_OPTIONS = [
   { id: 'torii-principal', label: 'Torii — Principal' },
+  { id: 'torii-hook-referidos', label: 'Torii — Hook Referidos' },
+  { id: 'torii-hook-estancado', label: 'Torii — Hook Estancado' },
+  { id: 'torii-hook-facturacion', label: 'Torii — Hook Facturación' },
   { id: 'adolfo-blasco', label: 'Adolfo Blasco' },
   { id: 'raul-galindo', label: 'Raul Galindo' },
 ] as const;
