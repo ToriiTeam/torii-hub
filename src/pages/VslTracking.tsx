@@ -559,12 +559,30 @@ export default function VslTracking() {
 
   // Only meaningful in the "all landings" view — when a specific landing is
   // selected, sessionSummaries already only contains that one landing.
-  const landingBreakdown = useMemo(
-    () => (landingId === ALL_LANDINGS
-      ? buildUtmBreakdown(sessionSummaries, s => s.landingId).sort((a, b) => b.sessions - a.sessions)
-      : []),
-    [sessionSummaries, landingId],
-  );
+  // Starts from LANDING_OPTIONS (known landings, whether they have traffic
+  // yet or not) instead of only the landing_ids present in the fetched
+  // events — otherwise a landing with zero events (e.g. a hook just
+  // launched) would silently never show up here at all. Any landing_id in
+  // the data that isn't in LANDING_OPTIONS still shows up, appended after.
+  const landingBreakdown = useMemo(() => {
+    if (landingId !== ALL_LANDINGS) return [];
+    const real = buildUtmBreakdown(sessionSummaries, s => s.landingId);
+    const byKey = new Map(real.map(r => [r.key, r]));
+    const known = LANDING_OPTIONS.map(opt => byKey.get(opt.id) ?? {
+      key: opt.id,
+      fullValue: opt.id,
+      campaign: null,
+      sessions: 0,
+      playRate: 0,
+      avgProgress: 0,
+      ctaClicks: 0,
+      formSubmits: 0,
+      conversionRate: 0,
+    });
+    const knownIds = new Set<string>(LANDING_OPTIONS.map(opt => opt.id));
+    const unlisted = real.filter(r => !knownIds.has(r.key));
+    return [...known, ...unlisted].sort((a, b) => b.sessions - a.sessions);
+  }, [sessionSummaries, landingId]);
 
   const sourceBreakdown = useMemo(
     () => buildUtmBreakdown(sessionSummaries, s => s.utmSource)
