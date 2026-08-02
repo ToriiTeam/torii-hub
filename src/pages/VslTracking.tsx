@@ -22,13 +22,29 @@ const ALL_CAMPAIGNS = 'all';
 // Fixed list, not derived from data — a landing should be selectable (and
 // show up as all-zeros) even before its first event lands.
 const LANDING_OPTIONS = [
-  { id: 'torii-principal', label: 'Torii — Principal' },
+  { id: 'torii-principal', label: 'Torii — Todas las variantes' },
   { id: 'torii-hook-referidos', label: 'Torii — Hook Referidos' },
   { id: 'torii-hook-estancado', label: 'Torii — Hook Estancado' },
   { id: 'torii-hook-facturacion', label: 'Torii — Hook Facturación' },
   { id: 'adolfo-blasco', label: 'Adolfo Blasco' },
   { id: 'raul-galindo', label: 'Raul Galindo' },
 ] as const;
+
+// Selecting 'torii-principal' is an umbrella pick, not a literal single-
+// landing filter: it aggregates all 4 Torii variants together (the
+// original landing plus its 3 newer hooks), since day-to-day the team
+// thinks of them as one funnel with different entry pages. Picking one of
+// the 3 hooks individually still behaves like any other single landing.
+const TORII_UMBRELLA_ID = 'torii-principal';
+const TORII_VARIANT_IDS: readonly string[] = [
+  'torii-principal', 'torii-hook-referidos', 'torii-hook-estancado', 'torii-hook-facturacion',
+];
+
+function matchesLandingFilter(eventLandingId: string | null, landingId: string): boolean {
+  if (landingId === ALL_LANDINGS) return true;
+  if (landingId === TORII_UMBRELLA_ID) return TORII_VARIANT_IDS.includes(eventLandingId ?? '');
+  return eventLandingId === landingId;
+}
 
 // Video progress milestones, in order. Each is a distinct event_name that
 // Torii's VSL tracking script fires at most once per session_id.
@@ -478,7 +494,8 @@ export default function VslTracking() {
     let cancelled = false;
     async function loadEarliest() {
       let query = supabase.from('vsl_events').select('created_at').order('created_at', { ascending: true }).limit(1);
-      if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
+      if (landingId === TORII_UMBRELLA_ID) query = query.in('landing_id', TORII_VARIANT_IDS as string[]);
+      else if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
       if (!includeNoUtm) query = query.not('utm_source', 'is', null);
       const { data, error } = await query;
       if (cancelled) return;
@@ -519,13 +536,13 @@ export default function VslTracking() {
   // Only the date range triggers a refetch — landing/campaign filters and
   // the trend granularity toggle all operate on the already-loaded window.
   const campaignOptions = useMemo(() => {
-    const scoped = landingId === ALL_LANDINGS ? events : events.filter(e => e.landing_id === landingId);
+    const scoped = events.filter(e => matchesLandingFilter(e.landing_id, landingId));
     return Array.from(new Set(scoped.map(e => e.utm_campaign).filter((v): v is string => !!v))).sort();
   }, [events, landingId]);
 
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
-      if (landingId !== ALL_LANDINGS && e.landing_id !== landingId) return false;
+      if (!matchesLandingFilter(e.landing_id, landingId)) return false;
       if (utmCampaign !== ALL_CAMPAIGNS && e.utm_campaign !== utmCampaign) return false;
       return true;
     });
@@ -557,28 +574,31 @@ export default function VslTracking() {
   );
   const trend = useMemo(() => buildTrend(filteredEvents, trendGranularity), [filteredEvents, trendGranularity]);
 
-  // Only meaningful in the "all landings" view — when a specific landing is
-  // selected, sessionSummaries already only contains that one landing.
-  // Starts from LANDING_OPTIONS (known landings, whether they have traffic
+  // Meaningful in two views: "all landings" (every LANDING_OPTIONS entry) and
+  // the Torii umbrella pick (just its 4 variants, not Adolfo/Raúl/etc). Any
+  // other single-landing selection already only has that one landing's data
+  // in sessionSummaries, so the breakdown table would be redundant.
+  // Starts from a fixed id list (known landings, whether they have traffic
   // yet or not) instead of only the landing_ids present in the fetched
   // events — otherwise a landing with zero events (e.g. a hook just
-  // launched) would silently never show up here at all. Any landing_id in
-  // the data that isn't in LANDING_OPTIONS still shows up, appended after.
+  // launched) would silently never show up here at all.
   const landingBreakdown = useMemo(() => {
-    if (landingId !== ALL_LANDINGS) return [];
+    if (landingId !== ALL_LANDINGS && landingId !== TORII_UMBRELLA_ID) return [];
+
     const real = buildUtmBreakdown(sessionSummaries, s => s.landingId);
     const byKey = new Map(real.map(r => [r.key, r]));
-    const known = LANDING_OPTIONS.map(opt => byKey.get(opt.id) ?? {
-      key: opt.id,
-      fullValue: opt.id,
-      campaign: null,
-      sessions: 0,
-      playRate: 0,
-      avgProgress: 0,
-      ctaClicks: 0,
-      formSubmits: 0,
-      conversionRate: 0,
+    const zeroRow = (id: string): UtmBreakdownRow => ({
+      key: id, fullValue: id, campaign: null,
+      sessions: 0, playRate: 0, avgProgress: 0, ctaClicks: 0, formSubmits: 0, conversionRate: 0,
     });
+
+    if (landingId === TORII_UMBRELLA_ID) {
+      return TORII_VARIANT_IDS
+        .map(id => byKey.get(id) ?? zeroRow(id))
+        .sort((a, b) => b.sessions - a.sessions);
+    }
+
+    const known = LANDING_OPTIONS.map(opt => byKey.get(opt.id) ?? zeroRow(opt.id));
     const knownIds = new Set<string>(LANDING_OPTIONS.map(opt => opt.id));
     const unlisted = real.filter(r => !knownIds.has(r.key));
     return [...known, ...unlisted].sort((a, b) => b.sessions - a.sessions);
@@ -829,8 +849,8 @@ export default function VslTracking() {
             </Card>
           </div>
 
-          {/* Per-landing summary — only shown in the "all landings" view, once more than one landing has data */}
-          {landingId === ALL_LANDINGS && landingBreakdown.length > 1 && (
+          {/* Per-landing summary — shown in the "all landings" view and the Torii umbrella pick */}
+          {(landingId === ALL_LANDINGS || landingId === TORII_UMBRELLA_ID) && landingBreakdown.length > 1 && (
             <Card className="bg-card border-border/50">
               <CardHeader>
                 <CardTitle className="text-base font-medium">Resumen por landing</CardTitle>
