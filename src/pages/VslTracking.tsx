@@ -20,29 +20,32 @@ const ALL_LANDINGS = 'all';
 const ALL_CAMPAIGNS = 'all';
 
 // Fixed list, not derived from data — a landing should be selectable (and
-// show up as all-zeros) even before its first event lands.
+// show up as all-zeros) even before its first event lands. Torii's hook
+// landings are deliberately NOT listed individually here — they rotate
+// over time (new angles replace old ones), so hardcoding their ids would
+// mean editing this file every time one changes. They're only reachable
+// through the "Torii — Todas las variantes" umbrella below, discovered
+// dynamically from the data instead.
 const LANDING_OPTIONS = [
   { id: 'torii-principal', label: 'Torii — Todas las variantes' },
-  { id: 'torii-hook-referidos', label: 'Torii — Hook Referidos' },
-  { id: 'torii-hook-estancado', label: 'Torii — Hook Estancado' },
-  { id: 'torii-hook-facturacion', label: 'Torii — Hook Facturación' },
   { id: 'adolfo-blasco', label: 'Adolfo Blasco' },
   { id: 'raul-galindo', label: 'Raul Galindo' },
 ] as const;
 
 // Selecting 'torii-principal' is an umbrella pick, not a literal single-
-// landing filter: it aggregates all 4 Torii variants together (the
-// original landing plus its 3 newer hooks), since day-to-day the team
-// thinks of them as one funnel with different entry pages. Picking one of
-// the 3 hooks individually still behaves like any other single landing.
+// landing filter: it aggregates the original landing with any current
+// 'torii-hook-*' landing (pattern match, not a fixed id list — see the
+// LANDING_OPTIONS comment above for why), since day-to-day the team thinks
+// of them as one funnel with different entry pages.
 const TORII_UMBRELLA_ID = 'torii-principal';
-const TORII_VARIANT_IDS: readonly string[] = [
-  'torii-principal', 'torii-hook-referidos', 'torii-hook-estancado', 'torii-hook-facturacion',
-];
+
+function isToriiHook(landingId: string | null): boolean {
+  return !!landingId && landingId.startsWith('torii-hook-');
+}
 
 function matchesLandingFilter(eventLandingId: string | null, landingId: string): boolean {
   if (landingId === ALL_LANDINGS) return true;
-  if (landingId === TORII_UMBRELLA_ID) return TORII_VARIANT_IDS.includes(eventLandingId ?? '');
+  if (landingId === TORII_UMBRELLA_ID) return eventLandingId === TORII_UMBRELLA_ID || isToriiHook(eventLandingId);
   return eventLandingId === landingId;
 }
 
@@ -494,7 +497,7 @@ export default function VslTracking() {
     let cancelled = false;
     async function loadEarliest() {
       let query = supabase.from('vsl_events').select('created_at').order('created_at', { ascending: true }).limit(1);
-      if (landingId === TORII_UMBRELLA_ID) query = query.in('landing_id', TORII_VARIANT_IDS as string[]);
+      if (landingId === TORII_UMBRELLA_ID) query = query.or('landing_id.eq.torii-principal,landing_id.like.torii-hook-*');
       else if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
       if (!includeNoUtm) query = query.not('utm_source', 'is', null);
       const { data, error } = await query;
@@ -575,13 +578,17 @@ export default function VslTracking() {
   const trend = useMemo(() => buildTrend(filteredEvents, trendGranularity), [filteredEvents, trendGranularity]);
 
   // Meaningful in two views: "all landings" (every LANDING_OPTIONS entry) and
-  // the Torii umbrella pick (just its 4 variants, not Adolfo/Raúl/etc). Any
-  // other single-landing selection already only has that one landing's data
-  // in sessionSummaries, so the breakdown table would be redundant.
+  // the Torii umbrella pick. Any other single-landing selection already only
+  // has that one landing's data in sessionSummaries, so the breakdown table
+  // would be redundant.
   // Starts from a fixed id list (known landings, whether they have traffic
   // yet or not) instead of only the landing_ids present in the fetched
-  // events — otherwise a landing with zero events (e.g. a hook just
-  // launched) would silently never show up here at all.
+  // events — otherwise a landing with zero events would silently never show
+  // up here at all. The Torii umbrella is the one exception: its hook rows
+  // are discovered dynamically (any 'torii-hook-*' id with data in the
+  // selected range), since hooks rotate and a fixed list would need code
+  // changes every time one does — only 'torii-principal' itself stays
+  // pinned as the fixed historical fallback row.
   const landingBreakdown = useMemo(() => {
     if (landingId !== ALL_LANDINGS && landingId !== TORII_UMBRELLA_ID) return [];
 
@@ -593,9 +600,9 @@ export default function VslTracking() {
     });
 
     if (landingId === TORII_UMBRELLA_ID) {
-      return TORII_VARIANT_IDS
-        .map(id => byKey.get(id) ?? zeroRow(id))
-        .sort((a, b) => b.sessions - a.sessions);
+      const principalRow = byKey.get(TORII_UMBRELLA_ID) ?? zeroRow(TORII_UMBRELLA_ID);
+      const hookRows = real.filter(r => isToriiHook(r.key));
+      return [principalRow, ...hookRows].sort((a, b) => b.sessions - a.sessions);
     }
 
     const known = LANDING_OPTIONS.map(opt => byKey.get(opt.id) ?? zeroRow(opt.id));
