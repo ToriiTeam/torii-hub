@@ -12,26 +12,527 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
+  academy: {
     Tables: {
-      [_ in never]: never
+      blog_posts: {
+        Row: {
+          author_id: string
+          content: string
+          cover_image_url: string | null
+          created_at: string
+          excerpt: string | null
+          id: string
+          published: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          published?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          cover_image_url?: string | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          published?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      exam_questions: {
+        Row: {
+          correct_answer: string | null
+          created_at: string
+          exam_id: string
+          id: string
+          options: Json | null
+          order_index: number
+          question_text: string
+          question_type: string
+        }
+        Insert: {
+          correct_answer?: string | null
+          created_at?: string
+          exam_id: string
+          id?: string
+          options?: Json | null
+          order_index?: number
+          question_text: string
+          question_type?: string
+        }
+        Update: {
+          correct_answer?: string | null
+          created_at?: string
+          exam_id?: string
+          id?: string
+          options?: Json | null
+          order_index?: number
+          question_text?: string
+          question_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_questions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_submissions: {
+        Row: {
+          answers: Json
+          exam_id: string
+          id: string
+          is_graded: boolean
+          score: number | null
+          submitted_at: string
+          team_member_id: string
+          total_questions: number
+        }
+        Insert: {
+          answers?: Json
+          exam_id: string
+          id?: string
+          is_graded?: boolean
+          score?: number | null
+          submitted_at?: string
+          team_member_id: string
+          total_questions?: number
+        }
+        Update: {
+          answers?: Json
+          exam_id?: string
+          id?: string
+          is_graded?: boolean
+          score?: number | null
+          submitted_at?: string
+          team_member_id?: string
+          total_questions?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exam_submissions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exam_submissions_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exams: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          order_index: number
+          title: string
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title: string
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exams_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formacion_access: {
+        Row: {
+          formacion_id: string
+          id: string
+          is_unlocked: boolean
+          team_member_id: string
+          unlocked_at: string | null
+        }
+        Insert: {
+          formacion_id: string
+          id?: string
+          is_unlocked?: boolean
+          team_member_id: string
+          unlocked_at?: string | null
+        }
+        Update: {
+          formacion_id?: string
+          id?: string
+          is_unlocked?: boolean
+          team_member_id?: string
+          unlocked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formacion_access_formacion_id_fkey"
+            columns: ["formacion_id"]
+            isOneToOne: false
+            referencedRelation: "formaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formacion_access_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      formaciones: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          order_index: number
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      module_access: {
+        Row: {
+          id: string
+          is_unlocked: boolean
+          module_id: string
+          team_member_id: string
+          unlocked_at: string | null
+        }
+        Insert: {
+          id?: string
+          is_unlocked?: boolean
+          module_id: string
+          team_member_id: string
+          unlocked_at?: string | null
+        }
+        Update: {
+          id?: string
+          is_unlocked?: boolean
+          module_id?: string
+          team_member_id?: string
+          unlocked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_access_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_access_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_materials: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          is_downloadable: boolean
+          module_id: string | null
+          order_index: number
+          title: string
+          video_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          is_downloadable?: boolean
+          module_id?: string | null
+          order_index?: number
+          title: string
+          video_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          is_downloadable?: boolean
+          module_id?: string | null
+          order_index?: number
+          title?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_materials_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_materials_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modules: {
+        Row: {
+          badge_text: string | null
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          formacion_id: string | null
+          id: string
+          order_index: number
+          title: string
+        }
+        Insert: {
+          badge_text?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          formacion_id?: string | null
+          id?: string
+          order_index?: number
+          title: string
+        }
+        Update: {
+          badge_text?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          formacion_id?: string | null
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modules_formacion_id_fkey"
+            columns: ["formacion_id"]
+            isOneToOne: false
+            referencedRelation: "formaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reflection_tasks: {
+        Row: {
+          content: string
+          id: string
+          is_reviewed: boolean
+          module_id: string
+          submitted_at: string
+          team_member_id: string
+        }
+        Insert: {
+          content: string
+          id?: string
+          is_reviewed?: boolean
+          module_id: string
+          submitted_at?: string
+          team_member_id: string
+        }
+        Update: {
+          content?: string
+          id?: string
+          is_reviewed?: boolean
+          module_id?: string
+          submitted_at?: string
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reflection_tasks_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reflection_tasks_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          active: boolean
+          client_id: string
+          created_at: string
+          full_name: string
+          id: string
+          role: Database["academy"]["Enums"]["app_role"] | null
+          status: Database["academy"]["Enums"]["setter_status"]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          client_id: string
+          created_at?: string
+          full_name: string
+          id?: string
+          role?: Database["academy"]["Enums"]["app_role"] | null
+          status?: Database["academy"]["Enums"]["setter_status"]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          client_id?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          role?: Database["academy"]["Enums"]["app_role"] | null
+          status?: Database["academy"]["Enums"]["setter_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      video_progress: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          id: string
+          team_member_id: string
+          video_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          id?: string
+          team_member_id: string
+          video_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          id?: string
+          team_member_id?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_progress_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_progress_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          created_at: string
+          id: string
+          module_id: string
+          order_index: number
+          title: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          module_id: string
+          order_index?: number
+          title: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          module_id?: string
+          order_index?: number
+          title?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
+      is_own_client: { Args: { _client_id: string }; Returns: boolean }
+      is_portal_admin: { Args: never; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "setter" | "closer" | "manager"
+      setter_status:
+        | "capacitacion"
+        | "fase_de_prueba"
+        | "setter_oficial"
+        | "activo"
+        | "inactivo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -591,7 +1092,10 @@ export type Database = {
       client_closer_calls: {
         Row: {
           ad_id: string | null
+          calificaba: boolean | null
+          calificacion: string | null
           califico: boolean | null
+          canal: string | null
           capacidad_ahorro: string | null
           cerro: boolean | null
           client_id: string | null
@@ -601,7 +1105,10 @@ export type Database = {
           created_by: string | null
           edad: number | null
           estado_seguimiento: string | null
+          etapa: string | null
+          fecha_agenda: string | null
           fecha_llamada: string | null
+          fecha_primer_contacto: string | null
           followup_count: number | null
           followup_notes: string | null
           fuente: string | null
@@ -610,6 +1117,7 @@ export type Database = {
           hora_llamada: string | null
           id: string
           lead_email: string | null
+          lead_linkedin: string | null
           lead_name: string | null
           lead_phone: string | null
           loss_reason: string | null
@@ -626,11 +1134,13 @@ export type Database = {
           preocupacion_actual: string | null
           producto: string | null
           reagenda_texto: string | null
+          recording_url: string | null
           se_presento: boolean | null
           seguimiento_requerido: boolean | null
           segunda_llamada_fecha: string | null
           segunda_llamada_se_presento: boolean | null
           segunda_llamada_status: string | null
+          segunda_reunion: boolean | null
           setter_agendo: string | null
           situacion_3ra_llamada: string | null
           situacion_laboral: string | null
@@ -641,7 +1151,10 @@ export type Database = {
         }
         Insert: {
           ad_id?: string | null
+          calificaba?: boolean | null
+          calificacion?: string | null
           califico?: boolean | null
+          canal?: string | null
           capacidad_ahorro?: string | null
           cerro?: boolean | null
           client_id?: string | null
@@ -651,7 +1164,10 @@ export type Database = {
           created_by?: string | null
           edad?: number | null
           estado_seguimiento?: string | null
+          etapa?: string | null
+          fecha_agenda?: string | null
           fecha_llamada?: string | null
+          fecha_primer_contacto?: string | null
           followup_count?: number | null
           followup_notes?: string | null
           fuente?: string | null
@@ -660,6 +1176,7 @@ export type Database = {
           hora_llamada?: string | null
           id?: string
           lead_email?: string | null
+          lead_linkedin?: string | null
           lead_name?: string | null
           lead_phone?: string | null
           loss_reason?: string | null
@@ -676,11 +1193,13 @@ export type Database = {
           preocupacion_actual?: string | null
           producto?: string | null
           reagenda_texto?: string | null
+          recording_url?: string | null
           se_presento?: boolean | null
           seguimiento_requerido?: boolean | null
           segunda_llamada_fecha?: string | null
           segunda_llamada_se_presento?: boolean | null
           segunda_llamada_status?: string | null
+          segunda_reunion?: boolean | null
           setter_agendo?: string | null
           situacion_3ra_llamada?: string | null
           situacion_laboral?: string | null
@@ -691,7 +1210,10 @@ export type Database = {
         }
         Update: {
           ad_id?: string | null
+          calificaba?: boolean | null
+          calificacion?: string | null
           califico?: boolean | null
+          canal?: string | null
           capacidad_ahorro?: string | null
           cerro?: boolean | null
           client_id?: string | null
@@ -701,7 +1223,10 @@ export type Database = {
           created_by?: string | null
           edad?: number | null
           estado_seguimiento?: string | null
+          etapa?: string | null
+          fecha_agenda?: string | null
           fecha_llamada?: string | null
+          fecha_primer_contacto?: string | null
           followup_count?: number | null
           followup_notes?: string | null
           fuente?: string | null
@@ -710,6 +1235,7 @@ export type Database = {
           hora_llamada?: string | null
           id?: string
           lead_email?: string | null
+          lead_linkedin?: string | null
           lead_name?: string | null
           lead_phone?: string | null
           loss_reason?: string | null
@@ -726,11 +1252,13 @@ export type Database = {
           preocupacion_actual?: string | null
           producto?: string | null
           reagenda_texto?: string | null
+          recording_url?: string | null
           se_presento?: boolean | null
           seguimiento_requerido?: boolean | null
           segunda_llamada_fecha?: string | null
           segunda_llamada_se_presento?: boolean | null
           segunda_llamada_status?: string | null
+          segunda_reunion?: boolean | null
           setter_agendo?: string | null
           situacion_3ra_llamada?: string | null
           situacion_laboral?: string | null
@@ -3633,12 +4161,17 @@ export type Database = {
           agendas_generadas: number | null
           año: number
           calificados: number | null
+          calificados_manual: number | null
           cerrados: number | null
           client_id: string
+          cpbc: number | null
+          cpl: number | null
           created_at: string | null
           fecha_fin: string | null
           fecha_inicio: string | null
           id: string
+          inversion: number | null
+          leads: number | null
           llamadas_realizadas: number | null
           no_shows: number | null
           notas: string | null
@@ -3646,17 +4179,23 @@ export type Database = {
           show_rate: number | null
           tasa_calificacion: number | null
           tasa_cierre: number | null
+          updated_at: string | null
         }
         Insert: {
           agendas_generadas?: number | null
           año: number
           calificados?: number | null
+          calificados_manual?: number | null
           cerrados?: number | null
           client_id: string
+          cpbc?: number | null
+          cpl?: number | null
           created_at?: string | null
           fecha_fin?: string | null
           fecha_inicio?: string | null
           id?: string
+          inversion?: number | null
+          leads?: number | null
           llamadas_realizadas?: number | null
           no_shows?: number | null
           notas?: string | null
@@ -3664,17 +4203,23 @@ export type Database = {
           show_rate?: number | null
           tasa_calificacion?: number | null
           tasa_cierre?: number | null
+          updated_at?: string | null
         }
         Update: {
           agendas_generadas?: number | null
           año?: number
           calificados?: number | null
+          calificados_manual?: number | null
           cerrados?: number | null
           client_id?: string
+          cpbc?: number | null
+          cpl?: number | null
           created_at?: string | null
           fecha_fin?: string | null
           fecha_inicio?: string | null
           id?: string
+          inversion?: number | null
+          leads?: number | null
           llamadas_realizadas?: number | null
           no_shows?: number | null
           notas?: string | null
@@ -3682,6 +4227,7 @@ export type Database = {
           show_rate?: number | null
           tasa_calificacion?: number | null
           tasa_cierre?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -5325,6 +5871,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_weekly_automatic_metrics: {
+        Args: { p_client_id: string; p_week_end: string; p_week_start: string }
+        Returns: {
+          agendas_generadas: number
+          calificados: number
+          cpbc: number
+          cpl: number
+          inversion: number
+          leads: number
+          llamadas_realizadas: number
+          no_shows: number
+          show_rate: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -5501,8 +6061,17 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
+  academy: {
+    Enums: {
+      app_role: ["admin", "setter", "closer", "manager"],
+      setter_status: [
+        "capacitacion",
+        "fase_de_prueba",
+        "setter_oficial",
+        "activo",
+        "inactivo",
+      ],
+    },
   },
   public: {
     Enums: {

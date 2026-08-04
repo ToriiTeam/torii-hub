@@ -27,6 +27,12 @@ interface AuthContextType {
   // authenticated with Supabase Auth is not enough to enter the Hub, since
   // Auth is shared with torii-portal. Undefined until resolved.
   hasAccess: boolean | undefined;
+  // Strictly admin (user_roles), not moderator/auditor. Needed for
+  // Academia: its academy.* RLS policies gate on profiles.role='admin' via
+  // academy.is_portal_admin(), which has no concept of 'moderator' — so the
+  // Hub route is gated to this narrower flag instead of hasAccess, to avoid
+  // silently-empty screens for a moderator who lacks that profiles.role.
+  isAdmin: boolean | undefined;
 }
 
 const HUB_ACCESS_ROLES = new Set(['admin', 'moderator', 'auditor']);
@@ -40,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuditor, setIsAuditor] = useState<boolean | undefined>(undefined);
   const [hasAccess, setHasAccess] = useState<boolean | undefined>(undefined);
+  const [isAdmin, setIsAdmin] = useState<boolean | undefined>(undefined);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -81,12 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             fetchRoles(session.user.id).then(roles => {
               setIsAuditor(roles.includes('auditor'));
               setHasAccess(roles.some(r => HUB_ACCESS_ROLES.has(r)));
+              setIsAdmin(roles.includes('admin'));
             });
           }, 0);
         } else {
           setProfile(null);
           setIsAuditor(undefined);
           setHasAccess(undefined);
+          setIsAdmin(undefined);
         }
       }
     );
@@ -101,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetchRoles(session.user.id).then(roles => {
           setIsAuditor(roles.includes('auditor'));
           setHasAccess(roles.some(r => HUB_ACCESS_ROLES.has(r)));
+          setIsAdmin(roles.includes('admin'));
         });
       }
       setIsLoading(false);
@@ -140,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setIsAuditor(undefined);
     setHasAccess(undefined);
+    setIsAdmin(undefined);
   };
 
   return (
@@ -155,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         isAuditor,
         hasAccess,
+        isAdmin,
       }}
     >
       {children}

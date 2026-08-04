@@ -19,6 +19,7 @@ import MaquinaCierres from "@/pages/MaquinaCierres";
 import MetaAds from "@/pages/MetaAds";
 import ContenidoOrganico from "@/pages/ContenidoOrganico";
 import Portal from "@/pages/Portal";
+import Academia from "@/pages/Academia";
 import AuditorVslFunnel from "@/pages/AuditorVslFunnel";
 import NotFound from "./pages/NotFound";
 
@@ -110,6 +111,7 @@ function AppContent() {
             <Route path="/meta-ads" element={<MetaAds />} />
             <Route path="/contenido" element={<ContenidoOrganico />} />
             <Route path="/portal" element={<Portal />} />
+            <Route path="/academia" element={<Academia />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

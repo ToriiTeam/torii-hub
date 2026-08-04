@@ -29,6 +29,7 @@ import {
   Gauge,
   Sprout,
   Globe,
+  GraduationCap,
 } from 'lucide-react';
 
 interface Task {
@@ -52,6 +53,10 @@ const navigation = [
   { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
   { name: 'Contenido Orgánico', href: '/contenido', icon: Sprout },
   { name: 'Portal', href: '/portal', icon: Globe },
+  // academy.* RLS only recognizes profiles.role='admin' (via
+  // academy.is_portal_admin()), not moderator — see AuthContext's isAdmin
+  // comment. Gated narrower than the rest of the sidebar on purpose.
+  { name: 'Academia', href: '/academia', icon: GraduationCap, adminOnly: true },
 ];
 
 interface LayoutProps {
@@ -63,7 +68,7 @@ interface LayoutProps {
 const AUDITOR_NAV_HREFS = ['/dashboard', '/meta-ads', '/vsl-tracking'];
 
 export default function Layout({ children }: LayoutProps) {
-  const { profile, signOut, isAuditor } = useAuth();
+  const { profile, signOut, isAuditor, isAdmin } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -71,7 +76,7 @@ export default function Layout({ children }: LayoutProps) {
 
   const visibleNavigation = isAuditor
     ? navigation.filter((item) => AUDITOR_NAV_HREFS.includes(item.href))
-    : navigation;
+    : navigation.filter((item) => !item.adminOnly || isAdmin);
 
   useEffect(() => {
     if (isAuditor) return; // auditor has no Tareas access — nothing to notify about
