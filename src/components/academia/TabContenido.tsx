@@ -40,7 +40,8 @@ export default function TabContenido() {
   const [questionDialog, setQuestionDialog] = useState(false);
 
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [formacionForm, setFormacionForm] = useState({ title: '', description: '', order_index: 0 });
+  const [formacionForm, setFormacionForm] = useState({ title: '', description: '', order_index: 0, cover_image_url: '' });
+  const [uploadingFormacionCover, setUploadingFormacionCover] = useState(false);
   const [moduleForm, setModuleForm] = useState({ title: '', description: '', badge_text: '', order_index: 0, cover_image_url: '' });
   const [uploadingCover, setUploadingCover] = useState(false);
   const [videoForm, setVideoForm] = useState({ title: '', video_url: '', order_index: 0 });
@@ -86,17 +87,29 @@ export default function TabContenido() {
 
   const openNewFormacion = () => {
     setEditingItem(null);
-    setFormacionForm({ title: '', description: '', order_index: formaciones.length + 1 });
+    setFormacionForm({ title: '', description: '', order_index: formaciones.length + 1, cover_image_url: '' });
     setFormacionDialog(true);
   };
   const openEditFormacion = (f: any) => {
     setEditingItem(f);
-    setFormacionForm({ title: f.title, description: f.description || '', order_index: f.order_index });
+    setFormacionForm({ title: f.title, description: f.description || '', order_index: f.order_index, cover_image_url: f.cover_image_url || '' });
     setFormacionDialog(true);
+  };
+  const uploadFormacionCoverImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFormacionCover(true);
+    const filePath = `formacion-covers/${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage.from('module-materials').upload(filePath, file);
+    if (uploadError) { toast.error('Error: ' + uploadError.message); setUploadingFormacionCover(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('module-materials').getPublicUrl(filePath);
+    setFormacionForm(f => ({ ...f, cover_image_url: publicUrl }));
+    setUploadingFormacionCover(false);
+    toast.success('Imagen subida');
   };
   const saveFormacion = async () => {
     if (!formacionForm.title) { toast.error('Título requerido'); return; }
-    const payload = { ...formacionForm, description: formacionForm.description || null };
+    const payload = { ...formacionForm, description: formacionForm.description || null, cover_image_url: formacionForm.cover_image_url || null };
     if (editingItem) {
       await supabase.schema('academy').from('formaciones').update(payload).eq('id', editingItem.id);
     } else {
@@ -545,6 +558,18 @@ export default function TabContenido() {
           <div className="space-y-4">
             <div className="space-y-2"><Label>Título</Label><Input value={formacionForm.title} onChange={e => setFormacionForm(f => ({ ...f, title: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Descripción</Label><Textarea value={formacionForm.description} onChange={e => setFormacionForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Imagen de portada</Label>
+              {formacionForm.cover_image_url && (
+                <div className="relative">
+                  <img src={formacionForm.cover_image_url} alt="Portada" className="w-full h-40 object-cover rounded-md border border-border" />
+                  <Button size="sm" variant="destructive" className="absolute top-2 right-2" onClick={() => setFormacionForm(f => ({ ...f, cover_image_url: '' }))}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              <Input type="file" accept="image/*" onChange={uploadFormacionCoverImage} disabled={uploadingFormacionCover} />
+            </div>
             <div className="space-y-2"><Label>Orden</Label><Input type="number" value={formacionForm.order_index} onChange={e => setFormacionForm(f => ({ ...f, order_index: parseInt(e.target.value) || 0 }))} /></div>
             <Button className="w-full" onClick={saveFormacion}>{editingItem ? 'Guardar' : 'Crear'}</Button>
           </div>

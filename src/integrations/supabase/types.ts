@@ -215,6 +215,7 @@ export type Database = {
       }
       formaciones: {
         Row: {
+          cover_image_url: string | null
           created_at: string
           description: string | null
           id: string
@@ -222,6 +223,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -229,6 +231,7 @@ export type Database = {
           title: string
         }
         Update: {
+          cover_image_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -413,6 +416,7 @@ export type Database = {
       team_members: {
         Row: {
           active: boolean
+          avatar_url: string | null
           client_id: string
           created_at: string
           full_name: string
@@ -423,6 +427,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          avatar_url?: string | null
           client_id: string
           created_at?: string
           full_name: string
@@ -433,6 +438,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          avatar_url?: string | null
           client_id?: string
           created_at?: string
           full_name?: string
