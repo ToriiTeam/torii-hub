@@ -7,8 +7,10 @@ import TabContenido from '@/components/academia/TabContenido';
 import TabExamenes from '@/components/academia/TabExamenes';
 import TabReflexiones from '@/components/academia/TabReflexiones';
 import TabProgreso from '@/components/academia/TabProgreso';
+import TabEquipo from '@/components/academia/TabEquipo';
 
 const TABS = [
+  { value: 'equipo', label: 'Equipo' },
   { value: 'contenido', label: 'Contenido' },
   { value: 'examenes', label: 'Exámenes' },
   { value: 'reflexiones', label: 'Reflexiones' },
@@ -17,7 +19,7 @@ const TABS = [
 
 export default function Academia() {
   const { isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState('contenido');
+  const [activeTab, setActiveTab] = useState('equipo');
 
   // academy.* RLS only recognizes profiles.role='admin' — see AuthContext's
   // isAdmin comment. This is a second line of defense (the sidebar link is
@@ -53,6 +55,7 @@ export default function Academia() {
           ))}
         </TabsList>
 
+        <TabsContent value="equipo"><TabEquipo /></TabsContent>
         <TabsContent value="contenido"><TabContenido /></TabsContent>
         <TabsContent value="examenes"><TabExamenes /></TabsContent>
         <TabsContent value="reflexiones"><TabReflexiones /></TabsContent>
