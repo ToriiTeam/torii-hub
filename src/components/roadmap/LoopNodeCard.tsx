@@ -1,16 +1,16 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { Badge } from '@/components/ui/badge';
-import type { RoadmapCycleNode } from '@/features/roadmap-cycles/types';
+import type { RoadmapProcess } from '@/features/roadmap/types';
 
 export interface LoopNodeData {
-  node: RoadmapCycleNode;
+  process: RoadmapProcess;
   [key: string]: unknown;
 }
 
-// Registered once in CycleLoopDiagram.tsx's module-scope `nodeTypes` map —
-// same stable-reference requirement as CreativeNodeCard.
+// Registrado una sola vez en el nodeTypes module-scope de
+// CycleLoopDiagram.tsx — misma referencia estable que CreativeNodeCard.
 export function LoopNodeCard({ data, selected }: NodeProps & { data: LoopNodeData }) {
-  const { node } = data;
+  const { process } = data;
 
   return (
     <div className="w-40 flex flex-col items-center text-center cursor-pointer">
@@ -21,16 +21,16 @@ export function LoopNodeCard({ data, selected }: NodeProps & { data: LoopNodeDat
           selected ? 'border-primary ring-2 ring-primary/40' : 'border-primary/50'
         }`}
       >
-        <span className="font-bold text-sm leading-tight">{node.nombre}</span>
+        <span className="font-bold text-sm leading-tight">{process.nombre}</span>
       </div>
 
-      {node.descripcion && (
-        <p className="text-xs text-muted-foreground mt-2 line-clamp-3">{node.descripcion}</p>
+      {process.objetivo && (
+        <p className="text-xs text-muted-foreground mt-2 line-clamp-3">{process.objetivo}</p>
       )}
 
-      {node.output && (
+      {process.done_criteria && (
         <Badge variant="outline" className="mt-1.5 border-primary/40 text-primary text-[10px]">
-          {node.output}
+          {process.done_criteria}
         </Badge>
       )}
 

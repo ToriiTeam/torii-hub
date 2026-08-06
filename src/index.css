@@ -117,3 +117,15 @@
   0%, 100% { box-shadow: 0 0 5px hsl(var(--torii-red) / 0.5); }
   50% { box-shadow: 0 0 20px hsl(var(--torii-red) / 0.8); }
 }
+
+/* Ciclos del Roadmap: pulso real de opacity/glow en las conexiones del
+   loop — a propósito distinto del animated:true de React Flow (que anima
+   el dash-offset del trazo, "hormigas marchando"). */
+@keyframes roadmap-edge-pulse {
+  0%, 100% { opacity: 0.35; filter: drop-shadow(0 0 0 transparent); }
+  50% { opacity: 1; filter: drop-shadow(0 0 3px hsl(var(--primary) / 0.7)); }
+}
+
+.roadmap-pulse-edge {
+  animation: roadmap-edge-pulse 2.2s ease-in-out infinite;
+}

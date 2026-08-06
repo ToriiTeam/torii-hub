@@ -4301,89 +4301,109 @@ export type Database = {
           },
         ]
       }
-      roadmap_cycle_nodes: {
+      roadmap_documents: {
         Row: {
-          cycle_id: string
-          descripcion: string | null
+          client_id: string
+          file_url: string
           id: string
-          nombre: string
-          orden: number
-          output: string | null
-          updated_at: string
+          phase_id: string | null
+          process_id: string | null
+          tipo: string
+          titulo: string
+          uploaded_at: string
         }
         Insert: {
-          cycle_id: string
-          descripcion?: string | null
+          client_id: string
+          file_url: string
           id?: string
-          nombre: string
-          orden: number
-          output?: string | null
-          updated_at?: string
+          phase_id?: string | null
+          process_id?: string | null
+          tipo: string
+          titulo: string
+          uploaded_at?: string
         }
         Update: {
-          cycle_id?: string
-          descripcion?: string | null
+          client_id?: string
+          file_url?: string
           id?: string
-          nombre?: string
-          orden?: number
-          output?: string | null
-          updated_at?: string
+          phase_id?: string | null
+          process_id?: string | null
+          tipo?: string
+          titulo?: string
+          uploaded_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "roadmap_cycle_nodes_cycle_id_fkey"
-            columns: ["cycle_id"]
+            foreignKeyName: "roadmap_documents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "roadmap_cycles"
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_documents_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_documents_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
             referencedColumns: ["id"]
           },
         ]
       }
-      roadmap_cycles: {
+      roadmap_phases: {
         Row: {
-          cadence: string | null
-          descripcion: string | null
+          activated_at: string
+          client_id: string
           id: string
-          key: string
           nombre: string
+          objetivo_fase: string | null
           orden: number
-          phase_key: string | null
-          status: string
+          phase_key: string
+          trigger_entrada: string | null
+          trigger_salida: string | null
           updated_at: string
         }
         Insert: {
-          cadence?: string | null
-          descripcion?: string | null
+          activated_at?: string
+          client_id: string
           id?: string
-          key: string
           nombre: string
-          orden?: number
-          phase_key?: string | null
-          status?: string
+          objetivo_fase?: string | null
+          orden: number
+          phase_key: string
+          trigger_entrada?: string | null
+          trigger_salida?: string | null
           updated_at?: string
         }
         Update: {
-          cadence?: string | null
-          descripcion?: string | null
+          activated_at?: string
+          client_id?: string
           id?: string
-          key?: string
           nombre?: string
+          objetivo_fase?: string | null
           orden?: number
-          phase_key?: string | null
-          status?: string
+          phase_key?: string
+          trigger_entrada?: string | null
+          trigger_salida?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "roadmap_cycles_phase_key_fkey"
-            columns: ["phase_key"]
+            foreignKeyName: "roadmap_phases_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "roadmap_phases"
-            referencedColumns: ["phase_key"]
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
         ]
       }
-      roadmap_phases: {
+      roadmap_phases_template: {
         Row: {
           nombre: string
           objetivo_fase: string | null
@@ -4413,18 +4433,190 @@ export type Database = {
         }
         Relationships: []
       }
+      roadmap_process_dependencies: {
+        Row: {
+          created_at: string
+          depends_on_process_id: string
+          id: string
+          process_id: string
+        }
+        Insert: {
+          created_at?: string
+          depends_on_process_id: string
+          id?: string
+          process_id: string
+        }
+        Update: {
+          created_at?: string
+          depends_on_process_id?: string
+          id?: string
+          process_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_process_dependencies_depends_on_process_id_fkey"
+            columns: ["depends_on_process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_process_dependencies_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roadmap_process_steps: {
+        Row: {
+          completado: boolean
+          created_at: string
+          id: string
+          orden: number
+          process_id: string
+          texto: string
+        }
+        Insert: {
+          completado?: boolean
+          created_at?: string
+          id?: string
+          orden?: number
+          process_id: string
+          texto: string
+        }
+        Update: {
+          completado?: boolean
+          created_at?: string
+          id?: string
+          orden?: number
+          process_id?: string
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_process_steps_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       roadmap_processes: {
         Row: {
+          client_id: string
           como_construirlo: string | null
           condiciona_a: string | null
+          created_at: string
           cuando: string | null
           depende_de: string | null
           done_criteria: string | null
+          es_ciclo: boolean
+          fecha_fin: string | null
+          fecha_inicio: string | null
           id: string
           nombre: string
           objetivo: string | null
           orden: number
-          phase_key: string
+          parent_process_id: string | null
+          phase_id: string | null
+          responsable: string | null
+          status: string
+          template_process_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          como_construirlo?: string | null
+          condiciona_a?: string | null
+          created_at?: string
+          cuando?: string | null
+          depende_de?: string | null
+          done_criteria?: string | null
+          es_ciclo?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre: string
+          objetivo?: string | null
+          orden?: number
+          parent_process_id?: string | null
+          phase_id?: string | null
+          responsable?: string | null
+          status?: string
+          template_process_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          como_construirlo?: string | null
+          condiciona_a?: string | null
+          created_at?: string
+          cuando?: string | null
+          depende_de?: string | null
+          done_criteria?: string | null
+          es_ciclo?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          nombre?: string
+          objetivo?: string | null
+          orden?: number
+          parent_process_id?: string | null
+          phase_id?: string | null
+          responsable?: string | null
+          status?: string
+          template_process_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_processes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_processes_parent_process_id_fkey"
+            columns: ["parent_process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_processes_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadmap_processes_template_process_id_fkey"
+            columns: ["template_process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roadmap_processes_template: {
+        Row: {
+          como_construirlo: string | null
+          condiciona_a: string | null
+          cuando: string | null
+          default_status: string | null
+          depende_de: string | null
+          done_criteria: string | null
+          es_ciclo: boolean
+          id: string
+          nombre: string
+          objetivo: string | null
+          orden: number
+          parent_process_id: string | null
+          phase_key: string | null
           responsable: string | null
           updated_at: string
         }
@@ -4432,13 +4624,16 @@ export type Database = {
           como_construirlo?: string | null
           condiciona_a?: string | null
           cuando?: string | null
+          default_status?: string | null
           depende_de?: string | null
           done_criteria?: string | null
+          es_ciclo?: boolean
           id?: string
           nombre: string
           objetivo?: string | null
           orden?: number
-          phase_key: string
+          parent_process_id?: string | null
+          phase_key?: string | null
           responsable?: string | null
           updated_at?: string
         }
@@ -4446,13 +4641,16 @@ export type Database = {
           como_construirlo?: string | null
           condiciona_a?: string | null
           cuando?: string | null
+          default_status?: string | null
           depende_de?: string | null
           done_criteria?: string | null
+          es_ciclo?: boolean
           id?: string
           nombre?: string
           objetivo?: string | null
           orden?: number
-          phase_key?: string
+          parent_process_id?: string | null
+          phase_key?: string | null
           responsable?: string | null
           updated_at?: string
         }
@@ -4461,8 +4659,15 @@ export type Database = {
             foreignKeyName: "roadmap_processes_phase_key_fkey"
             columns: ["phase_key"]
             isOneToOne: false
-            referencedRelation: "roadmap_phases"
+            referencedRelation: "roadmap_phases_template"
             referencedColumns: ["phase_key"]
+          },
+          {
+            foreignKeyName: "roadmap_processes_template_parent_process_id_fkey"
+            columns: ["parent_process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes_template"
+            referencedColumns: ["id"]
           },
         ]
       }

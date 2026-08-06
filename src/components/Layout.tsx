@@ -30,7 +30,6 @@ import {
   Sprout,
   Globe,
   GraduationCap,
-  Map,
 } from 'lucide-react';
 
 interface Task {
@@ -58,8 +57,6 @@ const navigation = [
   // academy.is_portal_admin()), not moderator — see AuthContext's isAdmin
   // comment. Gated narrower than the rest of the sidebar on purpose.
   { name: 'Academia', href: '/academia', icon: GraduationCap, adminOnly: true },
-  // Metodología de delivery interna — no algo que un cliente deba ver.
-  { name: 'Roadmap', href: '/roadmap', icon: Map, adminOnly: true },
 ];
 
 interface LayoutProps {
