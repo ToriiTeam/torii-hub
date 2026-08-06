@@ -4301,6 +4301,88 @@ export type Database = {
           },
         ]
       }
+      roadmap_cycle_nodes: {
+        Row: {
+          cycle_id: string
+          descripcion: string | null
+          id: string
+          nombre: string
+          orden: number
+          output: string | null
+          updated_at: string
+        }
+        Insert: {
+          cycle_id: string
+          descripcion?: string | null
+          id?: string
+          nombre: string
+          orden: number
+          output?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cycle_id?: string
+          descripcion?: string | null
+          id?: string
+          nombre?: string
+          orden?: number
+          output?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_cycle_nodes_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roadmap_cycles: {
+        Row: {
+          cadence: string | null
+          descripcion: string | null
+          id: string
+          key: string
+          nombre: string
+          orden: number
+          phase_key: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cadence?: string | null
+          descripcion?: string | null
+          id?: string
+          key: string
+          nombre: string
+          orden?: number
+          phase_key?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cadence?: string | null
+          descripcion?: string | null
+          id?: string
+          key?: string
+          nombre?: string
+          orden?: number
+          phase_key?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_cycles_phase_key_fkey"
+            columns: ["phase_key"]
+            isOneToOne: false
+            referencedRelation: "roadmap_phases"
+            referencedColumns: ["phase_key"]
+          },
+        ]
+      }
       roadmap_phases: {
         Row: {
           nombre: string

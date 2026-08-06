@@ -13,6 +13,9 @@ import {
 import { toast } from 'sonner';
 import { ShieldAlert, Plus, Trash2 } from 'lucide-react';
 import { EditableField } from '@/components/roadmap/EditableField';
+import { CycleTabs } from '@/components/roadmap/cycles/CycleTabs';
+import { fetchCyclesWithNodes } from '@/features/roadmap-cycles/lib/cyclesRepo';
+import type { RoadmapCycleWithNodes } from '@/features/roadmap-cycles/types';
 
 // El mapa de delivery de Torii, vivo — no un documento estático. 2 niveles:
 // roadmap_phases (las 6 macro-fases, metodología — no confundir con
@@ -50,6 +53,7 @@ export default function Roadmap() {
   const { isAdmin } = useAuth();
   const [phases, setPhases] = useState<RoadmapPhase[]>([]);
   const [processes, setProcesses] = useState<RoadmapProcess[]>([]);
+  const [cycles, setCycles] = useState<RoadmapCycleWithNodes[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<RoadmapProcess | null>(null);
 
@@ -57,13 +61,19 @@ export default function Roadmap() {
 
   async function loadData() {
     setLoading(true);
-    const [{ data: p }, { data: proc }] = await Promise.all([
+    const [{ data: p }, { data: proc }, cyc] = await Promise.all([
       supabase.from('roadmap_phases').select('*').order('orden'),
       supabase.from('roadmap_processes').select('*').order('orden'),
+      fetchCyclesWithNodes(),
     ]);
     setPhases((p ?? []) as RoadmapPhase[]);
     setProcesses((proc ?? []) as RoadmapProcess[]);
+    setCycles(cyc);
     setLoading(false);
+  }
+
+  async function reloadCycles() {
+    setCycles(await fetchCyclesWithNodes());
   }
 
   async function updatePhase(phaseKey: string, field: keyof RoadmapPhase, value: string) {
@@ -120,11 +130,26 @@ export default function Roadmap() {
       {loading ? (
         <div className="h-64 rounded-lg bg-secondary/40 animate-pulse" />
       ) : (
-        <Accordion type="multiple" defaultValue={[phases[0]?.phase_key]} className="space-y-3">
+        <>
+          {/* Corre en paralelo sin importar en qué fase esté el cliente —
+              no anida en ninguna AccordionItem, va fijo arriba de todas. */}
+          {cycles.filter((c) => c.phase_key === null).length > 0 && (
+            <Card className="bg-card border-border/50">
+              <CardContent className="p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Ciclo operativo recurrente
+                </p>
+                <CycleTabs cycles={cycles.filter((c) => c.phase_key === null)} onNodeSaved={reloadCycles} />
+              </CardContent>
+            </Card>
+          )}
+
+          <Accordion type="multiple" defaultValue={[phases[0]?.phase_key]} className="space-y-3">
           {phases.map((phase) => {
             const phaseProcesses = processes
               .filter((p) => p.phase_key === phase.phase_key)
               .sort((a, b) => a.orden - b.orden);
+            const phaseCycles = cycles.filter((c) => c.phase_key === phase.phase_key);
             return (
               <AccordionItem key={phase.phase_key} value={phase.phase_key} className="border border-border rounded-lg px-4 bg-card">
                 <AccordionTrigger className="hover:no-underline">
@@ -206,11 +231,19 @@ export default function Roadmap() {
                       ))
                     )}
                   </div>
+
+                  {phaseCycles.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ciclos</p>
+                      <CycleTabs cycles={phaseCycles} onNodeSaved={reloadCycles} />
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             );
           })}
-        </Accordion>
+          </Accordion>
+        </>
       )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
