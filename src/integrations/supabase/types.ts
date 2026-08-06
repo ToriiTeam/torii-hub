@@ -4301,6 +4301,89 @@ export type Database = {
           },
         ]
       }
+      roadmap_phases: {
+        Row: {
+          nombre: string
+          objetivo_fase: string | null
+          orden: number
+          phase_key: string
+          trigger_entrada: string | null
+          trigger_salida: string | null
+          updated_at: string
+        }
+        Insert: {
+          nombre: string
+          objetivo_fase?: string | null
+          orden: number
+          phase_key: string
+          trigger_entrada?: string | null
+          trigger_salida?: string | null
+          updated_at?: string
+        }
+        Update: {
+          nombre?: string
+          objetivo_fase?: string | null
+          orden?: number
+          phase_key?: string
+          trigger_entrada?: string | null
+          trigger_salida?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      roadmap_processes: {
+        Row: {
+          como_construirlo: string | null
+          condiciona_a: string | null
+          cuando: string | null
+          depende_de: string | null
+          done_criteria: string | null
+          id: string
+          nombre: string
+          objetivo: string | null
+          orden: number
+          phase_key: string
+          responsable: string | null
+          updated_at: string
+        }
+        Insert: {
+          como_construirlo?: string | null
+          condiciona_a?: string | null
+          cuando?: string | null
+          depende_de?: string | null
+          done_criteria?: string | null
+          id?: string
+          nombre: string
+          objetivo?: string | null
+          orden?: number
+          phase_key: string
+          responsable?: string | null
+          updated_at?: string
+        }
+        Update: {
+          como_construirlo?: string | null
+          condiciona_a?: string | null
+          cuando?: string | null
+          depende_de?: string | null
+          done_criteria?: string | null
+          id?: string
+          nombre?: string
+          objetivo?: string | null
+          orden?: number
+          phase_key?: string
+          responsable?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadmap_processes_phase_key_fkey"
+            columns: ["phase_key"]
+            isOneToOne: false
+            referencedRelation: "roadmap_phases"
+            referencedColumns: ["phase_key"]
+          },
+        ]
+      }
       sales_materials: {
         Row: {
           client_id: string | null

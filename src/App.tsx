@@ -20,6 +20,7 @@ import MetaAds from "@/pages/MetaAds";
 import ContenidoOrganico from "@/pages/ContenidoOrganico";
 import Portal from "@/pages/Portal";
 import Academia from "@/pages/Academia";
+import Roadmap from "@/pages/Roadmap";
 import AuditorVslFunnel from "@/pages/AuditorVslFunnel";
 import NotFound from "./pages/NotFound";
 
@@ -112,6 +113,7 @@ function AppContent() {
             <Route path="/contenido" element={<ContenidoOrganico />} />
             <Route path="/portal" element={<Portal />} />
             <Route path="/academia" element={<Academia />} />
+            <Route path="/roadmap" element={<Roadmap />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
