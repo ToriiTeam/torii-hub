@@ -25,9 +25,14 @@ const TABS = [
   { value: 'metricas', label: 'Métricas por Tanda', Component: TabMetricasTanda },
 ];
 
-export default function ContenidoOrganico() {
+// fixedClientId: cuando viene de la ficha de un cliente puntual
+// (ClienteDetalle.tsx → /clientes/:id/contenido) en vez del modo "Torii"
+// del sidebar — fija el cliente y oculta el selector correspondiente.
+interface ContenidoOrganicoProps { fixedClientId?: string }
+
+export default function ContenidoOrganico({ fixedClientId }: ContenidoOrganicoProps = {}) {
   const [clients, setClients] = useState<ClientOption[]>([]);
-  const [selectedClient, setSelectedClient] = useState<string>(TORII);
+  const [selectedClient, setSelectedClient] = useState<string>(fixedClientId ?? TORII);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>(ALL_CHANNELS);
   const [activeTab, setActiveTab] = useState('pilares');
 
@@ -113,13 +118,15 @@ export default function ContenidoOrganico() {
           <h1 className="text-2xl font-bold">Contenido Orgánico</h1>
           <p className="text-sm text-muted-foreground">Pilares, fases, hipótesis y calendario de producción de contenido</p>
         </div>
-        <Select value={selectedClient} onValueChange={setSelectedClient}>
-          <SelectTrigger className="w-48 h-9 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TORII}>Torii</SelectItem>
-            {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {!fixedClientId && (
+          <Select value={selectedClient} onValueChange={setSelectedClient}>
+            <SelectTrigger className="w-48 h-9 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TORII}>Torii</SelectItem>
+              {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={channelFilter} onValueChange={(v) => setChannelFilter(v as ChannelFilter)}>
           <SelectTrigger className="w-40 h-9 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>

@@ -1263,13 +1263,19 @@ function loadVisibleColumns(owner: OwnerKey): Set<string> {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function Closers() {
+// fixedClientId: cuando viene de la ficha de un cliente puntual
+// (ClienteDetalle.tsx → /clientes/:id/closing) en vez del modo "Torii" del
+// sidebar — fija el owner y oculta el selector, sin duplicar el resto del
+// componente.
+interface ClosersProps { fixedClientId?: string }
+
+export default function Closers({ fixedClientId }: ClosersProps = {}) {
   const [calls, setCalls]     = useState<Call[]>([]);
   const [closers, setClosers] = useState<CloserRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [owner, setOwner]   = useState<OwnerKey>(TORII);
+  const [owner, setOwner]   = useState<OwnerKey>(fixedClientId ?? TORII);
   const now = new Date();
   const [year, setYear]     = useState(now.getFullYear());
   const [month, setMonth]   = useState(now.getMonth() + 1);
@@ -1419,18 +1425,20 @@ export default function Closers() {
             {total} llamadas · {cerrados} cierres · ${revenue.toLocaleString()} revenue
           </p>
         </div>
-        <Select value={owner} onValueChange={v => setOwner(v as OwnerKey)}>
-          <SelectTrigger className="w-44 h-8 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TORII}>Torii</SelectItem>
-            {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            {unmappedCount > 0 && (
-              <SelectItem value={UNMAPPED} className="text-amber-500 focus:text-amber-500">
-                ⚠ Sin mapear ({unmappedCount})
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        {!fixedClientId && (
+          <Select value={owner} onValueChange={v => setOwner(v as OwnerKey)}>
+            <SelectTrigger className="w-44 h-8 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TORII}>Torii</SelectItem>
+              {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              {unmappedCount > 0 && (
+                <SelectItem value={UNMAPPED} className="text-amber-500 focus:text-amber-500">
+                  ⚠ Sin mapear ({unmappedCount})
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navMonthClick('prev')} disabled={allTime}>
             <ChevronLeft className="h-4 w-4" />

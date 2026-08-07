@@ -16,6 +16,9 @@ import TabCreativos from '@/components/clientes/TabCreativos';
 import TabAngulos from '@/components/clientes/TabAngulos';
 import TabOnboarding from '@/components/clientes/TabOnboarding';
 import TabRoadmap from '@/components/clientes/TabRoadmap';
+import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
+import TabClosingCliente from '@/components/clientes/TabClosingCliente';
+import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
 
 export interface Client {
   id: string;
@@ -74,14 +77,36 @@ const TABS = [
   { value: 'arbol', label: 'Árbol de Iteraciones' },
   { value: 'angulos', label: 'Ángulos' },
   { value: 'creativos', label: 'Creativos' },
+  { value: 'dashboard', label: 'Dashboard' },
+  { value: 'closing', label: 'Closing' },
+  { value: 'contenido', label: 'Contenido Orgánico' },
 ];
 
+// Únicos 3 tabs deep-linkeables (/clientes/:id/dashboard, etc.) — los otros
+// 9 siguen siendo puro estado local (activeTab), sin ruta propia.
+const URL_TABS = ['dashboard', 'closing', 'contenido'];
+
 export default function ClienteDetalle() {
-  const { id } = useParams<{ id: string }>();
+  const { id, tab: urlTab } = useParams<{ id: string; tab?: string }>();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ficha');
+
+  // Los 3 tabs deep-linkeables mandan cuando la URL los trae; si no,
+  // gobierna el estado local de siempre (los 9 tabs viejos, sin ruta
+  // propia). Cambiar de sub-ruta (dashboard→closing) NO dispara un
+  // re-fetch del cliente — fetchClient solo depende de :id, más abajo.
+  const effectiveTab = urlTab && URL_TABS.includes(urlTab) ? urlTab : activeTab;
+
+  function handleTabChange(value: string) {
+    if (URL_TABS.includes(value)) {
+      navigate(`/clientes/${id}/${value}`);
+    } else {
+      setActiveTab(value);
+      if (urlTab) navigate(`/clientes/${id}`, { replace: true });
+    }
+  }
 
   useEffect(() => {
     if (id) fetchClient();
@@ -147,7 +172,7 @@ export default function ClienteDetalle() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={effectiveTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
           {TABS.map(tab => (
             <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
@@ -190,6 +215,18 @@ export default function ClienteDetalle() {
 
         <TabsContent value="creativos">
           <TabCreativos clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="dashboard">
+          <TabDashboardCliente clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="closing">
+          <TabClosingCliente clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="contenido">
+          <TabContenidoCliente clientId={client.id} />
         </TabsContent>
       </Tabs>
     </div>
