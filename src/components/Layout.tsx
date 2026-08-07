@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { ClientNavSection } from '@/components/ClientNavSection';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -192,25 +193,46 @@ export default function Layout({ children }: LayoutProps) {
               {section.label}
             </div>
           )}
-          {section.items.map((item) => {
-            const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
-            return (
+          {section.label === 'Clientes' ? (
+            collapsed ? (
+              // Selector rico no entra en modo colapsado — fallback simple,
+              // mismo comportamiento que tenía el NavLink único de antes.
               <NavLink
-                key={item.name}
-                to={item.href}
+                to="/clientes"
                 onClick={onNavigate}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                  isActive
+                  location.pathname.startsWith('/clientes')
                     ? 'bg-primary/15 text-primary border border-primary/30'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 )}
               >
-                <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
-                {!collapsed && <span>{item.name}</span>}
+                <Users className="h-5 w-5 flex-shrink-0" />
               </NavLink>
-            );
-          })}
+            ) : (
+              <ClientNavSection />
+            )
+          ) : (
+            section.items.map((item) => {
+              const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-primary/15 text-primary border border-primary/30'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  )}
+                >
+                  <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
+                  {!collapsed && <span>{item.name}</span>}
+                </NavLink>
+              );
+            })
+          )}
         </div>
       ))}
     </nav>

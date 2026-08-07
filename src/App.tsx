@@ -13,6 +13,7 @@ import Setters from "@/pages/Setters";
 import Closers from "@/pages/Closers";
 import Clientes from "@/pages/Clientes";
 import ClienteDetalle from "@/pages/ClienteDetalle";
+import ClientesGlobalDashboard from "@/pages/ClientesGlobalDashboard";
 import Reportes from "@/pages/Reportes";
 import VslTracking from "@/pages/VslTracking";
 import MaquinaCierres from "@/pages/MaquinaCierres";
@@ -100,6 +101,7 @@ function AppContent() {
             <Route path="/" element={<ExecutiveDashboard />} />
             <Route path="/dashboard" element={<ExecutiveDashboard />} />
             <Route path="/clientes" element={<Clientes />} />
+            <Route path="/clientes/global" element={<ClientesGlobalDashboard />} />
             <Route path="/clientes/:id" element={<ClienteDetalle />} />
             <Route path="/clientes/:id/:tab" element={<ClienteDetalle />} />
             <Route path="/setters" element={<Setters />} />

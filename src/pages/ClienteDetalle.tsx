@@ -7,15 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
-import TabFichaBasica from '@/components/clientes/TabFichaBasica';
-import TabCSB from '@/components/clientes/TabCSB';
-import TabCSL from '@/components/clientes/TabCSL';
-import CreativeTree from '@/components/clientes/creative-tree/CreativeTree';
-import TabCreativos from '@/components/clientes/TabCreativos';
-import TabAngulos from '@/components/clientes/TabAngulos';
-import TabOnboarding from '@/components/clientes/TabOnboarding';
-import TabRoadmap from '@/components/clientes/TabRoadmap';
+import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
+import TabCreativosCliente from '@/components/clientes/TabCreativosCliente';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
 import TabClosingCliente from '@/components/clientes/TabClosingCliente';
 import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
@@ -67,45 +60,36 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
+// Los antiguos 9 tabs sueltos (Ficha Operativa/Básica/Onboarding/Roadmap/
+// CSB/CSL y Árbol de Iteraciones/Ángulos/Creativos) se agruparon en
+// Estrategia y Creativos respectivamente — ver TabEstrategiaCliente.tsx/
+// TabCreativosCliente.tsx (sub-tabs internos, estado local, sin ruta
+// propia). Los 5 de acá son TODOS deep-linkeables vía /clientes/:id/:tab.
 const TABS = [
-  { value: 'ficha', label: 'Ficha Operativa' },
-  { value: 'basica', label: 'Ficha Básica' },
-  { value: 'onboarding', label: 'Onboarding' },
-  { value: 'roadmap', label: 'Roadmap' },
-  { value: 'csb', label: 'CSB' },
-  { value: 'csl', label: 'CSL' },
-  { value: 'arbol', label: 'Árbol de Iteraciones' },
-  { value: 'angulos', label: 'Ángulos' },
+  { value: 'estrategia', label: 'Estrategia' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'closing', label: 'Closing' },
   { value: 'contenido', label: 'Contenido Orgánico' },
 ];
 
-// Únicos 3 tabs deep-linkeables (/clientes/:id/dashboard, etc.) — los otros
-// 9 siguen siendo puro estado local (activeTab), sin ruta propia.
-const URL_TABS = ['dashboard', 'closing', 'contenido'];
+// 'estrategia' es el default — mantiene la URL limpia /clientes/:id, sin
+// sufijo, mismo criterio que tenía 'ficha' antes de este cambio.
+const DEFAULT_TAB = 'estrategia';
 
 export default function ClienteDetalle() {
   const { id, tab: urlTab } = useParams<{ id: string; tab?: string }>();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('ficha');
 
-  // Los 3 tabs deep-linkeables mandan cuando la URL los trae; si no,
-  // gobierna el estado local de siempre (los 9 tabs viejos, sin ruta
-  // propia). Cambiar de sub-ruta (dashboard→closing) NO dispara un
-  // re-fetch del cliente — fetchClient solo depende de :id, más abajo.
-  const effectiveTab = urlTab && URL_TABS.includes(urlTab) ? urlTab : activeTab;
+  // Los 5 tabs son todos deep-linkeables — la URL es la única fuente de
+  // verdad, sin estado local propio. Cambiar de tab (dashboard→closing) NO
+  // dispara un re-fetch del cliente — fetchClient solo depende de :id.
+  const effectiveTab = urlTab && TABS.some((t) => t.value === urlTab) ? urlTab : DEFAULT_TAB;
 
   function handleTabChange(value: string) {
-    if (URL_TABS.includes(value)) {
-      navigate(`/clientes/${id}/${value}`);
-    } else {
-      setActiveTab(value);
-      if (urlTab) navigate(`/clientes/${id}`, { replace: true });
-    }
+    navigate(value === DEFAULT_TAB ? `/clientes/${id}` : `/clientes/${id}/${value}`);
   }
 
   useEffect(() => {
@@ -181,40 +165,12 @@ export default function ClienteDetalle() {
           ))}
         </TabsList>
 
-        <TabsContent value="ficha">
-          <TabFichaOperativa client={client} onClientUpdate={fetchClient} />
-        </TabsContent>
-
-        <TabsContent value="basica">
-          <TabFichaBasica client={client} onClientUpdate={fetchClient} />
-        </TabsContent>
-
-        <TabsContent value="onboarding">
-          <TabOnboarding clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="roadmap">
-          <TabRoadmap clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="csb">
-          <TabCSB clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="csl">
-          <TabCSL clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="arbol">
-          <CreativeTree clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="angulos">
-          <TabAngulos clientId={client.id} />
+        <TabsContent value="estrategia">
+          <TabEstrategiaCliente client={client} onClientUpdate={fetchClient} />
         </TabsContent>
 
         <TabsContent value="creativos">
-          <TabCreativos clientId={client.id} />
+          <TabCreativosCliente clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="dashboard">
