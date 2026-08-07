@@ -44,8 +44,17 @@ interface ClientOption { id: string; name: string; }
 // instead of hardcoded (was a fixed 3-entry array before).
 const TORII: OwnerKey = 'torii';
 
+// Agendas que llegaron por el webhook de GHL sin que ninguna fila de
+// clients matcheara su ghl_location_id/ghl_calendar_id (owner_type queda
+// NULL en vez de defaultear a Torii en silencio) — ver
+// ghl-appointment-webhook/index.ts::resolveOwner. Sin este filtro esas
+// filas quedarían invisibles: el resto de la página siempre está
+// scopeada a un owner puntual, nunca hay una vista "todos".
+const UNMAPPED: OwnerKey = '__unmapped__';
+
 function matchesOwner(c: Call, owner: OwnerKey): boolean {
   if (owner === TORII) return c.owner_type === 'torii';
+  if (owner === UNMAPPED) return c.owner_type === null;
   return c.client_id === owner;
 }
 
@@ -1324,6 +1333,10 @@ export default function Closers() {
     [calls, owner, since, until],
   );
 
+  // Sin filtro de fecha a propósito — son pocas filas raras y no queremos
+  // que "Todo el historial" apagado esconda una que sigue sin asignar.
+  const unmappedCount = useMemo(() => calls.filter(c => c.owner_type === null).length, [calls]);
+
   // KPIs
   const total          = viewCalls.length;
   const asistieron     = viewCalls.filter(c => c.se_presento).length;
@@ -1411,6 +1424,11 @@ export default function Closers() {
           <SelectContent>
             <SelectItem value={TORII}>Torii</SelectItem>
             {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {unmappedCount > 0 && (
+              <SelectItem value={UNMAPPED} className="text-amber-500 focus:text-amber-500">
+                ⚠ Sin mapear ({unmappedCount})
+              </SelectItem>
+            )}
           </SelectContent>
         </Select>
         <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
@@ -1482,9 +1500,11 @@ export default function Closers() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Llamadas ({tableCalls.length})
                 </CardTitle>
-                <Button size="sm" onClick={() => setNewOpen(true)} className="bg-primary h-8 ml-auto">
-                  <Plus className="h-4 w-4 mr-1" />Nueva agenda
-                </Button>
+                {owner !== UNMAPPED && (
+                  <Button size="sm" onClick={() => setNewOpen(true)} className="bg-primary h-8 ml-auto">
+                    <Plus className="h-4 w-4 mr-1" />Nueva agenda
+                  </Button>
+                )}
                 <Select value={filterCloser} onValueChange={setFilterCloser}>
                   <SelectTrigger className="w-36 h-8 bg-secondary/50 text-sm"><SelectValue placeholder="Closer" /></SelectTrigger>
                   <SelectContent>

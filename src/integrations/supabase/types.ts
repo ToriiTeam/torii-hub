@@ -1102,6 +1102,7 @@ export type Database = {
           calificacion: string | null
           califico: boolean | null
           canal: string | null
+          cancelada: boolean
           capacidad_ahorro: string | null
           cerro: boolean | null
           client_id: string | null
@@ -1110,6 +1111,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           edad: number | null
+          estado_cita: string | null
           estado_seguimiento: string | null
           etapa: string | null
           fecha_agenda: string | null
@@ -1141,6 +1143,7 @@ export type Database = {
           producto: string | null
           reagenda_texto: string | null
           recording_url: string | null
+          referido_id: string | null
           se_presento: boolean | null
           seguimiento_requerido: boolean | null
           segunda_llamada_fecha: string | null
@@ -1161,6 +1164,7 @@ export type Database = {
           calificacion?: string | null
           califico?: boolean | null
           canal?: string | null
+          cancelada?: boolean
           capacidad_ahorro?: string | null
           cerro?: boolean | null
           client_id?: string | null
@@ -1169,6 +1173,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           edad?: number | null
+          estado_cita?: string | null
           estado_seguimiento?: string | null
           etapa?: string | null
           fecha_agenda?: string | null
@@ -1200,6 +1205,7 @@ export type Database = {
           producto?: string | null
           reagenda_texto?: string | null
           recording_url?: string | null
+          referido_id?: string | null
           se_presento?: boolean | null
           seguimiento_requerido?: boolean | null
           segunda_llamada_fecha?: string | null
@@ -1220,6 +1226,7 @@ export type Database = {
           calificacion?: string | null
           califico?: boolean | null
           canal?: string | null
+          cancelada?: boolean
           capacidad_ahorro?: string | null
           cerro?: boolean | null
           client_id?: string | null
@@ -1228,6 +1235,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           edad?: number | null
+          estado_cita?: string | null
           estado_seguimiento?: string | null
           etapa?: string | null
           fecha_agenda?: string | null
@@ -1259,6 +1267,7 @@ export type Database = {
           producto?: string | null
           reagenda_texto?: string | null
           recording_url?: string | null
+          referido_id?: string | null
           se_presento?: boolean | null
           seguimiento_requerido?: boolean | null
           segunda_llamada_fecha?: string | null
@@ -1286,6 +1295,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_closer_calls_referido_id_fkey"
+            columns: ["referido_id"]
+            isOneToOne: false
+            referencedRelation: "referidos"
             referencedColumns: ["id"]
           },
         ]
@@ -2137,6 +2153,8 @@ export type Database = {
           end_date: string | null
           fase: string | null
           fecha_cancelacion: string | null
+          ghl_calendar_id: string | null
+          ghl_location_id: string | null
           id: string
           installment_amount: number | null
           motivo_cancelacion: string | null
@@ -2174,6 +2192,8 @@ export type Database = {
           end_date?: string | null
           fase?: string | null
           fecha_cancelacion?: string | null
+          ghl_calendar_id?: string | null
+          ghl_location_id?: string | null
           id?: string
           installment_amount?: number | null
           motivo_cancelacion?: string | null
@@ -2211,6 +2231,8 @@ export type Database = {
           end_date?: string | null
           fase?: string | null
           fecha_cancelacion?: string | null
+          ghl_calendar_id?: string | null
+          ghl_location_id?: string | null
           id?: string
           installment_amount?: number | null
           motivo_cancelacion?: string | null
