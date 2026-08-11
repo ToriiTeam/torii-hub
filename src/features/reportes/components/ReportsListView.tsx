@@ -7,7 +7,6 @@ import { Plus, Download, Send, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { listReports, markReportSent } from '../lib/reportsRepo';
 import type { ReportWithClient } from '../types';
 
@@ -48,35 +47,19 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
 
   useEffect(() => { fetchReports(); }, [fetchReports, refreshKey]);
 
-  async function handleResend(report: ReportWithClient) {
+  async function handlePublish(report: ReportWithClient) {
     if (!report.pdf_url) {
       toast.error('Este informe todavía no tiene un PDF generado');
       return;
     }
-    if (!report.clientEmail) {
-      toast.error('Este cliente no tiene email cargado');
-      return;
-    }
     setSendingId(report.id);
     try {
-      const pdfRes = await fetch(report.pdf_url);
-      const blob = await pdfRes.blob();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1] ?? '');
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      const { error } = await supabase.functions.invoke('send-report-email', {
-        body: { to: report.clientEmail, clientName: report.clientName, monthLabel: formatReportPeriod(report), pdfBase64: base64 },
-      });
-      if (error) throw error;
       await markReportSent(report.id);
-      toast.success('Informe enviado');
+      toast.success('Informe publicado en el Portal');
       fetchReports();
     } catch (err) {
       console.error(err);
-      toast.error('Error al enviar el informe');
+      toast.error('Error al publicar el informe');
     } finally {
       setSendingId(null);
     }
@@ -135,11 +118,11 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!r.pdf_url || !r.clientEmail || sendingId === r.id}
-                    onClick={() => handleResend(r)}
+                    disabled={!r.pdf_url || sendingId === r.id}
+                    onClick={() => handlePublish(r)}
                   >
                     {sendingId === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                    Enviar
+                    Publicar
                   </Button>
                 </TableCell>
               </TableRow>

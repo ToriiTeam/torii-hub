@@ -10,9 +10,7 @@ import { Step5Recomendaciones } from './wizard/Step5Recomendaciones';
 import { Step6PreviewGenerate } from './wizard/Step6PreviewGenerate';
 import { useReportDraft } from '../hooks/useReportDraft';
 import { createReport, updateReportPdfUrl, uploadReportPdf, markReportSent } from '../lib/reportsRepo';
-import { blobToBase64 } from '../lib/generatePdf';
 import { generateNarrativeDraft } from '../lib/generateNarrativeDraft';
-import { supabase } from '@/integrations/supabase/client';
 
 const STEP_LABELS = [
   'Cliente y período',
@@ -44,7 +42,6 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
   } = useReportDraft();
   const [step, setStep] = useState(0);
   const [reportId, setReportId] = useState<string | null>(null);
-  const [clientEmail, setClientEmail] = useState<string | null>(null);
   const [generatingNarrativa, setGeneratingNarrativa] = useState(false);
 
   // Auto-fill once when the metrics step is first reached for a given
@@ -55,16 +52,6 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
       loadMetrics();
     }
   }, [step, draft.clientId, draft.metricsAutoFilled, loadMetrics]);
-
-  useEffect(() => {
-    if (!draft.clientId) {
-      setClientEmail(null);
-      return;
-    }
-    supabase.from('clients').select('email').eq('id', draft.clientId).single().then(({ data }) => {
-      setClientEmail(data?.email ?? null);
-    });
-  }, [draft.clientId]);
 
   const canGoNext = step === 0 ? !!draft.clientId : true;
 
@@ -111,26 +98,10 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
     onSaved();
   }
 
-  async function handleSend(blob: Blob) {
-    if (!clientEmail) {
-      toast.error('Este cliente no tiene email cargado');
-      return;
-    }
+  async function handlePublish(blob: Blob) {
     const id = await ensureReport();
     const url = await uploadReportPdf(id, draft.clientId, periodRange.fechaInicio, blob);
     await updateReportPdfUrl(id, url);
-
-    const base64 = await blobToBase64(blob);
-    const { error } = await supabase.functions.invoke('send-report-email', {
-      body: {
-        to: clientEmail,
-        clientName: draft.clientName,
-        monthLabel: periodRange.label,
-        pdfBase64: base64,
-      },
-    });
-    if (error) throw error;
-
     await markReportSent(id);
     onSaved();
   }
@@ -181,10 +152,9 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
             metrics={draft.metrics}
             trend={draft.trend}
             narrativa={draft.narrativa}
-            canSend={!!clientEmail}
-            sendDisabledReason={!clientEmail ? 'Este cliente no tiene email cargado en Clientes.' : undefined}
+            canSend
             onGenerated={handleGenerated}
-            onSend={handleSend}
+            onSend={handlePublish}
           />
         );
       default:

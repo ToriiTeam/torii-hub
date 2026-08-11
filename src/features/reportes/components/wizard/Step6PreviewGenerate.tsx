@@ -71,7 +71,7 @@ export function Step6PreviewGenerate({
     try {
       const blob = await generatePdfFromNode(hiddenRef.current);
       await onSend(blob);
-      toast.success('Informe enviado al cliente');
+      toast.success('Informe publicado en el Portal');
     } catch (err) {
       console.error(err);
       toast.error('Error al enviar el informe');
@@ -103,7 +103,7 @@ export function Step6PreviewGenerate({
             className="bg-primary"
           >
             {sending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-            Enviar al cliente
+            Publicar en el Portal
           </Button>
         </div>
       </CardHeader>
