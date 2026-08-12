@@ -92,6 +92,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: `No se pudo crear el usuario de Auth: ${msg}` }, 400)
   }
 
+  // profiles no se crea sola — no hay trigger en auth.users que la genere
+  // (confirmado al diagnosticar el caso de Víctor Othon: el createUser de
+  // arriba había funcionado en un intento previo, pero como este paso no
+  // existía, clients.profile_id nunca se pudo setear — la FK
+  // clients_profile_id_fkey exige que la fila de profiles exista primero).
+  const { error: profileErr } = await supabase
+    .from('profiles')
+    .insert({ id: created.user.id, email: body.email, role: 'client' })
+  if (profileErr) {
+    return json({ error: `Usuario de Auth creado pero no se pudo crear su perfil: ${profileErr.message}` }, 500)
+  }
+
   const { error: updateErr } = await supabase
     .from('clients')
     .update({ profile_id: created.user.id })
