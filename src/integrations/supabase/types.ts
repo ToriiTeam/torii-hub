@@ -3675,6 +3675,33 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_sync_runs: {
+        Row: {
+          error_count: number
+          has_token_error: boolean
+          id: string
+          ok_count: number
+          results: Json
+          run_at: string
+        }
+        Insert: {
+          error_count: number
+          has_token_error?: boolean
+          id?: string
+          ok_count: number
+          results: Json
+          run_at?: string
+        }
+        Update: {
+          error_count?: number
+          has_token_error?: boolean
+          id?: string
+          ok_count?: number
+          results?: Json
+          run_at?: string
+        }
+        Relationships: []
+      }
       metrics_templates: {
         Row: {
           created_at: string | null

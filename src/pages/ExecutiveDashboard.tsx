@@ -15,6 +15,7 @@ import { fetchPortfolioData } from '@/features/executive-dashboard/lib/fetchPort
 import { fetchClientData } from '@/features/executive-dashboard/lib/fetchClientData';
 import { fetchToriiData } from '@/features/executive-dashboard/lib/fetchToriiData';
 import { fetchVslFunnelData } from '@/features/executive-dashboard/lib/fetchVslFunnel';
+import { MetaSyncAlertBanner } from '@/features/meta-ads/components/common/MetaSyncAlertBanner';
 import { getPeriodRange, periodSuffixLabel, clampToNuevoTorii, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
 import type { PortfolioData, ClientDetailData, ToriiData } from '@/features/executive-dashboard/types';
 import type { VslFunnelData } from '@/features/executive-dashboard/lib/fetchVslFunnel';
@@ -91,6 +92,7 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <MetaSyncAlertBanner />
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">Dashboard Ejecutivo</h1>
