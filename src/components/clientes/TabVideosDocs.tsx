@@ -8,9 +8,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Play, Plus, Edit2, Trash2, ExternalLink, FileText, FileType as FileTypeIcon, File as FileIcon } from 'lucide-react';
+import { Play, Plus, Edit2, Trash2, ExternalLink, FileText, FileType as FileTypeIcon, File as FileIcon, Upload, Link as LinkIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getYoutubeId, getEmbedUrl, getDriveEmbedUrl } from '@/lib/embedUrl';
+
+const UPLOADS_BUCKET = 'client-informes-sueltos';
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+function isUploadedFile(url: string): boolean {
+  return url.includes(`/storage/v1/object/public/${UPLOADS_BUCKET}/`);
+}
+
+async function uploadClientFile(clientId: string, file: File): Promise<string | null> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    toast.error('El archivo pesa más de 100MB — máximo permitido.');
+    return null;
+  }
+  const filePath = `${clientId}/${Date.now()}_${file.name}`;
+  const { error: uploadError } = await supabase.storage.from(UPLOADS_BUCKET).upload(filePath, file);
+  if (uploadError) { toast.error('Error al subir el archivo: ' + uploadError.message); return null; }
+  const { data: { publicUrl } } = supabase.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath);
+  return publicUrl;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -64,12 +83,16 @@ export default function TabVideosDocs({ clientId }: Props) {
   const [videoForm, setVideoForm] = useState(emptyVideoForm);
   const [savingVideo, setSavingVideo] = useState(false);
   const [previewVideo, setPreviewVideo] = useState<ClientVideo | null>(null);
+  const [videoInputMode, setVideoInputMode] = useState<'url' | 'file'>('url');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
   const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<ClientDocument | null>(null);
   const [docForm, setDocForm] = useState(emptyDocForm);
   const [savingDoc, setSavingDoc] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<ClientDocument | null>(null);
+  const [docInputMode, setDocInputMode] = useState<'url' | 'file'>('url');
+  const [docFile, setDocFile] = useState<File | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,6 +112,8 @@ export default function TabVideosDocs({ clientId }: Props) {
   function openNewVideo() {
     setEditingVideo(null);
     setVideoForm(emptyVideoForm);
+    setVideoInputMode('url');
+    setVideoFile(null);
     setVideoDialogOpen(true);
   }
 
@@ -98,19 +123,37 @@ export default function TabVideosDocs({ clientId }: Props) {
       title: v.title, video_url: v.video_url,
       description: v.description || '', sent_at: v.sent_at ? v.sent_at.slice(0, 10) : '',
     });
+    setVideoInputMode('url');
+    setVideoFile(null);
     setVideoDialogOpen(true);
   }
 
   async function handleSaveVideo() {
-    if (!videoForm.title.trim() || !videoForm.video_url.trim()) {
-      toast.error('Título y URL son requeridos');
+    if (!videoForm.title.trim()) {
+      toast.error('El título es requerido');
+      return;
+    }
+    if (videoInputMode === 'url' && !videoForm.video_url.trim()) {
+      toast.error('La URL es requerida');
+      return;
+    }
+    if (videoInputMode === 'file' && !videoFile && !editingVideo) {
+      toast.error('Elegí un archivo de video');
       return;
     }
     setSavingVideo(true);
+
+    let videoUrl = videoForm.video_url.trim();
+    if (videoInputMode === 'file' && videoFile) {
+      const uploadedUrl = await uploadClientFile(clientId, videoFile);
+      if (!uploadedUrl) { setSavingVideo(false); return; }
+      videoUrl = uploadedUrl;
+    }
+
     const data = {
       client_id: clientId,
       title: videoForm.title.trim(),
-      video_url: videoForm.video_url.trim(),
+      video_url: videoUrl,
       description: videoForm.description.trim() || null,
       sent_at: videoForm.sent_at || null,
     };
@@ -136,6 +179,8 @@ export default function TabVideosDocs({ clientId }: Props) {
   function openNewDoc() {
     setEditingDoc(null);
     setDocForm(emptyDocForm);
+    setDocInputMode('url');
+    setDocFile(null);
     setDocDialogOpen(true);
   }
 
@@ -145,21 +190,50 @@ export default function TabVideosDocs({ clientId }: Props) {
       name: d.name, description: d.description || '',
       file_type: d.file_type || 'pdf', file_url: d.file_url,
     });
+    setDocInputMode('url');
+    setDocFile(null);
     setDocDialogOpen(true);
   }
 
+  function handleDocFileSelect(file: File | null) {
+    setDocFile(file);
+    // Mismo valor que ya se usa por default en modo URL (emptyDocForm.file_type
+    // = 'pdf') — acá se auto-setea explícitamente en vez de depender del
+    // default del Select, para no perderlo si el usuario lo había cambiado
+    // a otra cosa antes de elegir el archivo.
+    if (file && file.type === 'application/pdf') {
+      setDocForm((f) => ({ ...f, file_type: 'pdf' }));
+    }
+  }
+
   async function handleSaveDoc() {
-    if (!docForm.name.trim() || !docForm.file_url.trim()) {
-      toast.error('Nombre y URL son requeridos');
+    if (!docForm.name.trim()) {
+      toast.error('El nombre es requerido');
+      return;
+    }
+    if (docInputMode === 'url' && !docForm.file_url.trim()) {
+      toast.error('La URL es requerida');
+      return;
+    }
+    if (docInputMode === 'file' && !docFile && !editingDoc) {
+      toast.error('Elegí un archivo');
       return;
     }
     setSavingDoc(true);
+
+    let fileUrl = docForm.file_url.trim();
+    if (docInputMode === 'file' && docFile) {
+      const uploadedUrl = await uploadClientFile(clientId, docFile);
+      if (!uploadedUrl) { setSavingDoc(false); return; }
+      fileUrl = uploadedUrl;
+    }
+
     const data = {
       client_id: clientId,
       name: docForm.name.trim(),
       description: docForm.description.trim() || null,
       file_type: docForm.file_type,
-      file_url: docForm.file_url.trim(),
+      file_url: fileUrl,
     };
     const { error } = editingDoc
       ? await supabase.from('documents').update(data).eq('id', editingDoc.id)
@@ -298,10 +372,27 @@ export default function TabVideosDocs({ clientId }: Props) {
               <Label className="text-xs">Título</Label>
               <Input value={videoForm.title} onChange={e => setVideoForm({ ...videoForm, title: e.target.value })} className="bg-secondary/50" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">URL (YouTube o Loom)</Label>
-              <Input value={videoForm.video_url} onChange={e => setVideoForm({ ...videoForm, video_url: e.target.value })} className="bg-secondary/50" placeholder="https://youtube.com/watch?v=... o https://loom.com/share/..." />
+            <div className="flex rounded-md border border-border/50 p-0.5 w-fit">
+              <button type="button" onClick={() => setVideoInputMode('url')} className={cn('flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors', videoInputMode === 'url' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                <LinkIcon className="h-3 w-3" />URL
+              </button>
+              <button type="button" onClick={() => setVideoInputMode('file')} className={cn('flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors', videoInputMode === 'file' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                <Upload className="h-3 w-3" />Subir archivo
+              </button>
             </div>
+            {videoInputMode === 'url' ? (
+              <div className="space-y-1">
+                <Label className="text-xs">URL (YouTube o Loom)</Label>
+                <Input value={videoForm.video_url} onChange={e => setVideoForm({ ...videoForm, video_url: e.target.value })} className="bg-secondary/50" placeholder="https://youtube.com/watch?v=... o https://loom.com/share/..." />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="text-xs">Archivo de video (máx. 100MB)</Label>
+                <Input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] ?? null)} className="bg-secondary/50" />
+                {videoFile && <p className="text-xs text-muted-foreground">{videoFile.name} ({(videoFile.size / (1024 * 1024)).toFixed(1)}MB)</p>}
+                {editingVideo && !videoFile && <p className="text-xs text-muted-foreground">Dejá vacío para conservar el video actual.</p>}
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Descripción (opcional)</Label>
               <Textarea value={videoForm.description} onChange={e => setVideoForm({ ...videoForm, description: e.target.value })} className="bg-secondary/50" rows={3} />
@@ -323,14 +414,18 @@ export default function TabVideosDocs({ clientId }: Props) {
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>{previewVideo?.title}</DialogTitle></DialogHeader>
           {previewVideo && (
-            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-              <iframe
-                src={getEmbedUrl(previewVideo.video_url)}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full border-0 rounded-md"
-              />
-            </div>
+            isUploadedFile(previewVideo.video_url) ? (
+              <video src={previewVideo.video_url} controls autoPlay className="w-full max-h-[70vh] rounded-md bg-black" />
+            ) : (
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <iframe
+                  src={getEmbedUrl(previewVideo.video_url)}
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full border-0 rounded-md"
+                />
+              </div>
+            )
           )}
         </DialogContent>
       </Dialog>
@@ -353,10 +448,27 @@ export default function TabVideosDocs({ clientId }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">URL</Label>
-              <Input value={docForm.file_url} onChange={e => setDocForm({ ...docForm, file_url: e.target.value })} className="bg-secondary/50" placeholder="https://drive.google.com/..." />
+            <div className="flex rounded-md border border-border/50 p-0.5 w-fit">
+              <button type="button" onClick={() => setDocInputMode('url')} className={cn('flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors', docInputMode === 'url' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                <LinkIcon className="h-3 w-3" />URL
+              </button>
+              <button type="button" onClick={() => setDocInputMode('file')} className={cn('flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors', docInputMode === 'file' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                <Upload className="h-3 w-3" />Subir archivo
+              </button>
             </div>
+            {docInputMode === 'url' ? (
+              <div className="space-y-1">
+                <Label className="text-xs">URL</Label>
+                <Input value={docForm.file_url} onChange={e => setDocForm({ ...docForm, file_url: e.target.value })} className="bg-secondary/50" placeholder="https://drive.google.com/..." />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="text-xs">Archivo (PDF u otro, máx. 100MB)</Label>
+                <Input type="file" onChange={e => handleDocFileSelect(e.target.files?.[0] ?? null)} className="bg-secondary/50" />
+                {docFile && <p className="text-xs text-muted-foreground">{docFile.name} ({(docFile.size / (1024 * 1024)).toFixed(1)}MB)</p>}
+                {editingDoc && !docFile && <p className="text-xs text-muted-foreground">Dejá vacío para conservar el archivo actual.</p>}
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs">Descripción (opcional)</Label>
               <Textarea value={docForm.description} onChange={e => setDocForm({ ...docForm, description: e.target.value })} className="bg-secondary/50" rows={3} />
