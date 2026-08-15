@@ -19,6 +19,7 @@ import {
   DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
+import ReferidosClienteTab from '@/components/closers/ReferidosClienteTab';
 import type { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { Phone, Users, CheckCircle, DollarSign, TrendingUp, TrendingDown, Plus, Columns3, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
@@ -1464,6 +1465,7 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
         <TabsList>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="crm">CRM</TabsTrigger>
+          {fixedClientId && <TabsTrigger value="referidos">Referidos</TabsTrigger>}
         </TabsList>
 
         {/* ── TAB 1: Dashboard ── */}
@@ -1601,6 +1603,13 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── TAB 3: Referidos (solo en la ficha de un cliente puntual) ── */}
+        {fixedClientId && (
+          <TabsContent value="referidos" className="mt-4">
+            <ReferidosClienteTab clientId={fixedClientId} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* ── New Call Dialog ── */}

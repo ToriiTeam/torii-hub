@@ -4211,6 +4211,81 @@ export type Database = {
         }
         Relationships: []
       }
+      referidos: {
+        Row: {
+          client_id: string
+          created_at: string
+          fecha_cierre: string | null
+          fecha_contacto: string | null
+          fecha_pedido: string
+          ghl_contact_id: string | null
+          id: string
+          incentivo: string | null
+          notas: string | null
+          origen_call_id: string | null
+          perfil_referido: string | null
+          presentado_por: string | null
+          referido_nombre: string
+          referido_telefono: string | null
+          estado: string
+          updated_at: string
+          warm_intro: boolean
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          fecha_cierre?: string | null
+          fecha_contacto?: string | null
+          fecha_pedido?: string
+          ghl_contact_id?: string | null
+          id?: string
+          incentivo?: string | null
+          notas?: string | null
+          origen_call_id?: string | null
+          perfil_referido?: string | null
+          presentado_por?: string | null
+          referido_nombre: string
+          referido_telefono?: string | null
+          estado?: string
+          updated_at?: string
+          warm_intro?: boolean
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          fecha_cierre?: string | null
+          fecha_contacto?: string | null
+          fecha_pedido?: string
+          ghl_contact_id?: string | null
+          id?: string
+          incentivo?: string | null
+          notas?: string | null
+          origen_call_id?: string | null
+          perfil_referido?: string | null
+          presentado_por?: string | null
+          referido_nombre?: string
+          referido_telefono?: string | null
+          estado?: string
+          updated_at?: string
+          warm_intro?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referidos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referidos_origen_call_id_fkey"
+            columns: ["origen_call_id"]
+            isOneToOne: false
+            referencedRelation: "client_closer_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registro_semanal_fullfillment: {
         Row: {
           agendas_generadas: number | null
