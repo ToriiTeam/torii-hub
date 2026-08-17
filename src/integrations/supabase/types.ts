@@ -1095,6 +1095,51 @@ export type Database = {
         }
         Relationships: []
       }
+      client_activity_log: {
+        Row: {
+          client_id: string
+          created_at: string
+          cuello_de_botella_id: string | null
+          fecha: string
+          id: string
+          texto: string
+          tipo: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          cuello_de_botella_id?: string | null
+          fecha?: string
+          id?: string
+          texto: string
+          tipo: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          cuello_de_botella_id?: string | null
+          fecha?: string
+          id?: string
+          texto?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_activity_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_activity_log_cuello_de_botella_id_fkey"
+            columns: ["cuello_de_botella_id"]
+            isOneToOne: false
+            referencedRelation: "cuellos_de_botella"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_closer_calls: {
         Row: {
           ad_id: string | null
@@ -2145,18 +2190,22 @@ export type Database = {
         Row: {
           canal: string | null
           canal_captacion: string | null
+          ciclo_venta_semanas: number
+          comision_promedio_poliza: number
           contract_days: number | null
           country: string | null
           created_at: string
           days_in_phase: number | null
           email: string | null
           end_date: string | null
+          engage_ok: boolean
           fase: string | null
           fecha_cancelacion: string | null
           ghl_calendar_id: string | null
           ghl_location_id: string | null
           id: string
           installment_amount: number | null
+          meta_ad_account_id: string | null
           motivo_cancelacion: string | null
           mrr: number | null
           name: string
@@ -2184,18 +2233,22 @@ export type Database = {
         Insert: {
           canal?: string | null
           canal_captacion?: string | null
+          ciclo_venta_semanas?: number
+          comision_promedio_poliza?: number
           contract_days?: number | null
           country?: string | null
           created_at?: string
           days_in_phase?: number | null
           email?: string | null
           end_date?: string | null
+          engage_ok?: boolean
           fase?: string | null
           fecha_cancelacion?: string | null
           ghl_calendar_id?: string | null
           ghl_location_id?: string | null
           id?: string
           installment_amount?: number | null
+          meta_ad_account_id?: string | null
           motivo_cancelacion?: string | null
           mrr?: number | null
           name: string
@@ -2223,18 +2276,22 @@ export type Database = {
         Update: {
           canal?: string | null
           canal_captacion?: string | null
+          ciclo_venta_semanas?: number
+          comision_promedio_poliza?: number
           contract_days?: number | null
           country?: string | null
           created_at?: string
           days_in_phase?: number | null
           email?: string | null
           end_date?: string | null
+          engage_ok?: boolean
           fase?: string | null
           fecha_cancelacion?: string | null
           ghl_calendar_id?: string | null
           ghl_location_id?: string | null
           id?: string
           installment_amount?: number | null
+          meta_ad_account_id?: string | null
           motivo_cancelacion?: string | null
           mrr?: number | null
           name?: string
@@ -3012,6 +3069,66 @@ export type Database = {
           },
         ]
       }
+      cuellos_de_botella: {
+        Row: {
+          categoria: string
+          client_id: string
+          created_at: string
+          estado: string
+          fecha_inicio: string
+          fecha_resolucion: string | null
+          id: string
+          motivo: string
+          plan_contingencia: string
+          resultado: string | null
+          roadmap_process_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          categoria: string
+          client_id: string
+          created_at?: string
+          estado?: string
+          fecha_inicio?: string
+          fecha_resolucion?: string | null
+          id?: string
+          motivo: string
+          plan_contingencia: string
+          resultado?: string | null
+          roadmap_process_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          client_id?: string
+          created_at?: string
+          estado?: string
+          fecha_inicio?: string
+          fecha_resolucion?: string | null
+          id?: string
+          motivo?: string
+          plan_contingencia?: string
+          resultado?: string | null
+          roadmap_process_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cuellos_de_botella_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cuellos_de_botella_roadmap_process_id_fkey"
+            columns: ["roadmap_process_id"]
+            isOneToOne: false
+            referencedRelation: "roadmap_processes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       debts: {
         Row: {
           amount: number
@@ -3367,6 +3484,53 @@ export type Database = {
           payment_date?: number | null
         }
         Relationships: []
+      }
+      hipotesis: {
+        Row: {
+          client_id: string
+          created_at: string
+          estado: string
+          fecha: string
+          id: string
+          metrica: string | null
+          responsable: string | null
+          resultado: string | null
+          texto: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          estado?: string
+          fecha?: string
+          id?: string
+          metrica?: string | null
+          responsable?: string | null
+          resultado?: string | null
+          texto: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          estado?: string
+          fecha?: string
+          id?: string
+          metrica?: string | null
+          responsable?: string | null
+          resultado?: string | null
+          texto?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hipotesis_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hitos_cliente: {
         Row: {
@@ -4215,6 +4379,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          estado: string
           fecha_cierre: string | null
           fecha_contacto: string | null
           fecha_pedido: string
@@ -4227,16 +4392,16 @@ export type Database = {
           presentado_por: string | null
           referido_nombre: string
           referido_telefono: string | null
-          estado: string
           updated_at: string
           warm_intro: boolean
         }
         Insert: {
           client_id: string
           created_at?: string
+          estado?: string
           fecha_cierre?: string | null
           fecha_contacto?: string | null
-          fecha_pedido?: string
+          fecha_pedido: string
           ghl_contact_id?: string | null
           id?: string
           incentivo?: string | null
@@ -4246,13 +4411,13 @@ export type Database = {
           presentado_por?: string | null
           referido_nombre: string
           referido_telefono?: string | null
-          estado?: string
           updated_at?: string
           warm_intro?: boolean
         }
         Update: {
           client_id?: string
           created_at?: string
+          estado?: string
           fecha_cierre?: string | null
           fecha_contacto?: string | null
           fecha_pedido?: string
@@ -4265,7 +4430,6 @@ export type Database = {
           presentado_por?: string | null
           referido_nombre?: string
           referido_telefono?: string | null
-          estado?: string
           updated_at?: string
           warm_intro?: boolean
         }
@@ -6371,11 +6535,40 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_scorecard_salud: {
+        Args: { p_client_id: string }
+        Returns: {
+          ciclo_venta: number
+          cierres_esperados_be: number
+          cierres_pago_acum: number
+          cierres_referido_acum: number
+          client_id: string
+          close_rate_real: number
+          comision: number
+          conversion: string
+          costo_total: number
+          dias_desde_arranque_real: number
+          effective_start_date: string
+          engage_ok: boolean
+          entrega: string
+          mes_actual: number
+          n_breakeven: number
+          objetivo_verde: number
+          pauta_acumulada: number
+          shows_calif_acum: number
+          shows_esperados_be: number
+          shows_esperados_verde: number
+          sin_campana: boolean
+          veredicto: string
+        }[]
+      }
       get_weekly_automatic_metrics: {
         Args: { p_client_id: string; p_week_end: string; p_week_start: string }
         Returns: {
           agendas_generadas: number
           calificados: number
+          calificados_closer: number
+          cerrados: number
           cpbc: number
           cpl: number
           inversion: number
@@ -6383,6 +6576,8 @@ export type Database = {
           llamadas_realizadas: number
           no_shows: number
           show_rate: number
+          tasa_calificacion: number
+          tasa_cierre: number
         }[]
       }
       has_role: {

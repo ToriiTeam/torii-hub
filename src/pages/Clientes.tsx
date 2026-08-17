@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Plus, Search, Ban, Edit2, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { veredictoColor, veredictoLabel, veredictoDetail, type ScorecardSalud, type VeredictoColor } from '@/features/clientes/lib/scorecardVeredicto';
 
 type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
@@ -66,6 +67,23 @@ const renewalRiskColors: Record<string, string> = {
   high: 'bg-destructive/20 text-destructive',
 };
 
+// Franja lateral de la tarjeta + badge de veredicto (Scorecard de Salud,
+// get_scorecard_salud). 'neutro' cubre tanto sin_campana=true como el
+// estado transitorio "todavía no cargó".
+const veredictoBorderColors: Record<VeredictoColor, string> = {
+  verde: 'border-l-success',
+  rojo: 'border-l-destructive',
+  amarillo: 'border-l-warning',
+  neutro: 'border-l-muted-foreground/30',
+};
+
+const veredictoBadgeColors: Record<VeredictoColor, string> = {
+  verde: 'bg-success/20 text-success',
+  rojo: 'bg-destructive/20 text-destructive',
+  amarillo: 'bg-warning/20 text-warning',
+  neutro: 'bg-muted text-muted-foreground',
+};
+
 const emptyForm = {
   name: '', email: '', phone: '', offer_type: 'DFY' as OfferType,
   start_date: '', end_date: '', status: 'active' as ClientStatus,
@@ -84,6 +102,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [installments, setInstallments] = useState<{ client_id: string; amount: number; paid: boolean }[]>([]);
+  const [scorecards, setScorecards] = useState<Record<string, ScorecardSalud>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -106,6 +125,34 @@ export default function Clientes() {
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (installmentsRes.data) setInstallments(installmentsRes.data);
     setLoading(false);
+
+    const activeIds = (clientsRes.data ?? [])
+      .filter((c) => c.status === 'active')
+      .map((c) => c.id as string);
+    fetchScorecards(activeIds);
+  };
+
+  // Scorecard de Salud (get_scorecard_salud) — solo para clientes activos.
+  // Cada llamada es independiente: si una falla, el resto sigue mostrando
+  // su color y esa tarjeta queda en estado neutro/"Cargando…".
+  const fetchScorecards = async (activeClientIds: string[]) => {
+    const results = await Promise.all(
+      activeClientIds.map(async (id) => {
+        const { data, error } = await supabase.rpc('get_scorecard_salud', { p_client_id: id });
+        if (error) {
+          console.error('[Clientes] get_scorecard_salud failed for', id, error.message);
+          return null;
+        }
+        return (data?.[0] as ScorecardSalud | undefined) ?? null;
+      }),
+    );
+    setScorecards((prev) => {
+      const next = { ...prev };
+      results.forEach((row, i) => {
+        if (row) next[activeClientIds[i]] = row;
+      });
+      return next;
+    });
   };
 
   const filtered = clients.filter(c => {
@@ -329,10 +376,15 @@ export default function Clientes() {
             const progress = client.total_installments > 0
               ? (client.paid_installments / client.total_installments) * 100
               : 0;
+            const scorecard = client.status === 'active' ? scorecards[client.id] : undefined;
+            const health = client.status === 'active' ? veredictoColor(scorecard) : null;
             return (
               <Card
                 key={client.id}
-                className="bg-card border-border/50 hover:border-primary/30 cursor-pointer transition-all"
+                className={cn(
+                  'bg-card border-border/50 hover:border-primary/30 cursor-pointer transition-all',
+                  health && cn('border-l-4', veredictoBorderColors[health]),
+                )}
                 onClick={() => navigate(`/clientes/${client.id}`)}
               >
                 <CardContent className="p-4">
@@ -350,6 +402,15 @@ export default function Clientes() {
                       {statusLabels[client.status]}
                     </Badge>
                   </div>
+
+                  {health && (
+                    <Badge
+                      title={veredictoDetail(scorecard)}
+                      className={cn('text-xs border-0 mb-2 whitespace-normal text-left', veredictoBadgeColors[health])}
+                    >
+                      {veredictoLabel(scorecard)}
+                    </Badge>
+                  )}
 
                   {client.task_phase && (
                     <p className="text-xs text-muted-foreground mb-2 truncate">{client.task_phase}</p>
