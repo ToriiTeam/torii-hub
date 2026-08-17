@@ -4,7 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -12,10 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Search, Ban, Edit2, User, AlertTriangle } from 'lucide-react';
+import { Plus, Search, AlertTriangle, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { veredictoColor, veredictoLabel, veredictoDetail, type ScorecardSalud, type VeredictoColor } from '@/features/clientes/lib/scorecardVeredicto';
-import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
+import { veredictoColor, veredictoDetail, type ScorecardSalud, type VeredictoColor } from '@/features/clientes/lib/scorecardVeredicto';
 
 type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
@@ -62,27 +60,22 @@ const statusLabels: Record<ClientStatus, string> = {
   cancelled: 'Cancelado',
 };
 
-const renewalRiskColors: Record<string, string> = {
-  low: 'bg-success/20 text-success',
-  medium: 'bg-warning/20 text-warning',
-  high: 'bg-destructive/20 text-destructive',
+// Franja superior + dot de la tarjeta (Scorecard de Salud, get_scorecard_salud).
+// 'neutro' cubre tanto sin_campana=true como el estado transitorio "todavía
+// no cargó" — mismos tokens de tema en las dos variantes (top bar y dot),
+// no los hex literales del mockup.
+const veredictoBarColors: Record<VeredictoColor, string> = {
+  verde: 'border-t-success',
+  rojo: 'border-t-destructive',
+  amarillo: 'border-t-warning',
+  neutro: 'border-t-muted-foreground/30',
 };
 
-// Franja lateral de la tarjeta + badge de veredicto (Scorecard de Salud,
-// get_scorecard_salud). 'neutro' cubre tanto sin_campana=true como el
-// estado transitorio "todavía no cargó".
-const veredictoBorderColors: Record<VeredictoColor, string> = {
-  verde: 'border-l-success',
-  rojo: 'border-l-destructive',
-  amarillo: 'border-l-warning',
-  neutro: 'border-l-muted-foreground/30',
-};
-
-const veredictoBadgeColors: Record<VeredictoColor, string> = {
-  verde: 'bg-success/20 text-success',
-  rojo: 'bg-destructive/20 text-destructive',
-  amarillo: 'bg-warning/20 text-warning',
-  neutro: 'bg-muted text-muted-foreground',
+const veredictoDotColors: Record<VeredictoColor, string> = {
+  verde: 'bg-success',
+  rojo: 'bg-destructive',
+  amarillo: 'bg-warning',
+  neutro: 'bg-muted-foreground/40',
 };
 
 const emptyForm = {
@@ -100,25 +93,29 @@ export default function Clientes() {
   const [installments, setInstallments] = useState<{ client_id: string; amount: number; paid: boolean }[]>([]);
   const [scorecards, setScorecards] = useState<Record<string, ScorecardSalud>>({});
   const [bottlenecks, setBottlenecks] = useState<Record<string, { count: number; nombre: string }>>({});
+  const [lastActivity, setLastActivity] = useState<Record<string, { texto: string; fecha: string }>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [showCancelled, setShowCancelled] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState<Client | null>(null);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsRes, installmentsRes, bottlenecksRes] = await Promise.all([
+    const [clientsRes, installmentsRes, bottlenecksRes, activityRes] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('client_installments').select('client_id, amount, paid'),
       // Misma query que usaba el viejo Dashboard Global (ClientesGlobalDashboard.tsx)
       // para procesos bloqueados — fusionada acá en vez de en una página aparte.
       supabase.from('roadmap_processes').select('id, nombre, client_id').eq('status', 'bloqueado'),
+      // Última actividad por cliente — client_activity_log (Delivery OS) recién
+      // se creó y todavía no lo puebla nada, así que hoy esto vuelve vacío y
+      // cada card cae en el fallback "Sin actividad registrada". Ya queda
+      // conectado de verdad: en cuanto haya filas, aparecen solas.
+      supabase.from('client_activity_log').select('client_id, texto, fecha').order('fecha', { ascending: false }),
     ]);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (installmentsRes.data) setInstallments(installmentsRes.data);
@@ -132,6 +129,15 @@ export default function Clientes() {
         else byClient[row.client_id] = { count: 1, nombre: row.nombre };
       }
       setBottlenecks(byClient);
+    }
+    if (activityRes.error) {
+      console.error('[Clientes] last activity query failed:', activityRes.error.message);
+    } else {
+      const byClient: Record<string, { texto: string; fecha: string }> = {};
+      for (const row of activityRes.data ?? []) {
+        if (!byClient[row.client_id]) byClient[row.client_id] = { texto: row.texto, fecha: row.fecha };
+      }
+      setLastActivity(byClient);
     }
     setLoading(false);
 
@@ -173,29 +179,11 @@ export default function Clientes() {
 
   const resetForm = () => {
     setForm(emptyForm);
-    setEditingClient(null);
     setDialogOpen(false);
   };
 
-  const openEdit = (client: Client, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingClient(client);
-    setForm({
-      name: client.name, email: client.email || '', phone: client.phone || '',
-      offer_type: client.offer_type, start_date: client.start_date || '',
-      end_date: client.end_date || '', status: client.status,
-      payment_type: client.payment_type,
-      total_installments: client.total_installments.toString(),
-      paid_installments: client.paid_installments.toString(),
-      installment_amount: client.installment_amount.toString(),
-      total_amount: (client.total_amount || 0).toString(),
-      next_due_date: client.next_due_date || '', platform: client.platform,
-      platform_fee: client.platform_fee.toString(),
-      country: client.country || '', notes: client.notes || '',
-    });
-    setDialogOpen(true);
-  };
-
+  // Alta únicamente — editar un cliente existente vive en ClienteDetalle.tsx
+  // (botón "Editar" del header → TabFichaBasica), no acá.
   const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
     const data = {
@@ -211,22 +199,11 @@ export default function Clientes() {
       platform_fee: parseFloat(form.platform_fee) || 0,
       country: form.country || null, notes: form.notes || null,
     };
-    if (editingClient) {
-      const { error } = await supabase.from('clients').update(data).eq('id', editingClient.id);
-      if (error) { toast.error('Error al actualizar'); return; }
-      toast.success('Cliente actualizado');
-    } else {
-      const { error } = await supabase.from('clients').insert(data);
-      if (error) { toast.error('Error al crear'); return; }
-      toast.success('Cliente agregado');
-    }
+    const { error } = await supabase.from('clients').insert(data);
+    if (error) { toast.error('Error al crear'); return; }
+    toast.success('Cliente agregado');
     resetForm();
     fetchData();
-  };
-
-  const openCancel = (client: Client, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCancelTarget(client);
   };
 
   const activeClients = clients.filter(c => c.status === 'active');
@@ -249,7 +226,7 @@ export default function Clientes() {
     <>
       <Dialog open={dialogOpen} onOpenChange={open => { setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingClient ? 'Editar' : 'Nuevo'} Cliente</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nuevo Cliente</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="grid grid-cols-2 gap-4">
               <div><Label>Cliente *</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="bg-secondary/50" /></div>
@@ -310,7 +287,7 @@ export default function Clientes() {
             <div><Label>Notas</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="bg-secondary/50" /></div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={resetForm}>Cancelar</Button>
-              <Button onClick={handleSubmit} className="bg-primary">{editingClient ? 'Guardar' : 'Agregar'}</Button>
+              <Button onClick={handleSubmit} className="bg-primary">Agregar</Button>
             </div>
           </div>
         </DialogContent>
@@ -362,49 +339,80 @@ export default function Clientes() {
         {/* Clients Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map(client => {
-            const progress = client.total_installments > 0
-              ? (client.paid_installments / client.total_installments) * 100
-              : 0;
-            const scorecard = client.status === 'active' ? scorecards[client.id] : undefined;
-            const health = client.status === 'active' ? veredictoColor(scorecard) : null;
-            const bottleneck = client.status === 'active' ? bottlenecks[client.id] : undefined;
+            const isActive = client.status === 'active';
+            const scorecard = isActive ? scorecards[client.id] : undefined;
+            const health = isActive ? veredictoColor(scorecard) : null;
+            const bottleneck = isActive ? bottlenecks[client.id] : undefined;
+            const activity = lastActivity[client.id];
+
+            // undefined = todavía no llegó la respuesta de get_scorecard_salud
+            // (distinto de sin_campana=true, que sí llegó y no tiene datos).
+            const scorecardLoading = isActive && !scorecard;
+            const sinCampana = scorecard?.sin_campana === true;
+
             return (
               <Card
                 key={client.id}
                 className={cn(
                   'bg-card border-border/50 hover:border-primary/30 cursor-pointer transition-all',
-                  health && cn('border-l-4', veredictoBorderColors[health]),
+                  !isActive && 'opacity-70',
+                  health && cn('border-t-4', veredictoBarColors[health]),
                 )}
                 onClick={() => navigate(`/clientes/${client.id}`)}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <User className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-semibold truncate">{client.name}</h3>
-                        <p className="text-xs text-muted-foreground truncate">{client.email || 'Sin email'}</p>
-                      </div>
-                    </div>
-                    <Badge className={cn('text-xs border-0 flex-shrink-0', statusColors[client.status])}>
-                      {statusLabels[client.status]}
-                    </Badge>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-sm truncate">{client.name}</h3>
+                    {isActive ? (
+                      <span
+                        className={cn('h-2.5 w-2.5 rounded-full flex-shrink-0', health && veredictoDotColors[health])}
+                        title={veredictoDetail(scorecard)}
+                      />
+                    ) : (
+                      <Badge className={cn('text-xs border-0 flex-shrink-0', statusColors[client.status])}>
+                        {statusLabels[client.status]}
+                      </Badge>
+                    )}
                   </div>
 
-                  {health && (
-                    <Badge
-                      title={veredictoDetail(scorecard)}
-                      className={cn('text-xs border-0 mb-2 whitespace-normal text-left', veredictoBadgeColors[health])}
-                    >
-                      {veredictoLabel(scorecard)}
-                    </Badge>
+                  {isActive && (
+                    <div className="flex flex-col gap-1 text-xs">
+                      {scorecardLoading ? (
+                        <span className="text-muted-foreground">Cargando salud…</span>
+                      ) : sinCampana ? null : (
+                        <>
+                          <EntregaConversionRow
+                            good={scorecard!.entrega === 'Verde' || scorecard!.entrega === 'OK'}
+                            label={(scorecard!.entrega === 'Verde' || scorecard!.entrega === 'OK') ? 'Entrega buena' : 'Entrega mala'}
+                          />
+                          {scorecard!.conversion === 'Sin data' ? (
+                            <span className="flex items-center gap-1 text-muted-foreground">
+                              Conversión: sin datos suficientes
+                            </span>
+                          ) : (
+                            <EntregaConversionRow
+                              good={scorecard!.conversion === 'OK'}
+                              label={scorecard!.conversion === 'OK' ? 'Conversión buena' : 'Conversión mala'}
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
                   )}
+
+                  <p className="text-xs text-muted-foreground/70">
+                    {!isActive
+                      ? null
+                      : sinCampana
+                        ? 'Sin campaña activa'
+                        : scorecard
+                          ? `Día ${scorecard.dias_desde_arranque_real + 1} de campaña`
+                          : null}
+                  </p>
 
                   {bottleneck && (
                     <p
-                      className="flex items-center gap-1 text-xs text-warning mb-2 truncate"
+                      className="flex items-center gap-1 text-xs text-warning truncate"
                       title={bottleneck.count === 1 ? bottleneck.nombre : `${bottleneck.count} procesos bloqueados`}
                     >
                       <AlertTriangle className="h-3 w-3 flex-shrink-0" />
@@ -414,45 +422,10 @@ export default function Clientes() {
                     </p>
                   )}
 
-                  {client.task_phase && (
-                    <p className="text-xs text-muted-foreground mb-2 truncate">{client.task_phase}</p>
-                  )}
-
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3 flex-wrap">
-                    <span>{client.offer_type}</span>
-                    <span>•</span>
-                    <span>{client.country || 'Sin país'}</span>
-                    {client.renewal_risk && client.renewal_risk !== 'low' && (
-                      <>
-                        <span>•</span>
-                        <Badge className={cn('text-xs border-0 px-1.5 py-0', renewalRiskColors[client.renewal_risk])}>
-                          riesgo {client.renewal_risk}
-                        </Badge>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">
-                      Cuotas: {client.paid_installments}/{client.total_installments}
-                    </span>
-                    <span className="font-medium">${(client.total_amount || 0).toLocaleString()}</span>
-                  </div>
-                  <Progress value={progress} className="h-1.5 mb-3" />
-
-                  <div
-                    className="flex items-center justify-end gap-1 pt-2 border-t border-border/30"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => openEdit(client, e)}>
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                    {client.status !== 'cancelled' && (
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={e => openCancel(client, e)} title="Cancelar cliente">
-                        <Ban className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
+                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground/70 truncate" title={activity?.fecha}>
+                    <Clock className="h-3 w-3 flex-shrink-0" />
+                    Última actividad: {activity?.texto || 'Sin actividad registrada'}
+                  </p>
                 </CardContent>
               </Card>
             );
@@ -496,13 +469,20 @@ export default function Clientes() {
           </Card>
         </div>
       </div>
-
-      <CancelClientDialog
-        client={cancelTarget}
-        open={!!cancelTarget}
-        onOpenChange={open => !open && setCancelTarget(null)}
-        onCancelled={fetchData}
-      />
     </>
+  );
+}
+
+// Fila "Entrega buena/mala" o "Conversión buena/mala" con flecha — buena en
+// verde apuntando arriba-derecha, mala en rojo apuntando abajo-derecha,
+// mismo criterio del mockup (la dirección de la flecha codifica "bien/mal",
+// no un valor que sube o baja).
+function EntregaConversionRow({ good, label }: { good: boolean; label: string }) {
+  const Icon = good ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span className={cn('flex items-center gap-1', good ? 'text-success' : 'text-destructive')}>
+      <Icon className="h-3 w-3 flex-shrink-0" />
+      {label}
+    </span>
   );
 }
