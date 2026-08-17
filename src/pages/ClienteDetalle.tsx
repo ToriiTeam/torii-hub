@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Edit2 } from 'lucide-react';
+import { ArrowLeft, Edit2, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
 import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
 import TabCreativosCliente from '@/components/clientes/TabCreativosCliente';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
@@ -82,6 +83,11 @@ export default function ClienteDetalle() {
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  // Contador (no boolean) para que el atajo del header dispare el modo
+  // edición de TabFichaBasica cada vez que se clickea, incluso si ya
+  // estabas en Estrategia/Ficha Básica y el valor "no cambiaría".
+  const [autoEditTrigger, setAutoEditTrigger] = useState(0);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   // Los 5 tabs son todos deep-linkeables — la URL es la única fuente de
   // verdad, sin estado local propio. Cambiar de tab (dashboard→closing) NO
@@ -149,11 +155,27 @@ export default function ClienteDetalle() {
           <Badge className={cn('text-sm border-0', statusColors[client.status])}>
             {statusLabels[client.status]}
           </Badge>
-          <Button variant="outline" size="sm" onClick={() => navigate('/clientes')}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setAutoEditTrigger((n) => n + 1); handleTabChange('estrategia'); }}
+          >
             <Edit2 className="h-4 w-4 mr-1.5" />Editar
           </Button>
+          {client.status !== 'cancelled' && (
+            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelDialogOpen(true)}>
+              <Ban className="h-4 w-4 mr-1.5" />Cancelar cliente
+            </Button>
+          )}
         </div>
       </div>
+
+      <CancelClientDialog
+        client={client}
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        onCancelled={fetchClient}
+      />
 
       {/* Tabs */}
       <Tabs value={effectiveTab} onValueChange={handleTabChange} className="space-y-4">
@@ -166,7 +188,7 @@ export default function ClienteDetalle() {
         </TabsList>
 
         <TabsContent value="estrategia">
-          <TabEstrategiaCliente client={client} onClientUpdate={fetchClient} />
+          <TabEstrategiaCliente client={client} onClientUpdate={fetchClient} autoEditTrigger={autoEditTrigger} />
         </TabsContent>
 
         <TabsContent value="creativos">

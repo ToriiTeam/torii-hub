@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
 import TabFichaBasica from '@/components/clientes/TabFichaBasica';
@@ -23,10 +23,18 @@ const SUB_TABS = [
 interface Props {
   client: Client;
   onClientUpdate: () => void;
+  // Contador bumpeado por el atajo "Editar" del header de ClienteDetalle —
+  // fuerza el sub-tab a "basica" (Ficha Básica no es el default) para que
+  // el modo edición de TabFichaBasica quede a la vista.
+  autoEditTrigger?: number;
 }
 
-export default function TabEstrategiaCliente({ client, onClientUpdate }: Props) {
+export default function TabEstrategiaCliente({ client, onClientUpdate, autoEditTrigger }: Props) {
   const [activeSubTab, setActiveSubTab] = useState('ficha');
+
+  useEffect(() => {
+    if (autoEditTrigger) setActiveSubTab('basica');
+  }, [autoEditTrigger]);
 
   return (
     <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="space-y-4">
@@ -42,7 +50,7 @@ export default function TabEstrategiaCliente({ client, onClientUpdate }: Props) 
         <TabFichaOperativa client={client} onClientUpdate={onClientUpdate} />
       </TabsContent>
       <TabsContent value="basica">
-        <TabFichaBasica client={client} onClientUpdate={onClientUpdate} />
+        <TabFichaBasica client={client} onClientUpdate={onClientUpdate} autoEditTrigger={autoEditTrigger} />
       </TabsContent>
       <TabsContent value="onboarding">
         <TabOnboarding clientId={client.id} />

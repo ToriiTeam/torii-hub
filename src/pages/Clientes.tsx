@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Plus, Search, Ban, Edit2, User, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { veredictoColor, veredictoLabel, veredictoDetail, type ScorecardSalud, type VeredictoColor } from '@/features/clientes/lib/scorecardVeredicto';
+import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
 
 type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
@@ -93,11 +94,6 @@ const emptyForm = {
   platform_fee: '2.9', country: '', notes: '',
 };
 
-const emptyCancelForm = {
-  motivo: '',
-  fecha: new Date().toISOString().slice(0, 10),
-};
-
 export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
@@ -112,8 +108,6 @@ export default function Clientes() {
   const [form, setForm] = useState(emptyForm);
   const [showCancelled, setShowCancelled] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Client | null>(null);
-  const [cancelForm, setCancelForm] = useState(emptyCancelForm);
-  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -233,26 +227,6 @@ export default function Clientes() {
   const openCancel = (client: Client, e: React.MouseEvent) => {
     e.stopPropagation();
     setCancelTarget(client);
-    setCancelForm(emptyCancelForm);
-  };
-
-  const handleCancelClient = async () => {
-    if (!cancelTarget) return;
-    if (!cancelForm.motivo.trim()) { toast.error('El motivo es requerido'); return; }
-    setCancelling(true);
-    const { error } = await supabase
-      .from('clients')
-      .update({
-        status: 'cancelled' as ClientStatus,
-        motivo_cancelacion: cancelForm.motivo.trim(),
-        fecha_cancelacion: cancelForm.fecha,
-      })
-      .eq('id', cancelTarget.id);
-    setCancelling(false);
-    if (error) { toast.error('Error al cancelar el cliente'); return; }
-    toast.success('Cliente cancelado');
-    setCancelTarget(null);
-    fetchData();
   };
 
   const activeClients = clients.filter(c => c.status === 'active');
@@ -523,46 +497,12 @@ export default function Clientes() {
         </div>
       </div>
 
-      <Dialog open={!!cancelTarget} onOpenChange={open => !open && setCancelTarget(null)}>
-        <DialogContent className="bg-card border-border max-w-md">
-          <DialogHeader><DialogTitle>Cancelar cliente</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            {cancelTarget?.name} pasará a estado <strong>Cancelado</strong> y dejará de contarse como cliente activo.
-            No se elimina ningún dato — todo su historial queda accesible.
-          </p>
-          <div className="space-y-3 mt-2">
-            <div>
-              <Label>Motivo de cancelación *</Label>
-              <Textarea
-                value={cancelForm.motivo}
-                onChange={e => setCancelForm({ ...cancelForm, motivo: e.target.value })}
-                className="bg-secondary/50 mt-1"
-                rows={3}
-                placeholder="Por qué se cancela este cliente..."
-              />
-            </div>
-            <div>
-              <Label>Fecha de cancelación</Label>
-              <Input
-                type="date"
-                value={cancelForm.fecha}
-                onChange={e => setCancelForm({ ...cancelForm, fecha: e.target.value })}
-                className="bg-secondary/50 mt-1"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => setCancelTarget(null)}>Volver</Button>
-            <Button
-              onClick={handleCancelClient}
-              disabled={cancelling || !cancelForm.motivo.trim()}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {cancelling ? 'Cancelando…' : 'Confirmar cancelación'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CancelClientDialog
+        client={cancelTarget}
+        open={!!cancelTarget}
+        onOpenChange={open => !open && setCancelTarget(null)}
+        onCancelled={fetchData}
+      />
     </>
   );
 }

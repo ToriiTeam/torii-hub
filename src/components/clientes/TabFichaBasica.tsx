@@ -7,12 +7,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { DollarSign, CreditCard, Calendar, Edit2, X, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, differenceInDays, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { type Client } from '@/pages/ClienteDetalle';
+import { cn } from '@/lib/utils';
 
 interface Installment {
   installment_number: number;
@@ -23,6 +25,11 @@ interface Installment {
 }
 
 const PAYMENT_TYPES = ['Upfront', 'Mensual', 'Cuotas'] as const;
+// offer_type (DWY/DFY) y platform son distintos de payment_type/canal de
+// arriba — mismos valores que usa el diálogo de Clientes.tsx.
+const OFFER_TYPES = ['DWY', 'DFY'] as const;
+const OFFER_TYPE_LABELS: Record<string, string> = { DWY: 'DWY (Done With You)', DFY: 'DFY (Done For You)' };
+const PLATFORMS = ['Stripe', 'Binance', 'Transfer'] as const;
 
 // Mirrors the CHECK constraint on clients.canal_captacion exactly — how
 // Torii itself acquired this client, not the client's own marketing
@@ -65,11 +72,19 @@ interface FormState {
   canal: string;
   canal_captacion: string;
   oferta: string;
+  offer_type: string;
   start_date: string;
+  end_date: string;
   payment_type: string;
   total_installments: string;
   paid_installments: string;
+  installment_amount: string;
+  total_amount: string;
+  next_due_date: string;
+  platform: string;
+  platform_fee: string;
   mrr: string;
+  notes: string;
 }
 
 function toForm(client: Client): FormState {
@@ -81,23 +96,38 @@ function toForm(client: Client): FormState {
     canal: client.canal ?? '',
     canal_captacion: client.canal_captacion ?? NONE,
     oferta: client.oferta ?? NONE,
+    offer_type: client.offer_type ?? OFFER_TYPES[0],
     start_date: client.start_date ?? '',
+    end_date: client.end_date ?? '',
     payment_type: client.payment_type ?? '',
     total_installments: client.total_installments?.toString() ?? '',
     paid_installments: client.paid_installments?.toString() ?? '',
+    installment_amount: client.installment_amount?.toString() ?? '',
+    total_amount: client.total_amount?.toString() ?? '',
+    next_due_date: client.next_due_date ?? '',
+    platform: client.platform ?? PLATFORMS[0],
+    platform_fee: client.platform_fee?.toString() ?? '',
     mrr: client.mrr?.toString() ?? '',
+    notes: client.notes ?? '',
   };
 }
 
 interface Props {
   client: Client;
   onClientUpdate: () => void;
+  // Contador bumpeado desde el atajo "Editar" del header de ClienteDetalle
+  // (vía TabEstrategiaCliente) — cualquier cambio de valor fuerza modo edición.
+  autoEditTrigger?: number;
 }
 
-export default function TabFichaBasica({ client, onClientUpdate }: Props) {
+export default function TabFichaBasica({ client, onClientUpdate, autoEditTrigger }: Props) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormState>(toForm(client));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (autoEditTrigger) setEditing(true);
+  }, [autoEditTrigger]);
 
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [loadingInstallments, setLoadingInstallments] = useState(true);
@@ -133,11 +163,19 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
         canal: form.canal || null,
         canal_captacion: form.canal_captacion === NONE ? null : form.canal_captacion,
         oferta: form.oferta === NONE ? null : form.oferta,
+        offer_type: (form.offer_type || null) as 'DWY' | 'DFY' | null,
         start_date: form.start_date || null,
-        payment_type: form.payment_type || null,
+        end_date: form.end_date || null,
+        payment_type: (form.payment_type || null) as 'Upfront' | 'Mensual' | 'Cuotas' | null,
         total_installments: form.total_installments ? parseInt(form.total_installments) : null,
         paid_installments: form.paid_installments ? parseInt(form.paid_installments) : null,
+        installment_amount: form.installment_amount ? parseFloat(form.installment_amount) : null,
+        total_amount: form.total_amount ? parseFloat(form.total_amount) : null,
+        next_due_date: form.next_due_date || null,
+        platform: (form.platform || null) as 'Stripe' | 'Binance' | 'Transfer' | null,
+        platform_fee: form.platform_fee ? parseFloat(form.platform_fee) : null,
         mrr: form.mrr ? parseFloat(form.mrr) : null,
+        notes: form.notes || null,
       })
       .eq('id', client.id);
     setSaving(false);
@@ -223,8 +261,21 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
                 </Select>
               ) : <Value>{client.oferta || '—'}</Value>}
             </Field>
+            <Field label="Tipo de oferta">
+              {editing ? (
+                <Select value={form.offer_type} onValueChange={(v) => upd('offer_type', v)}>
+                  <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {OFFER_TYPES.map((t) => <SelectItem key={t} value={t}>{OFFER_TYPE_LABELS[t]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : <Value>{client.offer_type || '—'}</Value>}
+            </Field>
             <Field label="Fecha de inicio">
               {editing ? <Input type="date" value={form.start_date} onChange={(e) => upd('start_date', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{fmtDate(client.start_date)}</Value>}
+            </Field>
+            <Field label="Fecha de fin">
+              {editing ? <Input type="date" value={form.end_date} onChange={(e) => upd('end_date', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{fmtDate(client.end_date)}</Value>}
             </Field>
             <Field label="Días activo">
               <Value>{days != null ? `${days} días` : '—'}</Value>
@@ -250,6 +301,31 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
             </Field>
             <Field label="MRR">
               {editing ? <Input type="number" min={0} value={form.mrr} onChange={(e) => upd('mrr', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{client.mrr != null ? `$${Number(client.mrr).toLocaleString()}` : '—'}</Value>}
+            </Field>
+            <Field label="Monto total del contrato">
+              {editing ? <Input type="number" min={0} value={form.total_amount} onChange={(e) => upd('total_amount', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{client.total_amount != null ? `$${Number(client.total_amount).toLocaleString()}` : '—'}</Value>}
+            </Field>
+            <Field label="Monto por cuota">
+              {editing ? <Input type="number" min={0} value={form.installment_amount} onChange={(e) => upd('installment_amount', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{client.installment_amount != null ? `$${Number(client.installment_amount).toLocaleString()}` : '—'}</Value>}
+            </Field>
+            <Field label="Próximo vencimiento">
+              {editing ? <Input type="date" value={form.next_due_date} onChange={(e) => upd('next_due_date', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{fmtDate(client.next_due_date)}</Value>}
+            </Field>
+            <Field label="Plataforma de pago">
+              {editing ? (
+                <Select value={form.platform} onValueChange={(v) => upd('platform', v)}>
+                  <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : <Value>{client.platform || '—'}</Value>}
+            </Field>
+            <Field label="Fee de plataforma (%)">
+              {editing ? <Input type="number" min={0} step="0.1" value={form.platform_fee} onChange={(e) => upd('platform_fee', e.target.value)} className="bg-secondary/50 h-8 text-sm" /> : <Value>{client.platform_fee != null ? `${client.platform_fee}%` : '—'}</Value>}
+            </Field>
+            <Field label="Notas" full>
+              {editing ? <Textarea value={form.notes} onChange={(e) => upd('notes', e.target.value)} className="bg-secondary/50 text-sm" rows={3} /> : <Value>{client.notes || '—'}</Value>}
             </Field>
           </div>
         </CardContent>
@@ -312,9 +388,9 @@ export default function TabFichaBasica({ client, onClientUpdate }: Props) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
-    <div className="space-y-1">
+    <div className={cn('space-y-1', full && 'col-span-2 sm:col-span-3')}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
