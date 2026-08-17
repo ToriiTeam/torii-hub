@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Plus, Search, Ban, Edit2, User } from 'lucide-react';
+import { Plus, Search, Ban, Edit2, User, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { veredictoColor, veredictoLabel, veredictoDetail, type ScorecardSalud, type VeredictoColor } from '@/features/clientes/lib/scorecardVeredicto';
 
@@ -103,6 +103,7 @@ export default function Clientes() {
   const [clients, setClients] = useState<Client[]>([]);
   const [installments, setInstallments] = useState<{ client_id: string; amount: number; paid: boolean }[]>([]);
   const [scorecards, setScorecards] = useState<Record<string, ScorecardSalud>>({});
+  const [bottlenecks, setBottlenecks] = useState<Record<string, { count: number; nombre: string }>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -118,12 +119,26 @@ export default function Clientes() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsRes, installmentsRes] = await Promise.all([
+    const [clientsRes, installmentsRes, bottlenecksRes] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
       supabase.from('client_installments').select('client_id, amount, paid'),
+      // Misma query que usaba el viejo Dashboard Global (ClientesGlobalDashboard.tsx)
+      // para procesos bloqueados — fusionada acá en vez de en una página aparte.
+      supabase.from('roadmap_processes').select('id, nombre, client_id').eq('status', 'bloqueado'),
     ]);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
     if (installmentsRes.data) setInstallments(installmentsRes.data);
+    if (bottlenecksRes.error) {
+      console.error('[Clientes] bottlenecks query failed:', bottlenecksRes.error.message);
+    } else {
+      const byClient: Record<string, { count: number; nombre: string }> = {};
+      for (const row of bottlenecksRes.data ?? []) {
+        const existing = byClient[row.client_id];
+        if (existing) existing.count += 1;
+        else byClient[row.client_id] = { count: 1, nombre: row.nombre };
+      }
+      setBottlenecks(byClient);
+    }
     setLoading(false);
 
     const activeIds = (clientsRes.data ?? [])
@@ -378,6 +393,7 @@ export default function Clientes() {
               : 0;
             const scorecard = client.status === 'active' ? scorecards[client.id] : undefined;
             const health = client.status === 'active' ? veredictoColor(scorecard) : null;
+            const bottleneck = client.status === 'active' ? bottlenecks[client.id] : undefined;
             return (
               <Card
                 key={client.id}
@@ -410,6 +426,18 @@ export default function Clientes() {
                     >
                       {veredictoLabel(scorecard)}
                     </Badge>
+                  )}
+
+                  {bottleneck && (
+                    <p
+                      className="flex items-center gap-1 text-xs text-warning mb-2 truncate"
+                      title={bottleneck.count === 1 ? bottleneck.nombre : `${bottleneck.count} procesos bloqueados`}
+                    >
+                      <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">
+                        {bottleneck.count === 1 ? `1 bloqueado: ${bottleneck.nombre}` : `${bottleneck.count} bloqueados`}
+                      </span>
+                    </p>
                   )}
 
                   {client.task_phase && (

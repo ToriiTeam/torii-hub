@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { ChevronLeft, ChevronRight, ChevronsUpDown, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsUpDown } from 'lucide-react';
 
 interface ClientOption {
   id: string;
@@ -29,11 +29,11 @@ export function ClientNavSection() {
 
   // Cliente activo se deriva de la URL, no de estado propio — así el
   // selector siempre refleja dónde estás, incluso llegando por link directo.
-  const match = location.pathname.match(/^\/clientes\/([^/]+)/);
-  const rawId = match?.[1];
-  const isGlobal = rawId === 'global';
-  const currentId = rawId && !isGlobal ? rawId : null;
-  const currentIndex = currentId ? clients.findIndex((c) => c.id === currentId) : -1;
+  // "Global" es cualquier path bajo /clientes que no resuelva a un cliente
+  // real (la grilla en /clientes, o la vieja /clientes/global si alguien
+  // la visita directo — ya no se le linkea desde acá, ver punto D).
+  const rawId = location.pathname.match(/^\/clientes\/([^/]+)/)?.[1];
+  const currentIndex = rawId ? clients.findIndex((c) => c.id === rawId) : -1;
   const currentClient = currentIndex >= 0 ? clients[currentIndex] : null;
 
   function goTo(id: string) {
@@ -49,15 +49,18 @@ export function ClientNavSection() {
     if (currentIndex >= 0 && currentIndex < clients.length - 1) navigate(`/clientes/${clients[currentIndex + 1].id}`);
   }
 
-  const subItems = isGlobal || !currentClient
-    ? [{ label: 'Dashboard', href: '/clientes/global' }]
-    : [
+  // Sin cliente activo: "Global" es la grilla de tarjetas en /clientes
+  // (fusionada con lo que antes era el Dashboard aparte) — no hay sub-nav
+  // propia, todo vive en esa única pantalla.
+  const subItems = currentClient
+    ? [
         { label: 'Estrategia', href: `/clientes/${currentClient.id}` },
         { label: 'Creativos', href: `/clientes/${currentClient.id}/creativos` },
         { label: 'Dashboard', href: `/clientes/${currentClient.id}/dashboard` },
         { label: 'Closing', href: `/clientes/${currentClient.id}/closing` },
         { label: 'Contenido Orgánico', href: `/clientes/${currentClient.id}/contenido` },
-      ];
+      ]
+    : [];
 
   return (
     <div className="space-y-1">
@@ -77,7 +80,7 @@ export function ClientNavSection() {
         <Popover open={comboOpen} onOpenChange={setComboOpen}>
           <PopoverTrigger asChild>
             <Button variant="ghost" className="flex-1 min-w-0 h-7 px-2 justify-between text-sm font-medium">
-              <span className="truncate">{isGlobal || !currentClient ? 'Global' : currentClient.name}</span>
+              <span className="truncate">{currentClient ? currentClient.name : 'Global'}</span>
               <ChevronsUpDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             </Button>
           </PopoverTrigger>
@@ -87,7 +90,7 @@ export function ClientNavSection() {
               <CommandList>
                 <CommandEmpty>Sin resultados.</CommandEmpty>
                 <CommandGroup>
-                  <CommandItem value="Global" onSelect={() => { navigate('/clientes/global'); setComboOpen(false); }}>
+                  <CommandItem value="Global" onSelect={() => { navigate('/clientes'); setComboOpen(false); }}>
                     Global
                   </CommandItem>
                 </CommandGroup>
@@ -115,14 +118,7 @@ export function ClientNavSection() {
         </Button>
       </div>
 
-      <Link
-        to="/clientes"
-        className="flex items-center gap-1 px-3 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        Ver todos <ArrowRight className="h-3 w-3" />
-      </Link>
-
-      {/* Sub-items: 1 en modo Global, 5 con un cliente activo */}
+      {/* Sub-items: ninguno en modo Global (la grilla es la pantalla entera), 5 con un cliente activo */}
       <div className="pt-1 space-y-1">
         {subItems.map((item) => {
           const isActive = location.pathname === item.href;
