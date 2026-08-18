@@ -164,3 +164,10 @@ export async function addHipotesis(clientId: string, input: {
     });
   if (error) throw error;
 }
+
+// Usado por el kanban de VSL Funnel > Hipótesis para mover una tarjeta de
+// columna — mismos 4 valores de estado que ya tiene la tabla.
+export async function updateHipotesisEstado(id: string, estado: Hipotesis['estado']): Promise<void> {
+  const { error } = await supabase.from('hipotesis').update({ estado }).eq('id', id);
+  if (error) throw error;
+}

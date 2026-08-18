@@ -1910,6 +1910,41 @@ export type Database = {
           },
         ]
       }
+      client_notebook_entries: {
+        Row: {
+          client_id: string
+          contenido: Json | null
+          created_at: string
+          id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          contenido?: Json | null
+          created_at?: string
+          id?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          contenido?: Json | null
+          created_at?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notebook_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_onboarding_responses: {
         Row: {
           campo: string
