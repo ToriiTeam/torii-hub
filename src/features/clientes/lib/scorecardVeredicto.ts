@@ -38,7 +38,56 @@ const VEREDICTO_COLORS: Record<string, VeredictoColor> = {
   'Amarillo — Entrega (Torii)': 'amarillo',
   'Amarillo — poca data': 'amarillo',
   'Amarillo — conversión al límite': 'amarillo',
+  'Insuficientes datos': 'neutro',
 };
+
+const TARGET = 0.30;
+const MUY_BUENO_THRESHOLD = TARGET * 1.5;
+
+// Nomenclatura visible en pantalla (badges/pills/tooltips) — nunca "buena"/
+// "mala", solo estos 4 niveles. Ver supabase/migrations/20260817030000_*.sql
+// para las reglas que producen entrega/conversion.
+export function entregaLabel(entrega: string | null | undefined): string {
+  switch (entrega) {
+    case 'Verde': return 'Muy bueno';
+    case 'OK': return 'Bueno';
+    case 'Bajo': return 'Crítico';
+    case 'Insuficientes datos': return 'Insuficientes datos';
+    default: return '—';
+  }
+}
+
+export function conversionLabel(conversion: string | null | undefined, closeRateReal: number | null | undefined): string {
+  switch (conversion) {
+    case 'OK': return (closeRateReal ?? 0) >= MUY_BUENO_THRESHOLD ? 'Muy bueno' : 'Bueno';
+    case 'Límite': return 'Bueno';
+    case 'Bajo': return 'Crítico';
+    case 'Sin data': return 'Insuficientes datos';
+    default: return '—';
+  }
+}
+
+// Severidad para el color/ícono del pill — mismos 4 niveles, sin depender
+// del texto exacto de entregaLabel/conversionLabel.
+export type PillSeverity = 'muybueno' | 'bueno' | 'critico' | 'neutro';
+
+export function entregaSeverity(entrega: string | null | undefined): PillSeverity {
+  switch (entrega) {
+    case 'Verde': return 'muybueno';
+    case 'OK': return 'bueno';
+    case 'Bajo': return 'critico';
+    default: return 'neutro';
+  }
+}
+
+export function conversionSeverity(conversion: string | null | undefined, closeRateReal: number | null | undefined): PillSeverity {
+  switch (conversion) {
+    case 'OK': return (closeRateReal ?? 0) >= MUY_BUENO_THRESHOLD ? 'muybueno' : 'bueno';
+    case 'Límite': return 'bueno';
+    case 'Bajo': return 'critico';
+    default: return 'neutro';
+  }
+}
 
 export function veredictoColor(scorecard: ScorecardSalud | undefined): VeredictoColor {
   if (!scorecard || scorecard.sin_campana) return 'neutro';
