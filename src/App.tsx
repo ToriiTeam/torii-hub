@@ -104,6 +104,7 @@ function AppContent() {
             <Route path="/clientes/global" element={<ClientesGlobalDashboard />} />
             <Route path="/clientes/:id" element={<ClienteDetalle />} />
             <Route path="/clientes/:id/:tab" element={<ClienteDetalle />} />
+            <Route path="/clientes/:id/:tab/:subtab" element={<ClienteDetalle />} />
             <Route path="/setters" element={<Setters />} />
             <Route path="/closers" element={<Closers />} />
             <Route path="/finanzas" element={<Finanzas />} />

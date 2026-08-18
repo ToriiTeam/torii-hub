@@ -8,11 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Edit2, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
-import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
-import TabCreativosCliente from '@/components/clientes/TabCreativosCliente';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
-import TabClosingCliente from '@/components/clientes/TabClosingCliente';
-import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
 import TabDeliveryOS from '@/components/clientes/TabDeliveryOS';
 
 export interface Client {
@@ -62,42 +58,51 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
-// Los antiguos 9 tabs sueltos (Ficha Operativa/Básica/Onboarding/Roadmap/
-// CSB/CSL y Árbol de Iteraciones/Ángulos/Creativos) se agruparon en
-// Estrategia y Creativos respectivamente — ver TabEstrategiaCliente.tsx/
-// TabCreativosCliente.tsx (sub-tabs internos, estado local, sin ruta
-// propia). Los 6 de acá son TODOS deep-linkeables vía /clientes/:id/:tab.
+// Delivery OS es ahora la pantalla principal — absorbe Estrategia (como
+// sub-tab "Información"), Creativos (como "VSL Funnel"), Contenido Orgánico
+// (como "Social Funnel") y Closing como sub-navegación propia, ver
+// TabDeliveryOS.tsx. Solo estos 2 son deep-linkeables vía /clientes/:id/:tab
+// — los sub-tabs de Delivery OS tienen su propio nivel de URL
+// (/clientes/:id/delivery-os/:subtab), todo lo que cuelga de ahí para
+// adentro (ej. los 6 sub-sub-tabs de VSL Funnel) es estado local sin ruta
+// propia, mismo criterio que ya usaban Estrategia/Creativos antes de esto.
 const TABS = [
-  { value: 'estrategia', label: 'Estrategia' },
-  { value: 'creativos', label: 'Creativos' },
   { value: 'dashboard', label: 'Dashboard' },
-  { value: 'closing', label: 'Closing' },
-  { value: 'contenido', label: 'Contenido Orgánico' },
   { value: 'delivery-os', label: 'Delivery OS' },
 ];
 
-// 'estrategia' es el default — mantiene la URL limpia /clientes/:id, sin
-// sufijo, mismo criterio que tenía 'ficha' antes de este cambio.
-const DEFAULT_TAB = 'estrategia';
+// 'delivery-os' es el default — mantiene la URL limpia /clientes/:id.
+const DEFAULT_TAB = 'delivery-os';
+
+// Sub-tabs de Delivery OS — ver TabDeliveryOS.tsx.
+const DELIVERY_OS_SUBTABS = ['resumen', 'informacion', 'vsl-funnel', 'social-funnel', 'closing'];
 
 export default function ClienteDetalle() {
-  const { id, tab: urlTab } = useParams<{ id: string; tab?: string }>();
+  const { id, tab: urlTab, subtab: urlSubtab } = useParams<{ id: string; tab?: string; subtab?: string }>();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   // Contador (no boolean) para que el atajo del header dispare el modo
   // edición de TabFichaBasica cada vez que se clickea, incluso si ya
-  // estabas en Estrategia/Ficha Básica y el valor "no cambiaría".
+  // estabas en Delivery OS/Información/Ficha Básica y el valor "no cambiaría".
   const [autoEditTrigger, setAutoEditTrigger] = useState(0);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
-  // Los 5 tabs son todos deep-linkeables — la URL es la única fuente de
-  // verdad, sin estado local propio. Cambiar de tab (dashboard→closing) NO
-  // dispara un re-fetch del cliente — fetchClient solo depende de :id.
+  // Los 2 tabs son deep-linkeables — la URL es la única fuente de verdad,
+  // sin estado local propio. Cambiar de tab NO dispara un re-fetch del
+  // cliente — fetchClient solo depende de :id.
   const effectiveTab = urlTab && TABS.some((t) => t.value === urlTab) ? urlTab : DEFAULT_TAB;
 
   function handleTabChange(value: string) {
     navigate(value === DEFAULT_TAB ? `/clientes/${id}` : `/clientes/${id}/${value}`);
+  }
+
+  // Segundo nivel de deep-link, solo para Delivery OS — 'resumen' es su
+  // default (URL limpia, mismo criterio que el nivel de arriba).
+  const effectiveSubtab = urlSubtab && DELIVERY_OS_SUBTABS.includes(urlSubtab) ? urlSubtab : 'resumen';
+
+  function handleSubtabChange(subtab: string) {
+    navigate(subtab === 'resumen' ? `/clientes/${id}` : `/clientes/${id}/delivery-os/${subtab}`);
   }
 
   useEffect(() => {
@@ -160,7 +165,7 @@ export default function ClienteDetalle() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setAutoEditTrigger((n) => n + 1); handleTabChange('estrategia'); }}
+            onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/clientes/${id}/delivery-os/informacion`); }}
           >
             <Edit2 className="h-4 w-4 mr-1.5" />Editar
           </Button>
@@ -189,28 +194,18 @@ export default function ClienteDetalle() {
           ))}
         </TabsList>
 
-        <TabsContent value="estrategia">
-          <TabEstrategiaCliente client={client} onClientUpdate={fetchClient} autoEditTrigger={autoEditTrigger} />
-        </TabsContent>
-
-        <TabsContent value="creativos">
-          <TabCreativosCliente clientId={client.id} />
-        </TabsContent>
-
         <TabsContent value="dashboard">
           <TabDashboardCliente clientId={client.id} />
         </TabsContent>
 
-        <TabsContent value="closing">
-          <TabClosingCliente clientId={client.id} />
-        </TabsContent>
-
-        <TabsContent value="contenido">
-          <TabContenidoCliente clientId={client.id} />
-        </TabsContent>
-
         <TabsContent value="delivery-os">
-          <TabDeliveryOS clientId={client.id} clientName={client.name} />
+          <TabDeliveryOS
+            client={client}
+            onClientUpdate={fetchClient}
+            autoEditTrigger={autoEditTrigger}
+            activeSubtab={effectiveSubtab}
+            onSubtabChange={handleSubtabChange}
+          />
         </TabsContent>
       </Tabs>
     </div>

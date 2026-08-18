@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchClientRoadmap } from '@/features/roadmap/lib/roadmapRepo';
 import type { RoadmapPhase, RoadmapProcess } from '@/features/roadmap/types';
@@ -19,10 +20,26 @@ import { CalendarioSection } from '@/features/delivery-tracker/components/Calend
 import { BitacoraTimeline } from '@/features/delivery-tracker/components/BitacoraTimeline';
 import { BitacoraHipotesis } from '@/features/delivery-tracker/components/BitacoraHipotesis';
 import { AlertTriangle } from 'lucide-react';
+import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
+import TabVSLFunnel from '@/components/clientes/TabVSLFunnel';
+import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
+import TabClosingCliente from '@/components/clientes/TabClosingCliente';
+import type { Client } from '@/pages/ClienteDetalle';
+
+const SUB_TABS = [
+  { value: 'resumen', label: 'Resumen' },
+  { value: 'informacion', label: 'Información' },
+  { value: 'vsl-funnel', label: 'VSL Funnel' },
+  { value: 'social-funnel', label: 'Social Funnel' },
+  { value: 'closing', label: 'Closing' },
+];
 
 interface Props {
-  clientId: string;
-  clientName: string;
+  client: Client;
+  onClientUpdate: () => void;
+  autoEditTrigger?: number;
+  activeSubtab: string;
+  onSubtabChange: (subtab: string) => void;
 }
 
 interface State {
@@ -37,7 +54,9 @@ interface State {
 
 const EMPTY_STATE: State = { scorecard: undefined, phases: [], processes: [], phaseTemplate: [], cuellos: [], activityLog: [], hipotesis: [] };
 
-export default function TabDeliveryOS({ clientId, clientName }: Props) {
+export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger, activeSubtab, onSubtabChange }: Props) {
+  const clientId = client.id;
+  const clientName = client.name;
   const [state, setState] = useState<State>(EMPTY_STATE);
   const [loading, setLoading] = useState(true);
 
@@ -89,56 +108,84 @@ export default function TabDeliveryOS({ clientId, clientName }: Props) {
   const atraso = phaseAtraso(currentPhase, processes);
 
   return (
-    <div className="space-y-7">
-      {/* Header + scorecard */}
-      <div className="flex justify-between items-start gap-5 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap">
-            {clientName}
-            {currentPhase && (
-              <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-warning/10 text-warning">
-                {currentPhase.nombre}
-              </span>
-            )}
-            {atraso != null && atraso > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold bg-destructive/12 text-destructive">
-                <AlertTriangle className="h-3 w-3" />{atraso} días atrasado vs. plan
-              </span>
-            )}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {diasCampana != null ? `Día ${diasCampana} de campaña` : 'Sin campaña activa'}
-          </p>
+    <Tabs value={activeSubtab} onValueChange={onSubtabChange} className="space-y-5">
+      <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
+        {SUB_TABS.map((tab) => (
+          <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="resumen">
+        <div className="space-y-7">
+          {/* Header + scorecard */}
+          <div className="flex justify-between items-start gap-5 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap">
+                {clientName}
+                {currentPhase && (
+                  <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-warning/10 text-warning">
+                    {currentPhase.nombre}
+                  </span>
+                )}
+                {atraso != null && atraso > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold bg-destructive/12 text-destructive">
+                    <AlertTriangle className="h-3 w-3" />{atraso} días atrasado vs. plan
+                  </span>
+                )}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {diasCampana != null ? `Día ${diasCampana} de campaña` : 'Sin campaña activa'}
+              </p>
+            </div>
+            <ScorecardQuadrant scorecard={scorecard} />
+          </div>
+
+          {/* Métricas clave */}
+          <MetricasClave clientId={clientId} />
+
+          {/* Cuello de botella activo + Próximos deadlines */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-3.5 items-stretch">
+            <CuelloBotellaActivo clientId={clientId} currentPhaseId={currentPhase?.id ?? null} onApplied={loadAll} />
+            <ProximosDeadlines processes={processes} />
+          </div>
+
+          <HistorialCuellos cuellos={cuellos} />
+
+          <RoadmapCompacto
+            clientId={clientId}
+            phases={phases}
+            processes={processes}
+            phaseTemplate={phaseTemplate}
+            currentPhase={currentPhase}
+            onChanged={loadAll}
+          />
+
+          <BitacoraHipotesis clientId={clientId} hipotesis={hipotesis} onChanged={loadAll} />
+
+          <CalendarioSection processes={processes} />
+
+          <BitacoraTimeline clientId={clientId} activityLog={activityLog} cuellos={cuellos} onChanged={loadAll} />
         </div>
-        <ScorecardQuadrant scorecard={scorecard} />
-      </div>
+      </TabsContent>
 
-      {/* Métricas clave */}
-      <MetricasClave clientId={clientId} />
+      <TabsContent value="informacion">
+        <TabEstrategiaCliente client={client} onClientUpdate={onClientUpdate} autoEditTrigger={autoEditTrigger} />
+      </TabsContent>
 
-      {/* Cuello de botella activo + Próximos deadlines */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-3.5 items-stretch">
-        <CuelloBotellaActivo clientId={clientId} currentPhaseId={currentPhase?.id ?? null} onApplied={loadAll} />
-        <ProximosDeadlines processes={processes} />
-      </div>
+      <TabsContent value="vsl-funnel">
+        <TabVSLFunnel clientId={clientId} />
+      </TabsContent>
 
-      <HistorialCuellos cuellos={cuellos} />
+      <TabsContent value="social-funnel">
+        <TabContenidoCliente clientId={clientId} />
+      </TabsContent>
 
-      <RoadmapCompacto
-        clientId={clientId}
-        phases={phases}
-        processes={processes}
-        phaseTemplate={phaseTemplate}
-        currentPhase={currentPhase}
-        onChanged={loadAll}
-      />
-
-      <BitacoraHipotesis clientId={clientId} hipotesis={hipotesis} onChanged={loadAll} />
-
-      <CalendarioSection processes={processes} />
-
-      <BitacoraTimeline clientId={clientId} activityLog={activityLog} cuellos={cuellos} onChanged={loadAll} />
-    </div>
+      <TabsContent value="closing">
+        <TabClosingCliente clientId={clientId} />
+      </TabsContent>
+    </Tabs>
   );
 }
 

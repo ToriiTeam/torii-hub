@@ -823,7 +823,6 @@ export type Database = {
         Row: {
           client_id: string | null
           created_at: string | null
-          creative_node_id: string | null
           drive_folder_id: string | null
           estado: string | null
           hipotesis_activa: string | null
@@ -838,7 +837,6 @@ export type Database = {
         Insert: {
           client_id?: string | null
           created_at?: string | null
-          creative_node_id?: string | null
           drive_folder_id?: string | null
           estado?: string | null
           hipotesis_activa?: string | null
@@ -853,7 +851,6 @@ export type Database = {
         Update: {
           client_id?: string | null
           created_at?: string | null
-          creative_node_id?: string | null
           drive_folder_id?: string | null
           estado?: string | null
           hipotesis_activa?: string | null
@@ -871,13 +868,6 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "angles_creative_node_id_fkey"
-            columns: ["creative_node_id"]
-            isOneToOne: false
-            referencedRelation: "creative_nodes"
             referencedColumns: ["id"]
           },
         ]
@@ -2895,72 +2885,6 @@ export type Database = {
         }
         Relationships: []
       }
-      creative_nodes: {
-        Row: {
-          angulo: string | null
-          client_id: string | null
-          created_at: string | null
-          estado: string | null
-          hipotesis: string | null
-          id: string
-          media_url: string | null
-          nombre: string
-          notas: string | null
-          parent_id: string | null
-          position_x: number | null
-          position_y: number | null
-          tipo: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          angulo?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          estado?: string | null
-          hipotesis?: string | null
-          id?: string
-          media_url?: string | null
-          nombre: string
-          notas?: string | null
-          parent_id?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          angulo?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          estado?: string | null
-          hipotesis?: string | null
-          id?: string
-          media_url?: string | null
-          nombre?: string
-          notas?: string | null
-          parent_id?: string | null
-          position_x?: number | null
-          position_y?: number | null
-          tipo?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "creative_nodes_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "creative_nodes_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "creative_nodes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       crm_clientes: {
         Row: {
           asistio: boolean | null
@@ -3590,73 +3514,6 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hypothesis_history: {
-        Row: {
-          angle_id: string | null
-          aprendizaje: string | null
-          client_id: string | null
-          created_at: string | null
-          creative_node_id: string | null
-          fecha_cierre: string | null
-          fecha_inicio: string | null
-          hipotesis: string | null
-          id: string
-          metricas_fin: Json | null
-          metricas_inicio: Json | null
-          resultado: string | null
-        }
-        Insert: {
-          angle_id?: string | null
-          aprendizaje?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          creative_node_id?: string | null
-          fecha_cierre?: string | null
-          fecha_inicio?: string | null
-          hipotesis?: string | null
-          id?: string
-          metricas_fin?: Json | null
-          metricas_inicio?: Json | null
-          resultado?: string | null
-        }
-        Update: {
-          angle_id?: string | null
-          aprendizaje?: string | null
-          client_id?: string | null
-          created_at?: string | null
-          creative_node_id?: string | null
-          fecha_cierre?: string | null
-          fecha_inicio?: string | null
-          hipotesis?: string | null
-          id?: string
-          metricas_fin?: Json | null
-          metricas_inicio?: Json | null
-          resultado?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hypothesis_history_angle_id_fkey"
-            columns: ["angle_id"]
-            isOneToOne: false
-            referencedRelation: "angles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hypothesis_history_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hypothesis_history_creative_node_id_fkey"
-            columns: ["creative_node_id"]
-            isOneToOne: false
-            referencedRelation: "creative_nodes"
             referencedColumns: ["id"]
           },
         ]
