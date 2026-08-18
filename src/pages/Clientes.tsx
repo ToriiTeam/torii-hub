@@ -90,24 +90,21 @@ const emptyForm = {
 export default function Clientes() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
-  const [installments, setInstallments] = useState<{ client_id: string; amount: number; paid: boolean }[]>([]);
   const [scorecards, setScorecards] = useState<Record<string, ScorecardSalud>>({});
   const [bottlenecks, setBottlenecks] = useState<Record<string, { count: number; nombre: string }>>({});
   const [lastActivity, setLastActivity] = useState<Record<string, { texto: string; fecha: string }>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [showCancelled, setShowCancelled] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
-    const [clientsRes, installmentsRes, bottlenecksRes, activityRes] = await Promise.all([
+    const [clientsRes, bottlenecksRes, activityRes] = await Promise.all([
       supabase.from('clients').select('*').order('name'),
-      supabase.from('client_installments').select('client_id, amount, paid'),
       // Misma query que usaba el viejo Dashboard Global (ClientesGlobalDashboard.tsx)
       // para procesos bloqueados — fusionada acá en vez de en una página aparte.
       supabase.from('roadmap_processes').select('id, nombre, client_id').eq('status', 'bloqueado'),
@@ -118,7 +115,6 @@ export default function Clientes() {
       supabase.from('client_activity_log').select('client_id, texto, fecha').order('fecha', { ascending: false }),
     ]);
     if (clientsRes.data) setClients(clientsRes.data as Client[]);
-    if (installmentsRes.data) setInstallments(installmentsRes.data);
     if (bottlenecksRes.error) {
       console.error('[Clientes] bottlenecks query failed:', bottlenecksRes.error.message);
     } else {
@@ -171,9 +167,9 @@ export default function Clientes() {
   };
 
   const filtered = clients.filter(c => {
-    if (!showCancelled && c.status === 'cancelled' && filterStatus !== 'cancelled') return false;
+    const statusMatch = showInactive ? c.status !== 'active' : c.status === 'active';
+    if (!statusMatch) return false;
     if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filterStatus !== 'all' && c.status !== filterStatus) return false;
     return true;
   });
 
@@ -208,13 +204,6 @@ export default function Clientes() {
 
   const activeClients = clients.filter(c => c.status === 'active');
   const totalContractValue = activeClients.reduce((s, c) => s + (c.total_amount || 0), 0);
-  const totalPending = activeClients.reduce((s, c) => {
-    const ci = installments.filter(i => i.client_id === c.id);
-    if (ci.length > 0) return s + ci.filter(i => !i.paid).reduce((sum, i) => sum + Number(i.amount), 0);
-    const remaining = c.total_installments - c.paid_installments;
-    const avg = c.total_installments > 0 ? (c.total_amount || 0) / c.total_installments : 0;
-    return s + avg * remaining;
-  }, 0);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -296,34 +285,18 @@ export default function Clientes() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Clientes</h1>
+            <h1 className="text-2xl font-bold">Salud de la cartera</h1>
             <p className="text-muted-foreground">{clients.length} clientes • ${totalContractValue.toLocaleString()} total</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Switch checked={showCancelled} onCheckedChange={setShowCancelled} id="show-cancelled" />
-              <Label htmlFor="show-cancelled" className="text-sm text-muted-foreground cursor-pointer">Mostrar cancelados</Label>
+              <Switch checked={showInactive} onCheckedChange={setShowInactive} id="show-inactive" />
+              <Label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer">Mostrar inactivos</Label>
             </div>
             <Button className="bg-primary" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />Nuevo Cliente
             </Button>
           </div>
-        </div>
-
-        {/* Status filter */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {(['active', 'paused', 'finished', 'cancelled'] as ClientStatus[]).map(status => (
-            <Card
-              key={status}
-              className={cn('bg-card border-border/50 cursor-pointer transition-all', filterStatus === status && 'ring-2 ring-primary')}
-              onClick={() => setFilterStatus(filterStatus === status ? 'all' : status)}
-            >
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold">{clients.filter(c => c.status === status).length}</p>
-                <Badge className={cn('text-xs border-0 mt-1', statusColors[status])}>{statusLabels[status]}</Badge>
-              </CardContent>
-            </Card>
-          ))}
         </div>
 
         {/* Search */}
@@ -354,13 +327,13 @@ export default function Clientes() {
               <Card
                 key={client.id}
                 className={cn(
-                  'bg-card border-border/50 hover:border-primary/30 cursor-pointer transition-all',
+                  'bg-card border-border/50 hover:border-primary/30 cursor-pointer transition-all min-h-[180px] flex flex-col',
                   !isActive && 'opacity-70',
                   health && cn('border-t-4', veredictoBarColors[health]),
                 )}
                 onClick={() => navigate(`/clientes/${client.id}`)}
               >
-                <CardContent className="p-4 space-y-2">
+                <CardContent className="p-4 space-y-2 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold text-sm truncate">{client.name}</h3>
                     {isActive ? (
@@ -439,35 +412,6 @@ export default function Clientes() {
           )}
         </div>
 
-        {/* Summary Footer */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Total Contratos</p>
-              <p className="text-xl font-bold text-success">${totalContractValue.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Por Cobrar</p>
-              <p className="text-xl font-bold text-warning">${totalPending.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Clientes Activos</p>
-              <p className="text-xl font-bold">{activeClients.length}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border/50">
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground mb-1">Ticket Promedio</p>
-              <p className="text-xl font-bold">
-                ${activeClients.length > 0 ? Math.round(totalContractValue / activeClients.length).toLocaleString() : 0}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </>
   );
