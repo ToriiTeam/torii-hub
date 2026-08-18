@@ -1,5 +1,27 @@
 import { supabase } from '@/integrations/supabase/client';
+import { calcCostoPorLlamadaCalificada } from '@/features/executive-dashboard/lib/businessHealth';
 import { findMotivo } from './motivos';
+
+// CPBC = costo por llamada CALIFICADA — única definición correcta confirmada
+// en todo el sistema (se_presento=true AND califico=true en
+// client_closer_calls), mismo filtro que ya usan fetchToriiData.ts y
+// meta-ads/lib/fetchCpbc.ts. fetchClientData.ts (reusado para Show
+// Rate/Tasa Calificación/Close Rate en MetricasClave.tsx) trae un `cpbc`
+// propio que divide por TODAS las llamadas agendadas — ese campo NO se usa
+// acá a propósito, se recalcula con este filtro en su lugar.
+export async function fetchCpbcCalificado(clientId: string, adsInversion: number, since: string, until: string): Promise<number | null> {
+  const { count, error } = await supabase
+    .from('client_closer_calls')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_type', 'client')
+    .eq('client_id', clientId)
+    .eq('se_presento', true)
+    .eq('califico', true)
+    .gte('fecha_llamada', since)
+    .lte('fecha_llamada', until);
+  if (error) throw error;
+  return calcCostoPorLlamadaCalificada(adsInversion, count ?? 0);
+}
 
 export interface CuelloBotella {
   id: string;

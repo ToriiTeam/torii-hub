@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react';
 import { fetchClientData } from '@/features/executive-dashboard/lib/fetchClientData';
 import { getPeriodRange } from '@/features/executive-dashboard/lib/periodRange';
 import { safeDiv } from '@/features/executive-dashboard/lib/clientHealth';
+import { fetchCpbcCalificado } from '@/features/delivery-tracker/lib/deliveryOsRepo';
 import type { ClientDetailData } from '@/features/executive-dashboard/types';
 import { cn } from '@/lib/utils';
 
-// Reusa fetchClientData tal cual (mismo cálculo que ya ve el staff en
-// Dashboard del cliente) — no reescribe ninguna fórmula. Ojo: el CPBC de
-// acá es inversión/reuniones (llamadas agendadas), no inversión/calificadas
-// — es la definición que ya usa ClientView.tsx para un cliente puntual,
-// distinta del "costo por llamada calificada" de cartera en businessHealth.ts.
+// Show Rate/Tasa Calificación/Close Rate reusan fetchClientData tal cual
+// (mismo cálculo que ya ve el staff en Dashboard del cliente). El CPBC NO
+// sale de ahí — fetchClientData.cpbc divide por TODAS las llamadas
+// agendadas, no por calificadas; se recalcula acá con fetchCpbcCalificado
+// (se_presento=true AND califico=true), la única definición confirmada
+// como correcta. El mismo error de fetchClientData también aparece en
+// otras pantallas (Dashboard Ejecutivo, Portfolio, Reportes, Torii OS) —
+// fuera de alcance de este archivo, mapeado aparte.
 const SHOW_RATE_TARGET = 0.60;
 const CLOSE_RATE_TARGET = 0.25;
 
@@ -19,6 +23,7 @@ interface Props {
 
 export function MetricasClave({ clientId }: Props) {
   const [data, setData] = useState<ClientDetailData | null>(null);
+  const [cpbc, setCpbc] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,7 +36,12 @@ export function MetricasClave({ clientId }: Props) {
       customSince: now.toISOString().slice(0, 10), customUntil: now.toISOString().slice(0, 10),
     });
     fetchClientData(clientId, range.since, range.until, range.isShortPeriod)
-      .then((d) => { if (!cancelled) setData(d); })
+      .then(async (d) => {
+        if (cancelled) return;
+        setData(d);
+        const c = await fetchCpbcCalificado(clientId, d.ads.inversion, range.since, range.until);
+        if (!cancelled) setCpbc(c);
+      })
       .catch((err) => console.error('[MetricasClave] load failed:', err))
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -51,7 +61,7 @@ export function MetricasClave({ clientId }: Props) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-      <MetricCard label="CPBC" value={data?.cpbc != null ? `$${data.cpbc.toFixed(1)}` : '—'} />
+      <MetricCard label="CPBC" value={cpbc != null ? `$${cpbc.toFixed(1)}` : '—'} />
       <MetricCard
         label="Show Rate"
         value={data?.closing.showRate != null ? `${Math.round(data.closing.showRate * 100)}%` : '—'}
