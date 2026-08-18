@@ -13,6 +13,7 @@ import TabCreativosCliente from '@/components/clientes/TabCreativosCliente';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
 import TabClosingCliente from '@/components/clientes/TabClosingCliente';
 import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
+import TabDeliveryOS from '@/components/clientes/TabDeliveryOS';
 
 export interface Client {
   id: string;
@@ -65,13 +66,14 @@ const statusLabels: Record<string, string> = {
 // CSB/CSL y Árbol de Iteraciones/Ángulos/Creativos) se agruparon en
 // Estrategia y Creativos respectivamente — ver TabEstrategiaCliente.tsx/
 // TabCreativosCliente.tsx (sub-tabs internos, estado local, sin ruta
-// propia). Los 5 de acá son TODOS deep-linkeables vía /clientes/:id/:tab.
+// propia). Los 6 de acá son TODOS deep-linkeables vía /clientes/:id/:tab.
 const TABS = [
   { value: 'estrategia', label: 'Estrategia' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'closing', label: 'Closing' },
   { value: 'contenido', label: 'Contenido Orgánico' },
+  { value: 'delivery-os', label: 'Delivery OS' },
 ];
 
 // 'estrategia' es el default — mantiene la URL limpia /clientes/:id, sin
@@ -205,6 +207,10 @@ export default function ClienteDetalle() {
 
         <TabsContent value="contenido">
           <TabContenidoCliente clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="delivery-os">
+          <TabDeliveryOS clientId={client.id} clientName={client.name} />
         </TabsContent>
       </Tabs>
     </div>
