@@ -59,7 +59,7 @@ MÉTRICAS DEL PERÍODO
 - Leads generados: ${m.leads}
 - CPL (costo por lead): ${fmtMetric(m.cpl)}
 - Reuniones agendadas: ${m.reuniones}
-- CPBC (costo por reunión agendada): ${fmtMetric(m.cpbc)}
+- CPBC (costo por llamada calificada y presentada): ${fmtMetric(m.cpbc)}
 - Show rate (asistencia a la llamada): ${fmtMetric(m.showRate, '%')}
 - Cierres: ${m.cierres}
 - CAC (costo por cliente cerrado): ${fmtMetric(m.cac)}

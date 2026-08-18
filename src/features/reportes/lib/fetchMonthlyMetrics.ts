@@ -64,22 +64,30 @@ interface ClosingMetricsResult {
   reuniones: number;
   asistencias: number;
   cierres: number;
+  calificadasShow: number;
 }
 
+// calificadasShow = se_presento=true AND calificacion IS NOT NULL — única
+// definición correcta de CPBC confirmada (costo por llamada calificada Y
+// presentada), no reuniones (todas las agendadas, sin filtrar). owner_type
+// también faltaba acá — sin él, esta query mezclaba llamadas de otros
+// clientes/torii con el mismo client_id casualmente repetido.
 async function fetchClosingMetrics(clientId: string, since: string, until: string): Promise<ClosingMetricsResult> {
   const { data, error } = await supabase
     .from('client_closer_calls')
-    .select('se_presento, cerro')
+    .select('se_presento, cerro, calificacion')
+    .eq('owner_type', 'client')
     .eq('client_id', clientId)
     .gte('fecha_llamada', since)
     .lte('fecha_llamada', until);
 
-  if (error || !data) return { reuniones: 0, asistencias: 0, cierres: 0 };
+  if (error || !data) return { reuniones: 0, asistencias: 0, cierres: 0, calificadasShow: 0 };
 
   return {
     reuniones: data.length,
     asistencias: data.filter((r) => r.se_presento).length,
     cierres: data.filter((r) => r.cerro).length,
+    calificadasShow: data.filter((r) => r.se_presento && r.calificacion != null).length,
   };
 }
 
@@ -103,7 +111,7 @@ export async function fetchMonthlyMetrics(
   }
 
   const { inversionTotal, impresiones, clics, leads, alcanceTotal, trend } = meta;
-  const { reuniones, asistencias, cierres } = closing;
+  const { reuniones, asistencias, cierres, calificadasShow } = closing;
 
   const metrics: ReportMetrics = {
     inversionTotal,
@@ -116,7 +124,7 @@ export async function fetchMonthlyMetrics(
     // specified rather than "corrected" to the textbook definition.
     cpmAprox: alcanceTotal > 0 ? inversionTotal / alcanceTotal : null,
     reuniones,
-    cpbc: reuniones > 0 ? inversionTotal / reuniones : null,
+    cpbc: calificadasShow > 0 ? inversionTotal / calificadasShow : null,
     cac: cierres > 0 ? inversionTotal / cierres : null,
     conversionLeadReunion: leads > 0 ? (reuniones / leads) * 100 : null,
     showRate: reuniones > 0 ? (asistencias / reuniones) * 100 : null,

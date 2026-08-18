@@ -6,7 +6,7 @@ export interface ReportMetrics {
   cpl: number | null;
   cpmAprox: number | null; // inversión / alcance total
   reuniones: number;
-  cpbc: number | null; // inversión / reuniones
+  cpbc: number | null; // inversión / llamadas calificadas y presentadas (se_presento=true AND calificacion IS NOT NULL)
   cac: number | null; // inversión / cierres
   conversionLeadReunion: number | null; // reuniones / leads
   showRate: number | null; // asistencia / reuniones (0-100)
