@@ -82,7 +82,7 @@ export async function activateRoadmap(clientId: string): Promise<void> {
   }
 }
 
-export async function updatePhase(id: string, patch: Partial<Pick<RoadmapPhase, 'objetivo_fase' | 'trigger_entrada' | 'trigger_salida'>>): Promise<void> {
+export async function updatePhase(id: string, patch: Partial<Pick<RoadmapPhase, 'nombre' | 'orden' | 'objetivo_fase' | 'trigger_entrada' | 'trigger_salida'>>): Promise<void> {
   const { error } = await supabase.from('roadmap_phases').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }

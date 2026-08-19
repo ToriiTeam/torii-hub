@@ -2119,6 +2119,41 @@ export type Database = {
           },
         ]
       }
+      client_situacion_options: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          orden: number
+          tipo: string
+          valor: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          orden?: number
+          tipo: string
+          valor: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          orden?: number
+          tipo?: string
+          valor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_situacion_options_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_tasks: {
         Row: {
           assigned_to: string | null
@@ -3291,6 +3326,7 @@ export type Database = {
         Row: {
           amount: number
           category: string | null
+          client_id: string | null
           cost_type: string | null
           created_at: string
           date: string
@@ -3302,6 +3338,7 @@ export type Database = {
         Insert: {
           amount: number
           category?: string | null
+          client_id?: string | null
           cost_type?: string | null
           created_at?: string
           date?: string
@@ -3313,6 +3350,7 @@ export type Database = {
         Update: {
           amount?: number
           category?: string | null
+          client_id?: string | null
           cost_type?: string | null
           created_at?: string
           date?: string
@@ -3321,7 +3359,15 @@ export type Database = {
           name?: string
           sheet_row_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       experience_layer: {
         Row: {
@@ -6157,54 +6203,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tracked_landings: {
-        Row: {
-          active: boolean
-          business_line: string
-          client_id: string | null
-          created_at: string
-          group_id: string | null
-          id: string
-          label: string
-          landing_id: string
-        }
-        Insert: {
-          active?: boolean
-          business_line?: string
-          client_id?: string | null
-          created_at?: string
-          group_id?: string | null
-          id?: string
-          label: string
-          landing_id: string
-        }
-        Update: {
-          active?: boolean
-          business_line?: string
-          client_id?: string | null
-          created_at?: string
-          group_id?: string | null
-          id?: string
-          label?: string
-          landing_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tracked_landings_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tracked_landings_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "tracked_landings"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       time_audit_tasks: {
         Row: {
           category: string | null
@@ -6252,6 +6250,54 @@ export type Database = {
           xds?: string | null
         }
         Relationships: []
+      }
+      tracked_landings: {
+        Row: {
+          active: boolean
+          business_line: string
+          client_id: string | null
+          created_at: string
+          group_id: string | null
+          id: string
+          label: string
+          landing_id: string
+        }
+        Insert: {
+          active?: boolean
+          business_line?: string
+          client_id?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          label: string
+          landing_id: string
+        }
+        Update: {
+          active?: boolean
+          business_line?: string
+          client_id?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          label?: string
+          landing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracked_landings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracked_landings_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_landings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_performance: {
         Row: {

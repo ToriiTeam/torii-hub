@@ -3,14 +3,30 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Map } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Plus, Map, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  fetchClientRoadmap, activateRoadmap, addProcess, fetchDependencies,
+  fetchClientRoadmap, activateRoadmap, addProcess, fetchDependencies, updatePhase,
 } from '@/features/roadmap/lib/roadmapRepo';
 import { STATUS_LABELS, STATUS_BADGE_CLASS } from '@/features/roadmap/types';
 import type { RoadmapPhase, RoadmapProcess, RoadmapProcessDependency } from '@/features/roadmap/types';
 import { ProcessDetailPanel } from '@/components/roadmap/ProcessDetailPanel';
+
+type PhaseForm = { nombre: string; orden: string; objetivo_fase: string; trigger_entrada: string; trigger_salida: string };
+
+function toPhaseForm(p: RoadmapPhase): PhaseForm {
+  return {
+    nombre: p.nombre,
+    orden: String(p.orden),
+    objetivo_fase: p.objetivo_fase ?? '',
+    trigger_entrada: p.trigger_entrada ?? '',
+    trigger_salida: p.trigger_salida ?? '',
+  };
+}
 
 interface Props {
   clientId: string;
@@ -23,6 +39,9 @@ export default function TabRoadmap({ clientId }: Props) {
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
+  const [editingPhase, setEditingPhase] = useState<RoadmapPhase | null>(null);
+  const [phaseForm, setPhaseForm] = useState<PhaseForm | null>(null);
+  const [savingPhase, setSavingPhase] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -66,6 +85,36 @@ export default function TabRoadmap({ clientId }: Props) {
     } catch (err) {
       console.error('[TabRoadmap] add process failed:', err);
       toast.error('Error al agregar el proceso');
+    }
+  }
+
+  function openEditPhase(phase: RoadmapPhase) {
+    setEditingPhase(phase);
+    setPhaseForm(toPhaseForm(phase));
+  }
+
+  async function handleSavePhase() {
+    if (!editingPhase || !phaseForm) return;
+    if (!phaseForm.nombre.trim()) { toast.error('El nombre es requerido'); return; }
+    const orden = parseInt(phaseForm.orden, 10);
+    if (Number.isNaN(orden)) { toast.error('El orden debe ser un número'); return; }
+    setSavingPhase(true);
+    try {
+      await updatePhase(editingPhase.id, {
+        nombre: phaseForm.nombre.trim(),
+        orden,
+        objetivo_fase: phaseForm.objetivo_fase || null,
+        trigger_entrada: phaseForm.trigger_entrada || null,
+        trigger_salida: phaseForm.trigger_salida || null,
+      });
+      toast.success('Fase actualizada');
+      setEditingPhase(null);
+      await loadData();
+    } catch (err) {
+      console.error('[TabRoadmap] save phase failed:', err);
+      toast.error('Error al guardar la fase');
+    } finally {
+      setSavingPhase(false);
     }
   }
 
@@ -122,13 +171,22 @@ export default function TabRoadmap({ clientId }: Props) {
             .sort((a, b) => a.orden - b.orden);
           return (
             <AccordionItem key={phase.id} value={phase.id} className="border border-border rounded-lg px-4 bg-card">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline">{phase.orden}</Badge>
-                  <span className="font-semibold">{phase.nombre}</span>
-                  <span className="text-xs text-muted-foreground font-normal">{phaseProcesses.length} procesos</span>
-                </div>
-              </AccordionTrigger>
+              <div className="flex items-center">
+                <AccordionTrigger className="hover:no-underline flex-1">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline">{phase.orden}</Badge>
+                    <span className="font-semibold">{phase.nombre}</span>
+                    <span className="text-xs text-muted-foreground font-normal">{phaseProcesses.length} procesos</span>
+                  </div>
+                </AccordionTrigger>
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-muted-foreground"
+                  onClick={(e) => { e.stopPropagation(); openEditPhase(phase); }}
+                  title="Editar fase"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
               <AccordionContent className="space-y-4">
                 {(phase.objetivo_fase || phase.trigger_entrada || phase.trigger_salida) && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -183,9 +241,44 @@ export default function TabRoadmap({ clientId }: Props) {
         allProcesses={processes}
         dependencies={dependencies}
         onClose={() => setSelectedProcessId(null)}
-        onOpenProcess={setSelectedProcessId}
         onChanged={loadData}
       />
+
+      <Dialog open={!!editingPhase} onOpenChange={(v) => !v && setEditingPhase(null)}>
+        <DialogContent className="bg-card border-border max-w-lg">
+          <DialogHeader><DialogTitle>Editar fase</DialogTitle></DialogHeader>
+          {phaseForm && (
+            <div className="space-y-3 mt-2">
+              <div className="grid grid-cols-[1fr_100px] gap-3">
+                <div>
+                  <Label>Nombre</Label>
+                  <Input value={phaseForm.nombre} onChange={(e) => setPhaseForm({ ...phaseForm, nombre: e.target.value })} className="bg-secondary/50 mt-1" />
+                </div>
+                <div>
+                  <Label>Orden</Label>
+                  <Input type="number" value={phaseForm.orden} onChange={(e) => setPhaseForm({ ...phaseForm, orden: e.target.value })} className="bg-secondary/50 mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label>Objetivo de la fase</Label>
+                <Textarea rows={2} value={phaseForm.objetivo_fase} onChange={(e) => setPhaseForm({ ...phaseForm, objetivo_fase: e.target.value })} className="bg-secondary/50 mt-1 resize-none" />
+              </div>
+              <div>
+                <Label>Trigger de entrada</Label>
+                <Textarea rows={2} value={phaseForm.trigger_entrada} onChange={(e) => setPhaseForm({ ...phaseForm, trigger_entrada: e.target.value })} className="bg-secondary/50 mt-1 resize-none" />
+              </div>
+              <div>
+                <Label>Trigger de salida</Label>
+                <Textarea rows={2} value={phaseForm.trigger_salida} onChange={(e) => setPhaseForm({ ...phaseForm, trigger_salida: e.target.value })} className="bg-secondary/50 mt-1 resize-none" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditingPhase(null)}>Cancelar</Button>
+                <Button onClick={handleSavePhase} disabled={savingPhase}>{savingPhase ? 'Guardando…' : 'Guardar'}</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -199,7 +292,6 @@ function ProcessCard({ process, onClick }: { process: RoadmapProcess; onClick: (
     >
       <div className="flex items-start justify-between gap-2">
         <span className="font-medium text-sm">{process.nombre}</span>
-        {process.es_ciclo && <Badge variant="outline" className="border-primary/40 text-primary text-[10px] shrink-0">Ciclo</Badge>}
       </div>
       <Badge className={`border-0 text-[10px] mt-1.5 ${STATUS_BADGE_CLASS[process.status]}`}>
         {STATUS_LABELS[process.status]}

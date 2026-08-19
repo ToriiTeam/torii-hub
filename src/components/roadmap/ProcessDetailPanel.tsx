@@ -8,11 +8,15 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Save, Loader2, Plus, Trash2, FileText, Upload, ExternalLink, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   fetchSteps, addStep, toggleStep, deleteStep,
-  addDependency, removeDependency, fetchDocuments, uploadDocument, deleteDocument, updateProcess,
+  addDependency, removeDependency, fetchDocuments, uploadDocument, deleteDocument, updateProcess, deleteProcess,
 } from '@/features/roadmap/lib/roadmapRepo';
 import {
   STATUS_LABELS, RESPONSABLE_OPTIONS, DOCUMENT_TIPO_LABELS,
@@ -21,7 +25,6 @@ import type {
   RoadmapProcess, RoadmapProcessStep, RoadmapProcessDependency, RoadmapDocument,
   ProcessStatus, Responsable, DocumentTipo,
 } from '@/features/roadmap/types';
-import { CycleLoopDiagram } from './CycleLoopDiagram';
 
 const STATUSES = Object.keys(STATUS_LABELS) as ProcessStatus[];
 
@@ -59,17 +62,17 @@ interface Props {
   allProcesses: RoadmapProcess[];
   dependencies: RoadmapProcessDependency[];
   onClose: () => void;
-  onOpenProcess: (processId: string) => void;
   onChanged: () => void;
 }
 
-// Panel único para TODO proceso, normal o ciclo — mismo Sheet, mismos
-// campos (objetivo/cuándo/cómo construirlo/depende de/condiciona a/
-// responsable/status+fechas), más checklist y documentos. Si es_ciclo,
-// además muestra el diagrama de sus etapas (children por parent_process_id).
-export function ProcessDetailPanel({ clientId, process, allProcesses, dependencies, onClose, onOpenProcess, onChanged }: Props) {
+// Panel único para todo proceso — mismo Sheet, mismos campos (objetivo/
+// cuándo/cómo construirlo/depende de/condiciona a/responsable/status+
+// fechas), más checklist y documentos.
+export function ProcessDetailPanel({ clientId, process, allProcesses, dependencies, onClose, onChanged }: Props) {
   const [form, setForm] = useState<FormState | null>(process ? toForm(process) : null);
   const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [steps, setSteps] = useState<RoadmapProcessStep[]>([]);
   const [loadingSteps, setLoadingSteps] = useState(false);
@@ -104,11 +107,6 @@ export function ProcessDetailPanel({ clientId, process, allProcesses, dependenci
       console.error('[ProcessDetailPanel] failed to load documents:', err);
     }).finally(() => setLoadingDocs(false));
   }, [process, clientId]);
-
-  const childStages = useMemo(
-    () => (process ? allProcesses.filter((p) => p.parent_process_id === process.id) : []),
-    [process, allProcesses],
-  );
 
   const dependsOn = useMemo(
     () => (process ? dependencies.filter((d) => d.process_id === process.id) : []),
@@ -155,6 +153,23 @@ export function ProcessDetailPanel({ clientId, process, allProcesses, dependenci
       toast.error('Error al guardar');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!process) return;
+    setDeleting(true);
+    try {
+      await deleteProcess(process.id);
+      toast.success('Proceso eliminado');
+      setDeleteOpen(false);
+      onChanged();
+      onClose();
+    } catch (err) {
+      console.error('[ProcessDetailPanel] delete process failed:', err);
+      toast.error('Error al eliminar el proceso');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -246,12 +261,32 @@ export function ProcessDetailPanel({ clientId, process, allProcesses, dependenci
   }
 
   return (
-    <Sheet open onOpenChange={(v) => !v && onClose()}>
+    <>
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este proceso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará "{process.nombre}" junto con su checklist. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Sheet open onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="bg-card border-border overflow-y-auto w-full sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            {process.es_ciclo && <Badge variant="outline" className="border-primary/40 text-primary text-[10px]">Ciclo</Badge>}
+          <SheetTitle className="flex items-center justify-between gap-2 pr-8">
             Detalle del proceso
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive/60 hover:text-destructive" onClick={() => setDeleteOpen(true)} title="Eliminar proceso">
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </SheetTitle>
         </SheetHeader>
 
@@ -260,10 +295,6 @@ export function ProcessDetailPanel({ clientId, process, allProcesses, dependenci
             <Label>Nombre</Label>
             <Input value={form.nombre} onChange={(e) => upd('nombre', e.target.value)} className="bg-secondary/50 mt-1" />
           </div>
-
-          {process.es_ciclo && childStages.length > 0 && (
-            <CycleLoopDiagram stages={childStages} onNodeClick={(p) => onOpenProcess(p.id)} />
-          )}
 
           <div>
             <Label>Objetivo</Label>
@@ -447,6 +478,7 @@ export function ProcessDetailPanel({ clientId, process, allProcesses, dependenci
           </div>
         </div>
       </SheetContent>
-    </Sheet>
+      </Sheet>
+    </>
   );
 }

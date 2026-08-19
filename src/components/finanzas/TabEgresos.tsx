@@ -65,12 +65,17 @@ function fmtDate(d: string | null): string {
 
 // ─── AddEgresoDialog ──────────────────────────────────────────────────────
 
-function AddEgresoDialog({ onClose, onSaved, pushHistory }: { onClose: () => void; onSaved: () => void; pushHistory: FinanzasTabProps['pushHistory'] }) {
+const SHARED_EXPENSE = '__shared';
+
+function AddEgresoDialog({ clients, onClose, onSaved, pushHistory }: { clients: FinanzasTabProps['clients']; onClose: () => void; onSaved: () => void; pushHistory: FinanzasTabProps['pushHistory'] }) {
   const [form, setForm] = useState({
     name: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'),
     category: 'Otros' as ExpenseCategoryBucket, cost_type: 'CV' as ExpenseCostType, description: '',
+    client_id: SHARED_EXPENSE,
   });
   const [saving, setSaving] = useState(false);
+
+  const activeClients = clients.filter((c) => c.status === 'active');
 
   function upd<K extends keyof typeof form>(key: K, value: typeof form[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -86,6 +91,7 @@ function AddEgresoDialog({ onClose, onSaved, pushHistory }: { onClose: () => voi
       category: form.category,
       cost_type: form.cost_type,
       description: form.description || null,
+      client_id: form.client_id === SHARED_EXPENSE ? null : form.client_id,
     }).select().single();
     setSaving(false);
     if (error || !data) { toast.error('Error al guardar el egreso'); return; }
@@ -130,6 +136,16 @@ function AddEgresoDialog({ onClose, onSaved, pushHistory }: { onClose: () => voi
             </Select>
           </div>
           <div className="col-span-2">
+            <Label className="text-xs text-muted-foreground">Cliente</Label>
+            <Select value={form.client_id} onValueChange={(v) => upd('client_id', v)}>
+              <SelectTrigger className="bg-secondary/50 mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SHARED_EXPENSE}>Cliente compartido / Gasto general</SelectItem>
+                {activeClients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2">
             <Label className="text-xs text-muted-foreground">Notas</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => upd('description', e.target.value)} className="bg-secondary/50 mt-1 resize-none" placeholder="Detalle opcional" />
           </div>
@@ -147,7 +163,7 @@ function AddEgresoDialog({ onClose, onSaved, pushHistory }: { onClose: () => voi
 
 // ─── Main ─────────────────────────────────────────────────────────────────
 
-export default function TabEgresos({ periodBounds, expenses, refetch, pushHistory }: FinanzasTabProps) {
+export default function TabEgresos({ periodBounds, expenses, clients, refetch, pushHistory }: FinanzasTabProps) {
   const [adding, setAdding] = useState(false);
   const { periodStart, periodEnd } = periodBounds;
 
@@ -163,6 +179,11 @@ export default function TabEgresos({ periodBounds, expenses, refetch, pushHistor
     () => [...filtered].sort((a, b) => b.date.localeCompare(a.date)),
     [filtered],
   );
+
+  const clientName = useMemo(() => {
+    const byId = new Map(clients.map((c) => [c.id, c.name]));
+    return (clientId: string | null) => (clientId ? byId.get(clientId) ?? '—' : 'Compartido');
+  }, [clients]);
 
   const totalCF = useMemo(() => filtered.filter((e) => e.cost_type === 'CF').reduce((s, e) => s + Number(e.amount), 0), [filtered]);
   const totalCV = useMemo(() => filtered.filter((e) => e.cost_type === 'CV').reduce((s, e) => s + Number(e.amount), 0), [filtered]);
@@ -229,6 +250,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch, pushHistor
               <TableRow>
                 <TableHead className="text-xs">Fecha</TableHead>
                 <TableHead className="text-xs">Concepto</TableHead>
+                <TableHead className="text-xs">Cliente</TableHead>
                 <TableHead className="text-xs">Categoría</TableHead>
                 <TableHead className="text-xs">Tipo</TableHead>
                 <TableHead className="text-xs text-right">Monto</TableHead>
@@ -243,6 +265,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch, pushHistor
                     {e.name}
                     {e.description && <p className="text-xs text-muted-foreground">{e.description}</p>}
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground truncate max-w-[140px]">{clientName(e.client_id)}</TableCell>
                   <TableCell>{categoryBadge(e.category)}</TableCell>
                   <TableCell>{costTypeBadge(e.cost_type)}</TableCell>
                   <TableCell className="text-sm text-right font-medium text-destructive"><SensitiveAmount>{fmtUSD(Number(e.amount))}</SensitiveAmount></TableCell>
@@ -254,7 +277,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch, pushHistor
                 </TableRow>
               ))}
               {sorted.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">Sin egresos registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground text-sm">Sin egresos registrados</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -262,7 +285,7 @@ export default function TabEgresos({ periodBounds, expenses, refetch, pushHistor
       </Card>
 
       {adding && (
-        <AddEgresoDialog onClose={() => setAdding(false)} onSaved={refetch} pushHistory={pushHistory} />
+        <AddEgresoDialog clients={clients} onClose={() => setAdding(false)} onSaved={refetch} pushHistory={pushHistory} />
       )}
     </div>
   );
