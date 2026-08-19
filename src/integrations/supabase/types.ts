@@ -3733,6 +3733,66 @@ export type Database = {
         }
         Relationships: []
       }
+      landing_variants: {
+        Row: {
+          client_id: string
+          codigo_pegado: string | null
+          created_at: string
+          fecha_desde: string | null
+          fecha_hasta: string | null
+          id: string
+          notas: string | null
+          tipo: string | null
+          titulo: string
+          updated_at: string
+          video_embed_url: string | null
+          vsl_entry_id: string | null
+        }
+        Insert: {
+          client_id: string
+          codigo_pegado?: string | null
+          created_at?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          id?: string
+          notas?: string | null
+          tipo?: string | null
+          titulo: string
+          updated_at?: string
+          video_embed_url?: string | null
+          vsl_entry_id?: string | null
+        }
+        Update: {
+          client_id?: string
+          codigo_pegado?: string | null
+          created_at?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          id?: string
+          notas?: string | null
+          tipo?: string | null
+          titulo?: string
+          updated_at?: string
+          video_embed_url?: string | null
+          vsl_entry_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landing_variants_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "landing_variants_vsl_entry_id_fkey"
+            columns: ["vsl_entry_id"]
+            isOneToOne: false
+            referencedRelation: "vsl_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       li_account_metrics: {
         Row: {
           accept_rate: number | null
@@ -6468,6 +6528,69 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      vsl_entries: {
+        Row: {
+          client_id: string
+          codigo_pegado: string | null
+          copy: string | null
+          created_at: string
+          fecha_desde: string | null
+          fecha_hasta: string | null
+          hipotesis_doc: Json | null
+          id: string
+          notas: string | null
+          titulo: string
+          tracked_landing_id: string | null
+          updated_at: string
+          video_embed_url: string | null
+        }
+        Insert: {
+          client_id: string
+          codigo_pegado?: string | null
+          copy?: string | null
+          created_at?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          hipotesis_doc?: Json | null
+          id?: string
+          notas?: string | null
+          titulo: string
+          tracked_landing_id?: string | null
+          updated_at?: string
+          video_embed_url?: string | null
+        }
+        Update: {
+          client_id?: string
+          codigo_pegado?: string | null
+          copy?: string | null
+          created_at?: string
+          fecha_desde?: string | null
+          fecha_hasta?: string | null
+          hipotesis_doc?: Json | null
+          id?: string
+          notas?: string | null
+          titulo?: string
+          tracked_landing_id?: string | null
+          updated_at?: string
+          video_embed_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vsl_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vsl_entries_tracked_landing_id_fkey"
+            columns: ["tracked_landing_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_landings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vsl_events: {
         Row: {

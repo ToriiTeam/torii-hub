@@ -3,19 +3,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import { HipotesisSection } from '@/features/vsl-funnel/components/HipotesisSection';
 import { HistorialIteraciones } from '@/features/vsl-funnel/components/HistorialIteraciones';
+import { VslSection } from '@/features/vsl-funnel/components/VslSection';
+import { CalendarioVslFunnel } from '@/features/vsl-funnel/components/CalendarioVslFunnel';
 
 // Reemplaza a TabCreativosCliente.tsx (Árbol de Iteraciones/Ángulos/
 // Creativos) dentro de Delivery OS > VSL Funnel. "Creativos" es el mismo
 // componente de siempre, sin tocar. Historial e Hipótesis se construyeron
-// en las pasadas 2 y 3 (src/features/vsl-funnel/). VSL/Landing/Precall son
-// secciones nuevas todavía sin funcionalidad definida, quedan como
-// placeholder.
+// en las pasadas 2 y 3 (src/features/vsl-funnel/). "VSL" fusiona los
+// antiguos sub-tabs separados VSL+Landing (vsl_entries + landing_variants,
+// con landings sueltas asociables a varios VSL). "Calendario" reusa
+// CalendarioSection.tsx de Delivery OS. Precall queda como placeholder.
 const SUB_TABS = [
   { value: 'historial', label: 'Historial' },
   { value: 'hipotesis', label: 'Hipótesis' },
   { value: 'creativos', label: 'Creativos' },
   { value: 'vsl', label: 'VSL' },
-  { value: 'landing', label: 'Landing' },
+  { value: 'calendario', label: 'Calendario' },
   { value: 'precall', label: 'Precall' },
 ];
 
@@ -46,10 +49,10 @@ export default function TabVSLFunnel({ clientId }: Props) {
         <TabCreativos clientId={clientId} />
       </TabsContent>
       <TabsContent value="vsl">
-        <Proximamente label="VSL" />
+        <VslSection clientId={clientId} />
       </TabsContent>
-      <TabsContent value="landing">
-        <Proximamente label="Landing" />
+      <TabsContent value="calendario">
+        <CalendarioVslFunnel clientId={clientId} />
       </TabsContent>
       <TabsContent value="precall">
         <Proximamente label="Precall" />

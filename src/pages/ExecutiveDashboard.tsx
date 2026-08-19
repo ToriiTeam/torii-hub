@@ -1,29 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip as UiTooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Info } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { PortfolioView } from '@/features/executive-dashboard/components/PortfolioView';
-import { ClientView } from '@/features/executive-dashboard/components/ClientView';
 import { ToriiView } from '@/features/executive-dashboard/components/ToriiView';
 import { VslFunnelView } from '@/features/executive-dashboard/components/VslFunnelView';
 import { PeriodSelector } from '@/features/executive-dashboard/components/shared/PeriodSelector';
 import { fetchPortfolioData } from '@/features/executive-dashboard/lib/fetchPortfolioData';
-import { fetchClientData } from '@/features/executive-dashboard/lib/fetchClientData';
 import { fetchToriiData } from '@/features/executive-dashboard/lib/fetchToriiData';
 import { fetchVslFunnelData } from '@/features/executive-dashboard/lib/fetchVslFunnel';
 import { MetaSyncAlertBanner } from '@/features/meta-ads/components/common/MetaSyncAlertBanner';
 import { getPeriodRange, periodSuffixLabel, clampToNuevoTorii, type PeriodType, type PresetKey } from '@/features/executive-dashboard/lib/periodRange';
-import type { PortfolioData, ClientDetailData, ToriiData } from '@/features/executive-dashboard/types';
+import type { PortfolioData, ToriiData } from '@/features/executive-dashboard/types';
 import type { VslFunnelData } from '@/features/executive-dashboard/lib/fetchVslFunnel';
 
 const ALL_CLIENTS = 'all';
 const TORII = 'torii';
-
-interface ClientOption { id: string; name: string; }
 
 function navMonth(year: number, month: number, dir: 'prev' | 'next'): { year: number; month: number } {
   if (dir === 'prev') return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
@@ -32,8 +26,13 @@ function navMonth(year: number, month: number, dir: 'prev' | 'next'): { year: nu
 
 export default function ExecutiveDashboard() {
   const now = new Date();
-  const [clients, setClients] = useState<ClientOption[]>([]);
-  const [selectedClient, setSelectedClient] = useState<string>(TORII);
+  // Vista portfolio/Torii únicamente — el dashboard de un cliente puntual
+  // vive en TabDashboardCliente.tsx (dentro de la ficha de cada cliente,
+  // ClienteDetalle.tsx), que reusa ClientView/fetchClientData por su
+  // cuenta. No se borran esos 2 archivos: fetchClientData.ts también
+  // alimenta phaseMetrics.ts y MetricasClave.tsx, ninguno relacionado con
+  // este dashboard.
+  const [view, setView] = useState<typeof ALL_CLIENTS | typeof TORII>(TORII);
 
   const [periodType, setPeriodType] = useState<PeriodType>('preset');
   const [preset, setPreset] = useState<PresetKey>('all');
@@ -56,7 +55,6 @@ export default function ExecutiveDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
-  const [clientData, setClientData] = useState<ClientDetailData | null>(null);
   const [toriiData, setToriiData] = useState<ToriiData | null>(null);
   const [vslFunnelData, setVslFunnelData] = useState<VslFunnelData | null>(null);
   const [toriiTab, setToriiTab] = useState<'resumen' | 'funnel'>('resumen');
@@ -65,22 +63,16 @@ export default function ExecutiveDashboard() {
   const toriiRange = nuevoToriiOnly ? { ...range, ...clampToNuevoTorii(range.since, range.until) } : range;
 
   useEffect(() => {
-    supabase.from('clients').select('id, name').order('name').then(({ data }) => setClients(data ?? []));
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const { since, until, isShortPeriod } = range;
+    const { since, until } = range;
 
-    const load = selectedClient === ALL_CLIENTS
-      ? fetchPortfolioData(since, until).then((data) => { if (!cancelled) { setPortfolioData(data); setClientData(null); setToriiData(null); } })
-      : selectedClient === TORII
-      ? Promise.all([
+    const load = view === ALL_CLIENTS
+      ? fetchPortfolioData(since, until).then((data) => { if (!cancelled) { setPortfolioData(data); setToriiData(null); } })
+      : Promise.all([
           fetchToriiData(toriiRange.since, toriiRange.until, nuevoToriiOnly),
           fetchVslFunnelData(toriiRange.since, toriiRange.until),
-        ]).then(([data, funnel]) => { if (!cancelled) { setToriiData(data); setVslFunnelData(funnel); setPortfolioData(null); setClientData(null); } })
-      : fetchClientData(selectedClient, since, until, isShortPeriod).then((data) => { if (!cancelled) { setClientData(data); setPortfolioData(null); setToriiData(null); } });
+        ]).then(([data, funnel]) => { if (!cancelled) { setToriiData(data); setVslFunnelData(funnel); setPortfolioData(null); } });
 
     load
       .catch((err) => console.error('[ExecutiveDashboard] load failed:', err))
@@ -88,7 +80,7 @@ export default function ExecutiveDashboard() {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClient, periodType, preset, year, month, customSince, customUntil, nuevoToriiOnly]);
+  }, [view, periodType, preset, year, month, customSince, customUntil, nuevoToriiOnly]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -98,7 +90,7 @@ export default function ExecutiveDashboard() {
           <h1 className="text-2xl font-bold">Dashboard Ejecutivo</h1>
           <p className="text-sm text-muted-foreground">Vista consolidada de ads, closing, revenue y VSL por cliente</p>
         </div>
-        {selectedClient === TORII && (
+        {view === TORII && (
           <div className="flex items-center gap-2 bg-secondary/50 rounded-lg px-3 h-9">
             <Label htmlFor="nuevo-torii-toggle" className="text-sm cursor-pointer">
               {nuevoToriiOnly ? 'Nuevo Torii' : 'Viejo Torii'}
@@ -114,14 +106,12 @@ export default function ExecutiveDashboard() {
             </UiTooltip>
           </div>
         )}
-        <Select value={selectedClient} onValueChange={setSelectedClient}>
-          <SelectTrigger className="w-52 h-9 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_CLIENTS}>Todos los clientes</SelectItem>
-            <SelectItem value={TORII}>Torii</SelectItem>
-            {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Tabs value={view} onValueChange={(v) => setView(v as typeof ALL_CLIENTS | typeof TORII)}>
+          <TabsList>
+            <TabsTrigger value={TORII}>Torii</TabsTrigger>
+            <TabsTrigger value={ALL_CLIENTS}>Todos los clientes</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <PeriodSelector
@@ -136,7 +126,7 @@ export default function ExecutiveDashboard() {
         onCustomChange={(since, until) => { setCustomSince(since); setCustomUntil(until); }}
       />
 
-      {selectedClient === TORII && !loading && (
+      {view === TORII && !loading && (
         <Tabs value={toriiTab} onValueChange={(v) => setToriiTab(v as 'resumen' | 'funnel')}>
           <TabsList>
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
@@ -149,26 +139,22 @@ export default function ExecutiveDashboard() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
         </div>
-      ) : selectedClient === ALL_CLIENTS ? (
+      ) : view === ALL_CLIENTS ? (
         portfolioData && <PortfolioView data={portfolioData} />
-      ) : selectedClient === TORII ? (
-        toriiTab === 'resumen' ? (
-          toriiData && (
-            <ToriiView
-              data={toriiData}
-              periodSuffix={periodSuffixLabel({ periodType, preset })}
-              periodStart={toriiRange.since}
-              periodEnd={toriiRange.until}
-              nuevoToriiOnly={nuevoToriiOnly}
-            />
-          )
-        ) : (
-          toriiData && vslFunnelData && (
-            <VslFunnelView metrics={toriiData} vslFunnelData={vslFunnelData} nuevoToriiOnly={nuevoToriiOnly} />
-          )
+      ) : toriiTab === 'resumen' ? (
+        toriiData && (
+          <ToriiView
+            data={toriiData}
+            periodSuffix={periodSuffixLabel({ periodType, preset })}
+            periodStart={toriiRange.since}
+            periodEnd={toriiRange.until}
+            nuevoToriiOnly={nuevoToriiOnly}
+          />
         )
       ) : (
-        clientData && <ClientView data={clientData} />
+        toriiData && vslFunnelData && (
+          <VslFunnelView metrics={toriiData} vslFunnelData={vslFunnelData} nuevoToriiOnly={nuevoToriiOnly} />
+        )
       )}
     </div>
   );

@@ -511,7 +511,13 @@ export default function VslTracking() {
   // Auditor role is RLS-scoped to landing_id='torii-principal' rows only —
   // "todas las landings" would just render as if the others don't exist,
   // so start (and lock) the filter on the one landing they can actually see.
-  const [landingId, setLandingId] = useState(isAuditor ? 'torii-principal' : ALL_LANDINGS);
+  // ?landing=<landing_id> permite un deep-link directo (ej. desde el mini-
+  // resumen de métricas de un VSL entry) — se lee una sola vez al montar,
+  // no queda sincronizado bidireccionalmente con la URL después.
+  const [landingId, setLandingId] = useState(() => {
+    if (isAuditor) return 'torii-principal';
+    return new URLSearchParams(window.location.search).get('landing') ?? ALL_LANDINGS;
+  });
   const [utmCampaign, setUtmCampaign] = useState(ALL_CAMPAIGNS);
   const [trendGranularity, setTrendGranularity] = useState<'day' | 'week'>('day');
   // Off by default — traffic with no utm_source is excluded from every KPI/
