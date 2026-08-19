@@ -2920,6 +2920,48 @@ export type Database = {
         }
         Relationships: []
       }
+      creative_iteration_log: {
+        Row: {
+          client_id: string
+          created_at: string
+          fecha: string
+          id: string
+          reemplaza_a_id: string | null
+          texto: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          reemplaza_a_id?: string | null
+          texto: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          reemplaza_a_id?: string | null
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creative_iteration_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creative_iteration_log_reemplaza_a_id_fkey"
+            columns: ["reemplaza_a_id"]
+            isOneToOne: false
+            referencedRelation: "creative_iteration_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crm_clientes: {
         Row: {
           asistio: boolean | null

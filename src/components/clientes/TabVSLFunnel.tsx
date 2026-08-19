@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import { HipotesisSection } from '@/features/vsl-funnel/components/HipotesisSection';
+import { HistorialIteraciones } from '@/features/vsl-funnel/components/HistorialIteraciones';
 
 // Reemplaza a TabCreativosCliente.tsx (Árbol de Iteraciones/Ángulos/
 // Creativos) dentro de Delivery OS > VSL Funnel. "Creativos" es el mismo
-// componente de siempre, sin tocar. Hipótesis se construyó en la pasada 3
-// (src/features/vsl-funnel/). Historial queda para la pasada 2.
-// VSL/Landing/Precall son secciones nuevas todavía sin funcionalidad
-// definida, quedan como placeholder.
+// componente de siempre, sin tocar. Historial e Hipótesis se construyeron
+// en las pasadas 2 y 3 (src/features/vsl-funnel/). VSL/Landing/Precall son
+// secciones nuevas todavía sin funcionalidad definida, quedan como
+// placeholder.
 const SUB_TABS = [
   { value: 'historial', label: 'Historial' },
   { value: 'hipotesis', label: 'Hipótesis' },
@@ -36,7 +37,7 @@ export default function TabVSLFunnel({ clientId }: Props) {
       </TabsList>
 
       <TabsContent value="historial">
-        <Proximamente label="Historial" />
+        <HistorialIteraciones clientId={clientId} />
       </TabsContent>
       <TabsContent value="hipotesis">
         <HipotesisSection clientId={clientId} />
