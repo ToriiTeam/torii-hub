@@ -104,6 +104,18 @@ const SITUACIONES = [
   'No se presentó', 'No calificó', 'Seguimiento', 'Cerró', 'Reagendado', 'Sin información',
 ];
 
+// Reemplaza el booleano viejo califico (deprecado, ver migración
+// migrate_calificacion_to_3_valores en torii-portal) — mismas 3 opciones
+// que ya usa VentasPage.tsx del Portal, mismo campo real (calificacion).
+const CALIFICACION_OPTIONS = ['Calificado', 'Calificado tipo B', 'Semicalificado'];
+
+// 'Calificado tipo B' cuenta como calificado para las métricas de embudo/
+// grupo (mismo criterio que calificadosAmplio en Portal.tsx); 'Semicalificado'
+// no cuenta como calificado para ningún cálculo agregado acá.
+function isCalificado(c: Call): boolean {
+  return c.calificacion === 'Calificado' || c.calificacion === 'Calificado tipo B';
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string | null) {
@@ -210,7 +222,7 @@ function FunnelCard({ total, asistieron, calificados, cerrados }: {
 function FollowUpsCard({ calls }: { calls: Call[] }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const pending = [...calls]
-    .filter(c => c.califico && !c.cerro)
+    .filter(c => isCalificado(c) && !c.cerro)
     .sort((a, b) => {
       if (!a.next_followup_date && !b.next_followup_date) return 0;
       if (!a.next_followup_date) return 1;
@@ -276,7 +288,7 @@ function buildGroupRows(calls: Call[], keyOf: (c: Call) => string): GroupRow[] {
       key,
       total: group.length,
       asistieron: group.filter(c => c.se_presento).length,
-      calificados: group.filter(c => c.califico).length,
+      calificados: group.filter(isCalificado).length,
       cerrados: closed.length,
       revenue: closed.reduce((s, c) => s + revenueOf(c), 0),
       cashUpfront: closed.filter(c => c.pago_en_llamada).reduce((s, c) => s + revenueOf(c), 0),
@@ -623,7 +635,6 @@ function NewCallDialog({ closers, owner, onClose, onSaved }: {
       owner_type:     owner === TORII ? 'torii' : 'client',
       client_id:      owner === TORII ? null : owner,
       se_presento:    false,
-      califico:       false,
       cerro:          false,
       pago_en_llamada: false,
       followup_count: 0,
@@ -697,7 +708,7 @@ type DForm = {
   setter_agendo: string; closer: string; nicho: string;
   se_presento: boolean; situacion_resultado: string; segunda_llamada_fecha: string; segunda_llamada_status: string;
   oferta_hecha: boolean; segunda_llamada_se_presento: boolean; reagenda_texto: string; situacion_3ra_llamada: string;
-  califico: boolean; cerro: boolean; producto: string; precio: string; comision_estimada: string;
+  calificacion: string; cerro: boolean; producto: string; precio: string; comision_estimada: string;
   num_cuotas: string; pago_en_llamada: boolean; loss_reason: string;
   situacion_laboral: string; nivel_ingresos: string; capacidad_ahorro: string;
   preocupacion_actual: string; edad: string; hijos_casado: string;
@@ -724,7 +735,7 @@ function toForm(c: Call): DForm {
     segunda_llamada_se_presento: c.segunda_llamada_se_presento ?? false,
     reagenda_texto:               c.reagenda_texto ?? '',
     situacion_3ra_llamada:        c.situacion_3ra_llamada ?? '',
-    califico:               c.califico ?? false,
+    calificacion:            c.calificacion ?? NONE,
     cerro:                  c.cerro ?? false,
     producto:               c.producto ?? '',
     precio:                 c.precio?.toString() ?? '',
@@ -785,7 +796,7 @@ function DetailDialog({ call, closers, owner, onClose, onSaved }: {
       segunda_llamada_se_presento: f.segunda_llamada_se_presento,
       reagenda_texto:               f.reagenda_texto || null,
       situacion_3ra_llamada:        f.situacion_3ra_llamada || null,
-      califico:               f.califico,
+      calificacion:            orNull(f.calificacion),
       cerro:                  f.cerro,
       producto:               f.producto || null,
       precio:                 f.precio ? parseFloat(f.precio) : null,
@@ -933,13 +944,21 @@ function DetailDialog({ call, closers, owner, onClose, onSaved }: {
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Resultado</p>
           <div className="flex flex-wrap gap-6 mb-3">
-            <CheckField id="dlg-califico" label="Calificado" checked={f.califico} onCheckedChange={v => upd('califico', v)} />
             <CheckField id="dlg-cerro" label="Cerrado" checked={f.cerro} onCheckedChange={v => upd('cerro', v)} />
             {isTorii && (
               <CheckField id="dlg-pago_en_llamada" label="Pagó en llamada" checked={f.pago_en_llamada} onCheckedChange={v => upd('pago_en_llamada', v)} />
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <F label="Calificación">
+              <Select value={f.calificacion} onValueChange={v => upd('calificacion', v)}>
+                <SelectTrigger className="bg-secondary/50 h-8 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>—</SelectItem>
+                  {CALIFICACION_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </F>
             {!isTorii && (
               <F label="Producto">
                 <Input value={f.producto} onChange={e => upd('producto', e.target.value)} className="bg-secondary/50 h-8 text-sm" />
@@ -957,7 +976,7 @@ function DetailDialog({ call, closers, owner, onClose, onSaved }: {
               </F>
             )}
           </div>
-          {f.califico && !f.cerro && (
+          {f.calificacion !== NONE && !f.cerro && (
             <div className="mt-3">
               <F label="Motivo de no cierre">
                 <Select value={f.loss_reason} onValueChange={v => upd('loss_reason', v)}>
@@ -1055,7 +1074,7 @@ function DetailDialog({ call, closers, owner, onClose, onSaved }: {
             <Button variant="outline" size="sm" onClick={handleDelete} disabled={saving} className="text-destructive border-destructive/40 hover:bg-destructive/10">
               <Trash2 className="h-4 w-4 mr-1" />Eliminar
             </Button>
-            {f.califico && !f.cerro && (
+            {f.calificacion !== NONE && !f.cerro && (
               <Button variant="outline" size="sm" onClick={markClosed} disabled={saving} className="text-success border-success/40 hover:bg-success/10">
                 <CheckCircle className="h-4 w-4 mr-1" />Marcar como cerrado
               </Button>
@@ -1128,9 +1147,11 @@ const CRM_COLUMNS: Record<string, ColumnDef> = {
     header: 'Se presentó',
     cell: c => YES_NO_BADGE(c.se_presento),
   },
-  califico: {
-    header: 'Calificó',
-    cell: c => YES_NO_BADGE(c.califico),
+  calificacion: {
+    header: 'Calificación',
+    cell: c => c.calificacion
+      ? <Badge className="text-xs border-0 bg-warning/20 text-warning">{c.calificacion}</Badge>
+      : <span className="text-muted-foreground text-xs">—</span>,
   },
   situacion_resultado: {
     header: 'Situación',
@@ -1220,14 +1241,14 @@ const CRM_COLUMNS: Record<string, ColumnDef> = {
 
 const TORII_COLUMN_KEYS = [
   'lead_name', 'fecha_llamada', 'hora_llamada', 'fuente', 'setter_agendo', 'nicho', 'closer',
-  'se_presento', 'califico', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
+  'se_presento', 'calificacion', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
   'reagenda_texto', 'situacion_3ra_llamada', 'cerro', 'precio', 'num_cuotas',
   'pago_en_llamada', 'loss_reason', 'next_followup_date', 'seguimiento_requerido', 'estado_seguimiento',
 ];
 
 const CLIENT_COLUMN_KEYS = [
   'lead_name', 'fecha_llamada', 'hora_llamada', 'ad_id', 'nicho', 'closer',
-  'se_presento', 'califico', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
+  'se_presento', 'calificacion', 'situacion_resultado', 'oferta_hecha', 'segunda_llamada_se_presento',
   'reagenda_texto', 'situacion_3ra_llamada', 'cerro', 'producto', 'precio',
   'comision_estimada', 'loss_reason', 'next_followup_date', 'seguimiento_requerido', 'estado_seguimiento',
   'situacion_laboral', 'nivel_ingresos', 'capacidad_ahorro', 'edad',
@@ -1239,7 +1260,7 @@ const CLIENT_COLUMN_KEYS = [
 // that mode's column list, so it has no effect either way.
 const ALWAYS_VISIBLE_KEYS = new Set(['lead_name']);
 const DEFAULT_VISIBLE_KEYS = new Set([
-  'lead_name', 'fecha_llamada', 'closer', 'se_presento', 'califico', 'cerro',
+  'lead_name', 'fecha_llamada', 'closer', 'se_presento', 'calificacion', 'cerro',
   'precio', 'comision_estimada', 'producto', 'next_followup_date',
   // Added to bring the default closer to the old Google Sheets' column set.
   'fuente', 'setter_agendo', 'num_cuotas', 'pago_en_llamada', 'loss_reason',
@@ -1289,7 +1310,7 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
   const [filterCloser, setFilterCloser] = useState('all');
   const [filterFuente, setFilterFuente] = useState('all');
   const [filterNicho, setFilterNicho]   = useState('');
-  const [filterCalifico, setFilterCalifico] = useState('all');
+  const [filterCalificacion, setFilterCalificacion] = useState('all');
   const [filterCerro, setFilterCerro]   = useState('all');
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => loadVisibleColumns(TORII));
 
@@ -1348,7 +1369,7 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
   const total          = viewCalls.length;
   const asistieron     = viewCalls.filter(c => c.se_presento).length;
   const noShow         = total - asistieron;
-  const calificados    = viewCalls.filter(c => c.califico).length;
+  const calificados    = viewCalls.filter(isCalificado).length;
   const closedCalls    = viewCalls.filter(c => c.cerro);
   const cerrados       = closedCalls.length;
   const revenue        = closedCalls.reduce((s, c) => s + revenueOf(c), 0);
@@ -1388,8 +1409,8 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
     if (filterCloser !== 'all' && normalizeCloserName(c.closer ?? '') !== normalizeCloserName(filterCloser)) return false;
     if (filterFuente !== 'all' && fuenteOf(c) !== filterFuente) return false;
     if (nichoLC && !(c.nicho ?? '').toLowerCase().includes(nichoLC)) return false;
-    if (filterCalifico === 'yes' && !c.califico) return false;
-    if (filterCalifico === 'no'  && c.califico)  return false;
+    if (filterCalificacion === 'yes' && !isCalificado(c)) return false;
+    if (filterCalificacion === 'no'  && isCalificado(c))  return false;
     if (filterCerro === 'yes' && !c.cerro) return false;
     if (filterCerro === 'no'  && c.cerro)  return false;
     return true;
@@ -1535,7 +1556,7 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
                   placeholder="Nicho…"
                   className="w-32 h-8 bg-secondary/50 text-sm"
                 />
-                <Select value={filterCalifico} onValueChange={setFilterCalifico}>
+                <Select value={filterCalificacion} onValueChange={setFilterCalificacion}>
                   <SelectTrigger className="w-36 h-8 bg-secondary/50 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Calificación: todos</SelectItem>
