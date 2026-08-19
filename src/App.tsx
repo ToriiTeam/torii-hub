@@ -22,6 +22,7 @@ import ContenidoOrganico from "@/pages/ContenidoOrganico";
 import Portal from "@/pages/Portal";
 import Academia from "@/pages/Academia";
 import AuditorVslFunnel from "@/pages/AuditorVslFunnel";
+import Landings from "@/pages/Landings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -111,6 +112,7 @@ function AppContent() {
             <Route path="/reportes" element={<Reportes />} />
             <Route path="/vsl-tracking" element={<VslTracking />} />
             <Route path="/maquina-cierres" element={<MaquinaCierres />} />
+            <Route path="/landings" element={<Landings />} />
             <Route path="/tareas" element={<Tareas />} />
             <Route path="/meta-ads" element={<MetaAds />} />
             <Route path="/contenido" element={<ContenidoOrganico />} />

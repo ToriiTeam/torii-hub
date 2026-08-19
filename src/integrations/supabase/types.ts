@@ -6157,6 +6157,54 @@ export type Database = {
         }
         Relationships: []
       }
+      tracked_landings: {
+        Row: {
+          active: boolean
+          business_line: string
+          client_id: string | null
+          created_at: string
+          group_id: string | null
+          id: string
+          label: string
+          landing_id: string
+        }
+        Insert: {
+          active?: boolean
+          business_line?: string
+          client_id?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          label: string
+          landing_id: string
+        }
+        Update: {
+          active?: boolean
+          business_line?: string
+          client_id?: string | null
+          created_at?: string
+          group_id?: string | null
+          id?: string
+          label?: string
+          landing_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracked_landings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracked_landings_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "tracked_landings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_audit_tasks: {
         Row: {
           category: string | null

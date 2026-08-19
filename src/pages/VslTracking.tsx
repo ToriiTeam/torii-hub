@@ -15,38 +15,55 @@ import { startOfWeek, format, parseISO, differenceInCalendarDays } from 'date-fn
 import { es } from 'date-fns/locale';
 
 type VslEvent = Database['public']['Tables']['vsl_events']['Row'];
+type TrackedLanding = Database['public']['Tables']['tracked_landings']['Row'];
 
 const ALL_LANDINGS = 'all';
 const ALL_CAMPAIGNS = 'all';
 
-// Fixed list, not derived from data — a landing should be selectable (and
-// show up as all-zeros) even before its first event lands. Torii's hook
-// landings are deliberately NOT listed individually here — they rotate
-// over time (new angles replace old ones), so hardcoding their ids would
-// mean editing this file every time one changes. They're only reachable
-// through the "Torii — Todas las variantes" umbrella below, discovered
-// dynamically from the data instead.
-const LANDING_OPTIONS = [
-  { id: 'torii-principal', label: 'Torii — Todas las variantes' },
-  { id: 'adolfo-blasco', label: 'Adolfo Blasco' },
-  { id: 'raul-galindo', label: 'Raul Galindo' },
-] as const;
-
-// Selecting 'torii-principal' is an umbrella pick, not a literal single-
-// landing filter: it aggregates the original landing with any current
-// 'torii-hook-*' landing (pattern match, not a fixed id list — see the
-// LANDING_OPTIONS comment above for why), since day-to-day the team thinks
-// of them as one funnel with different entry pages.
-const TORII_UMBRELLA_ID = 'torii-principal';
-
-function isToriiHook(landingId: string | null): boolean {
-  return !!landingId && landingId.startsWith('torii-hook-');
+// Landing options come from tracked_landings (registered via /landings)
+// instead of a hardcoded array — a landing should be selectable (and show
+// up as all-zeros) even before its first event lands, and adding one is a
+// database row instead of an edit to this file. Only rows with group_id
+// null are selectable directly; a row with group_id set (e.g. Torii's
+// rotating hook variants) is only reachable through its parent's umbrella
+// pick — see parentLandingIdOf below.
+function buildParentLandingIdOf(landings: TrackedLanding[]): Map<string, string> {
+  const byId = new Map(landings.map(l => [l.id, l]));
+  const parentOf = new Map<string, string>(); // child landing_id -> parent landing_id
+  for (const l of landings) {
+    if (!l.group_id) continue;
+    const parent = byId.get(l.group_id);
+    if (parent) parentOf.set(l.landing_id, parent.landing_id);
+  }
+  return parentOf;
 }
 
-function matchesLandingFilter(eventLandingId: string | null, landingId: string): boolean {
+function buildChildrenOf(parentOf: Map<string, string>): Map<string, string[]> {
+  const childrenOf = new Map<string, string[]>(); // parent landing_id -> [child landing_id]
+  for (const [child, parent] of parentOf) {
+    const arr = childrenOf.get(parent);
+    if (arr) arr.push(child); else childrenOf.set(parent, [child]);
+  }
+  return childrenOf;
+}
+
+// Selecting a landing with children is an umbrella pick, not a literal
+// single-landing filter: it aggregates the landing with everything whose
+// group_id points at it (any current Torii hook variant, or whatever else
+// gets registered under a parent), since day-to-day the team thinks of
+// them as one funnel with different entry pages.
+function matchesLandingFilter(eventLandingId: string | null, landingId: string, parentOf: Map<string, string>): boolean {
   if (landingId === ALL_LANDINGS) return true;
-  if (landingId === TORII_UMBRELLA_ID) return eventLandingId === TORII_UMBRELLA_ID || isToriiHook(eventLandingId);
-  return eventLandingId === landingId;
+  if (!eventLandingId) return false;
+  if (eventLandingId === landingId) return true;
+  return parentOf.get(eventLandingId) === landingId;
+}
+
+function landingZeroRow(landingId: string): UtmBreakdownRow {
+  return {
+    key: landingId, fullValue: landingId, campaign: null,
+    sessions: 0, playRate: 0, avgProgress: 0, ctaClicks: 0, formSubmits: 0, conversionRate: 0,
+  };
 }
 
 // Video progress milestones, in order. Each is a distinct event_name that
@@ -472,6 +489,24 @@ export default function VslTracking() {
   const { isAuditor } = useAuth();
   const [events, setEvents] = useState<VslEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trackedLandings, setTrackedLandings] = useState<TrackedLanding[]>([]);
+
+  useEffect(() => {
+    supabase.from('tracked_landings').select('*').eq('active', true).then(({ data, error }) => {
+      if (error) { console.error('[VslTracking] Error loading tracked_landings:', error); return; }
+      setTrackedLandings(data ?? []);
+    });
+  }, []);
+
+  // Roots are the selectable top-level options (group_id null); parentOf/
+  // childrenOf resolve the one-level rollup for both filtering and the
+  // per-landing summary table.
+  const rootLandings = useMemo(
+    () => trackedLandings.filter(l => l.group_id === null).sort((a, b) => a.label.localeCompare(b.label)),
+    [trackedLandings],
+  );
+  const parentLandingIdOf = useMemo(() => buildParentLandingIdOf(trackedLandings), [trackedLandings]);
+  const childrenLandingIdsOf = useMemo(() => buildChildrenOf(parentLandingIdOf), [parentLandingIdOf]);
   const [dateRangeKey, setDateRangeKey] = useState<typeof DATE_RANGES[number]['key']>('30');
   // Auditor role is RLS-scoped to landing_id='torii-principal' rows only —
   // "todas las landings" would just render as if the others don't exist,
@@ -497,8 +532,10 @@ export default function VslTracking() {
     let cancelled = false;
     async function loadEarliest() {
       let query = supabase.from('vsl_events').select('created_at').order('created_at', { ascending: true }).limit(1);
-      if (landingId === TORII_UMBRELLA_ID) query = query.or('landing_id.eq.torii-principal,landing_id.like.torii-hook-*');
-      else if (landingId !== ALL_LANDINGS) query = query.eq('landing_id', landingId);
+      if (landingId !== ALL_LANDINGS) {
+        const children = childrenLandingIdsOf.get(landingId);
+        query = children?.length ? query.in('landing_id', [landingId, ...children]) : query.eq('landing_id', landingId);
+      }
       if (!includeNoUtm) query = query.not('utm_source', 'is', null);
       const { data, error } = await query;
       if (cancelled) return;
@@ -507,7 +544,7 @@ export default function VslTracking() {
     }
     loadEarliest();
     return () => { cancelled = true; };
-  }, [landingId, includeNoUtm]);
+  }, [landingId, includeNoUtm, childrenLandingIdsOf]);
 
   async function loadData() {
     setLoading(true);
@@ -539,17 +576,17 @@ export default function VslTracking() {
   // Only the date range triggers a refetch — landing/campaign filters and
   // the trend granularity toggle all operate on the already-loaded window.
   const campaignOptions = useMemo(() => {
-    const scoped = events.filter(e => matchesLandingFilter(e.landing_id, landingId));
+    const scoped = events.filter(e => matchesLandingFilter(e.landing_id, landingId, parentLandingIdOf));
     return Array.from(new Set(scoped.map(e => e.utm_campaign).filter((v): v is string => !!v))).sort();
-  }, [events, landingId]);
+  }, [events, landingId, parentLandingIdOf]);
 
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
-      if (!matchesLandingFilter(e.landing_id, landingId)) return false;
+      if (!matchesLandingFilter(e.landing_id, landingId, parentLandingIdOf)) return false;
       if (utmCampaign !== ALL_CAMPAIGNS && e.utm_campaign !== utmCampaign) return false;
       return true;
     });
-  }, [events, landingId, utmCampaign]);
+  }, [events, landingId, utmCampaign, parentLandingIdOf]);
 
   const sessionSummaries = useMemo(
     () => Array.from(buildSessionSummaries(filteredEvents).values()),
@@ -577,39 +614,32 @@ export default function VslTracking() {
   );
   const trend = useMemo(() => buildTrend(filteredEvents, trendGranularity), [filteredEvents, trendGranularity]);
 
-  // Meaningful in two views: "all landings" (every LANDING_OPTIONS entry) and
-  // the Torii umbrella pick. Any other single-landing selection already only
+  // Meaningful in two views: "all landings" (every registered root) and a
+  // parent umbrella pick. Any other single-landing selection already only
   // has that one landing's data in sessionSummaries, so the breakdown table
   // would be redundant.
-  // Starts from a fixed id list (known landings, whether they have traffic
-  // yet or not) instead of only the landing_ids present in the fetched
-  // events — otherwise a landing with zero events would silently never show
-  // up here at all. The Torii umbrella is the one exception: its hook rows
-  // are discovered dynamically (any 'torii-hook-*' id with data in the
-  // selected range), since hooks rotate and a fixed list would need code
-  // changes every time one does — only 'torii-principal' itself stays
-  // pinned as the fixed historical fallback row.
+  // Starts from tracked_landings (whether they have traffic yet or not)
+  // instead of only the landing_ids present in the fetched events —
+  // otherwise a freshly-registered landing would silently never show up
+  // here at all until it gets its first hit.
   const landingBreakdown = useMemo(() => {
-    if (landingId !== ALL_LANDINGS && landingId !== TORII_UMBRELLA_ID) return [];
-
     const real = buildUtmBreakdown(sessionSummaries, s => s.landingId);
     const byKey = new Map(real.map(r => [r.key, r]));
-    const zeroRow = (id: string): UtmBreakdownRow => ({
-      key: id, fullValue: id, campaign: null,
-      sessions: 0, playRate: 0, avgProgress: 0, ctaClicks: 0, formSubmits: 0, conversionRate: 0,
-    });
 
-    if (landingId === TORII_UMBRELLA_ID) {
-      const principalRow = byKey.get(TORII_UMBRELLA_ID) ?? zeroRow(TORII_UMBRELLA_ID);
-      const hookRows = real.filter(r => isToriiHook(r.key));
-      return [principalRow, ...hookRows].sort((a, b) => b.sessions - a.sessions);
+    if (landingId === ALL_LANDINGS) {
+      const known = trackedLandings.map(l => byKey.get(l.landing_id) ?? landingZeroRow(l.landing_id));
+      const knownIds = new Set(trackedLandings.map(l => l.landing_id));
+      const unlisted = real.filter(r => !knownIds.has(r.key));
+      return [...known, ...unlisted].sort((a, b) => b.sessions - a.sessions);
     }
 
-    const known = LANDING_OPTIONS.map(opt => byKey.get(opt.id) ?? zeroRow(opt.id));
-    const knownIds = new Set<string>(LANDING_OPTIONS.map(opt => opt.id));
-    const unlisted = real.filter(r => !knownIds.has(r.key));
-    return [...known, ...unlisted].sort((a, b) => b.sessions - a.sessions);
-  }, [sessionSummaries, landingId]);
+    const children = childrenLandingIdsOf.get(landingId);
+    if (!children?.length) return [];
+
+    const parentRow = byKey.get(landingId) ?? landingZeroRow(landingId);
+    const childRows = children.map(c => byKey.get(c) ?? landingZeroRow(c));
+    return [parentRow, ...childRows].sort((a, b) => b.sessions - a.sessions);
+  }, [sessionSummaries, landingId, trackedLandings, childrenLandingIdsOf]);
 
   const sourceBreakdown = useMemo(
     () => buildUtmBreakdown(sessionSummaries, s => s.utmSource)
@@ -704,7 +734,7 @@ export default function VslTracking() {
       <div className="flex flex-wrap gap-3">
         {isAuditor ? (
           <div className="w-[220px] flex items-center px-3 h-9 rounded-md border border-input bg-secondary/50 text-sm">
-            {LANDING_OPTIONS.find(l => l.id === 'torii-principal')?.label ?? 'Torii — Principal'}
+            {rootLandings.find(l => l.landing_id === 'torii-principal')?.label ?? 'Torii — Principal'}
           </div>
         ) : (
           <Select value={landingId} onValueChange={setLandingId}>
@@ -713,8 +743,8 @@ export default function VslTracking() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL_LANDINGS}>Todas las landings</SelectItem>
-              {LANDING_OPTIONS.map(l => (
-                <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
+              {rootLandings.map(l => (
+                <SelectItem key={l.id} value={l.landing_id}>{l.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -857,7 +887,10 @@ export default function VslTracking() {
           </div>
 
           {/* Per-landing summary — shown in the "all landings" view and the Torii umbrella pick */}
-          {(landingId === ALL_LANDINGS || landingId === TORII_UMBRELLA_ID) && landingBreakdown.length > 1 && (
+          {/* landingBreakdown is already [] for any single-landing pick without
+              children, so length alone decides visibility here — no need to
+              special-case ALL_LANDINGS vs. a specific umbrella pick. */}
+          {landingBreakdown.length > 1 && (
             <Card className="bg-card border-border/50">
               <CardHeader>
                 <CardTitle className="text-base font-medium">Resumen por landing</CardTitle>

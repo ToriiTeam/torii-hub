@@ -31,6 +31,7 @@ import {
   Sprout,
   Globe,
   GraduationCap,
+  ListTree,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -73,6 +74,7 @@ const navigationClientes: NavItem[] = [
 const navigationOtros: NavItem[] = [
   { name: 'Portal', href: '/portal', icon: Globe },
   { name: 'Reportes', href: '/reportes', icon: FileText },
+  { name: 'Landings', href: '/landings', icon: ListTree },
   // academy.* RLS only recognizes profiles.role='admin' (via
   // academy.is_portal_admin()), not moderator — see AuthContext's isAdmin
   // comment. Gated narrower than the rest of the sidebar on purpose.
