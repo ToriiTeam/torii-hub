@@ -3,11 +3,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { fetchCreativeIterations, addCreativeIteration, type CreativeIteration } from '@/features/vsl-funnel/lib/creativeIterationRepo';
+import {
+  fetchCreativeIterations, addCreativeIteration, updateCreativeIteration, deleteCreativeIteration,
+  type CreativeIteration,
+} from '@/features/vsl-funnel/lib/creativeIterationRepo';
 
 // Mismo mecanismo visual que BitacoraTimeline.tsx (Delivery OS) — tronco
 // horizontal + ramas curvas alternando arriba/abajo, mismo cálculo de
@@ -43,6 +50,13 @@ export function HistorialIteraciones({ clientId }: Props) {
   const [texto, setTexto] = useState('');
   const [reemplazaAId, setReemplazaAId] = useState(NONE);
   const [saving, setSaving] = useState(false);
+
+  const [editing, setEditing] = useState(false);
+  const [editTexto, setEditTexto] = useState('');
+  const [editFecha, setEditFecha] = useState('');
+  const [updating, setUpdating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CreativeIteration | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +109,49 @@ export function HistorialIteraciones({ clientId }: Props) {
 
   const selected = nodes.find((n) => n.id === selectedId) ?? null;
 
+  function selectNode(id: string) {
+    setSelectedId(id);
+    setEditing(false);
+  }
+
+  function startEdit() {
+    if (!selected) return;
+    setEditTexto(selected.texto);
+    setEditFecha(selected.fecha);
+    setEditing(true);
+  }
+
+  async function handleUpdate() {
+    if (!selectedId || !editTexto.trim()) return;
+    setUpdating(true);
+    try {
+      await updateCreativeIteration(selectedId, { texto: editTexto.trim(), fecha: editFecha });
+      setEditing(false);
+      await load();
+    } catch (err) {
+      console.error('[HistorialIteraciones] update failed:', err);
+      toast.error('Error al actualizar la iteración');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteCreativeIteration(deleteTarget.id);
+      if (selectedId === deleteTarget.id) setSelectedId(null);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      console.error('[HistorialIteraciones] delete failed:', err);
+      toast.error('Error al eliminar la iteración');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground/70 mb-1">
@@ -146,7 +203,7 @@ export function HistorialIteraciones({ clientId }: Props) {
                 branchToggle++;
                 const y = MID_Y + offset;
                 return (
-                  <g key={node.id} className="cursor-pointer" onClick={() => setSelectedId(node.id)}>
+                  <g key={node.id} className="cursor-pointer" onClick={() => selectNode(node.id)}>
                     <path
                       d={`M ${x - 38} ${MID_Y} C ${x - 18} ${MID_Y}, ${x - 18} ${y}, ${x} ${y} C ${x + 18} ${y}, ${x + 18} ${MID_Y}, ${x + 38} ${MID_Y}`}
                       fill="none" stroke={ACCENT} strokeWidth={2.5} opacity={0.85}
@@ -162,7 +219,7 @@ export function HistorialIteraciones({ clientId }: Props) {
                 );
               }
               return (
-                <g key={node.id} className="cursor-pointer" onClick={() => setSelectedId(node.id)}>
+                <g key={node.id} className="cursor-pointer" onClick={() => selectNode(node.id)}>
                   <circle cx={x} cy={MID_Y} r={6} fill="#5b5f70" stroke="hsl(var(--card))" strokeWidth={2} />
                   <text x={x} y={MID_Y - 16} textAnchor="middle" className="fill-muted-foreground text-[9px] font-semibold">
                     Iteración
@@ -178,20 +235,71 @@ export function HistorialIteraciones({ clientId }: Props) {
 
         {selected && (
           <div className="mt-3.5 p-3.5 rounded-xl bg-white/[0.03]">
-            <span
-              className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-1.5"
-              style={{ background: `${ACCENT}26`, color: ACCENT }}
-            >
-              {selected.isBranch ? 'Reemplazo' : 'Iteración'}
-            </span>
-            <p className="text-sm text-foreground/90 leading-relaxed">{selected.texto}</p>
-            {selected.reemplazaTexto && (
-              <p className="text-xs text-muted-foreground/70 mt-1">Reemplaza a: {selected.reemplazaTexto}</p>
+            <div className="flex items-start justify-between gap-2">
+              <span
+                className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-1.5"
+                style={{ background: `${ACCENT}26`, color: ACCENT }}
+              >
+                {selected.isBranch ? 'Reemplazo' : 'Iteración'}
+              </span>
+              {!editing && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={startEdit} title="Editar">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-6 w-6"
+                    onClick={() => setDeleteTarget(iterations.find((it) => it.id === selected.id) ?? null)}
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editing ? (
+              <div className="space-y-2">
+                <Input value={editTexto} onChange={(e) => setEditTexto(e.target.value)} className="bg-secondary/50 text-sm" />
+                <Input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="bg-secondary/50 w-[150px]" style={{ colorScheme: 'dark' }} />
+                <div className="flex gap-1.5">
+                  <Button size="sm" onClick={handleUpdate} disabled={!editTexto.trim() || updating}>
+                    <Check className="h-3.5 w-3.5 mr-1" />Guardar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={updating}>
+                    <X className="h-3.5 w-3.5 mr-1" />Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-foreground/90 leading-relaxed">{selected.texto}</p>
+                {selected.reemplazaTexto && (
+                  <p className="text-xs text-muted-foreground/70 mt-1">Reemplaza a: {selected.reemplazaTexto}</p>
+                )}
+                <p className="text-[11px] text-muted-foreground/70 mt-1">{format(parseISO(selected.fecha), 'd MMM yyyy', { locale: es })}</p>
+              </>
             )}
-            <p className="text-[11px] text-muted-foreground/70 mt-1">{format(parseISO(selected.fecha), 'd MMM yyyy', { locale: es })}</p>
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar esta iteración?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Si otra entrada la marcaba como "reemplaza a" esta, esa referencia se limpia automáticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -77,11 +77,22 @@ export function ClientNavSection() {
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
+        {/* Label y buscador separados — antes todo el botón era el trigger
+            del popover, así que "clickear Clientes" no llevaba a ningún
+            lado (solo abría el buscador). Ahora el label navega directo
+            (a la Vista Global o al cliente actual) y el chevron abre el
+            buscador aparte. */}
+        <NavLink
+          to={currentClient ? `/clientes/${currentClient.id}` : '/clientes'}
+          className="flex-1 min-w-0 h-7 px-2 rounded-md flex items-center text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+        >
+          <span className="truncate">{currentClient ? currentClient.name : 'Global'}</span>
+        </NavLink>
+
         <Popover open={comboOpen} onOpenChange={setComboOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" className="flex-1 min-w-0 h-7 px-2 justify-between text-sm font-medium">
-              <span className="truncate">{currentClient ? currentClient.name : 'Global'}</span>
-              <ChevronsUpDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" title="Buscar cliente">
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">

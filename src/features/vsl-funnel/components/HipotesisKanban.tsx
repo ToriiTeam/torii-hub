@@ -1,5 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pencil, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -15,11 +17,13 @@ const COLUMNAS: { estado: Hipotesis['estado']; label: string }[] = [
 interface Props {
   hipotesis: Hipotesis[];
   onChanged: () => void;
+  onEdit: (h: Hipotesis) => void;
+  onDelete: (h: Hipotesis) => void;
 }
 
 // Sin drag-and-drop — un select de estado en cada card alcanza y es mucho
 // más simple de implementar sin bugs de reordenamiento/librería nueva.
-export function HipotesisKanban({ hipotesis, onChanged }: Props) {
+export function HipotesisKanban({ hipotesis, onChanged, onEdit, onDelete }: Props) {
   async function handleMove(h: Hipotesis, estado: Hipotesis['estado']) {
     if (estado === h.estado) return;
     try {
@@ -45,7 +49,17 @@ export function HipotesisKanban({ hipotesis, onChanged }: Props) {
               {items.map((h) => (
                 <Card key={h.id} className="bg-card border-border/50">
                   <CardContent className="p-3 space-y-2">
-                    <p className="text-sm leading-snug line-clamp-4">{h.texto}</p>
+                    <div className="flex items-start justify-between gap-1">
+                      <p className="text-sm leading-snug line-clamp-4 flex-1">{h.texto}</p>
+                      <div className="flex items-center gap-0.5 flex-shrink-0 -mr-1 -mt-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(h)} title="Editar">
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(h)} title="Eliminar">
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       {h.metrica && <p>Métrica: {h.metrica}</p>}
                       {h.responsable && <p>Dueño: {h.responsable}</p>}

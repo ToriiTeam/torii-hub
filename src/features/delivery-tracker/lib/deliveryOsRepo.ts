@@ -165,6 +165,28 @@ export async function addHipotesis(clientId: string, input: {
   if (error) throw error;
 }
 
+// Función separada de updateHipotesisEstado (abajo) a propósito — esa es de
+// un solo campo para el kanban, mezclar las dos firmas complica el caller.
+export async function updateHipotesis(id: string, input: {
+  texto: string; metrica: string; responsable: string; fecha: string;
+}): Promise<void> {
+  const { error } = await supabase
+    .from('hipotesis')
+    .update({
+      texto: input.texto,
+      metrica: input.metrica || null,
+      responsable: input.responsable || null,
+      fecha: input.fecha,
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteHipotesis(id: string): Promise<void> {
+  const { error } = await supabase.from('hipotesis').delete().eq('id', id);
+  if (error) throw error;
+}
+
 // Usado por el kanban de VSL Funnel > Hipótesis para mover una tarjeta de
 // columna — mismos 4 valores de estado que ya tiene la tabla.
 export async function updateHipotesisEstado(id: string, estado: Hipotesis['estado']): Promise<void> {

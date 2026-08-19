@@ -7,13 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  ExternalLink, FileText, Loader2, GitBranch, Layers,
+  ExternalLink, FileText, Loader2, GitBranch, Layers, Trash2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -94,6 +98,8 @@ export default function TabCreativos({ clientId }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyAngleForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Angle | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -144,6 +150,27 @@ export default function TabCreativos({ clientId }: Props) {
     if (error) {
       toast.error('Error al actualizar etapa');
       fetchAll(); // revert
+    }
+  };
+
+  // scripts.angle_id → angles.id es NO ACTION (sin cascada) — hay que
+  // borrar los scripts del angle antes, o el DELETE del angle falla por FK.
+  const handleDeleteAngle = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const { error: scriptsErr } = await supabase.from('scripts').delete().eq('angle_id', deleteTarget.id);
+      if (scriptsErr) throw scriptsErr;
+      const { error } = await supabase.from('angles').delete().eq('id', deleteTarget.id);
+      if (error) throw error;
+      toast.success('Angle eliminado');
+      setDeleteTarget(null);
+      fetchAll();
+    } catch (err) {
+      console.error('[TabCreativos] delete angle failed:', err);
+      toast.error('Error al eliminar el angle');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -209,6 +236,23 @@ export default function TabCreativos({ clientId }: Props) {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar "{deleteTarget?.nombre || 'este angle'}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Los scripts asociados a este angle también se eliminan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAngle} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -255,6 +299,7 @@ export default function TabCreativos({ clientId }: Props) {
                       scripts={scripts.filter(s => s.angle_id === angle.id)}
                       onChangeStage={changeStage}
                       onRefresh={fetchAll}
+                      onDelete={() => setDeleteTarget(angle)}
                     />
                   ))}
                 </div>
@@ -275,9 +320,10 @@ interface AngleCardProps {
   scripts: Script[];
   onChangeStage: (angle: Angle, newStage: string) => Promise<void>;
   onRefresh: () => void;
+  onDelete: () => void;
 }
 
-function AngleCard({ angle, stageIdx, scripts, onChangeStage, onRefresh }: AngleCardProps) {
+function AngleCard({ angle, stageIdx, scripts, onChangeStage, onRefresh, onDelete }: AngleCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [moving, setMoving] = useState(false);
 
@@ -302,11 +348,16 @@ function AngleCard({ angle, stageIdx, scripts, onChangeStage, onRefresh }: Angle
           <p className="font-medium text-sm leading-tight flex-1 min-w-0 truncate" title={angle.nombre ?? ''}>
             {angle.nombre || <span className="text-muted-foreground italic">Sin nombre</span>}
           </p>
-          {angle.resultado && (
-            <Badge className={cn('text-xs border-0 flex-shrink-0 px-1.5', resultStyle.badge)}>
-              {resultStyle.label}
-            </Badge>
-          )}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {angle.resultado && (
+              <Badge className={cn('text-xs border-0 px-1.5', resultStyle.badge)}>
+                {resultStyle.label}
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1" onClick={onDelete} title="Eliminar angle">
+              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+            </Button>
+          </div>
         </div>
 
         {/* ── Hipótesis ─────────────────────────────────────────────────── */}
