@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Plus } from 'lucide-react';
 import { NuevoClienteDialog } from '@/features/clientes/components/NuevoClienteDialog';
 
@@ -29,6 +31,8 @@ interface SituacionRow {
   dias_cuello_botella_activo: number | null;
 }
 
+type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
+
 function fmtDate(d: string | null): string {
   if (!d) return '-';
   return new Date(d + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -46,21 +50,48 @@ function fmtMoney(v: number): string {
 export default function ToriiClientes() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<SituacionRow[]>([]);
+  // client_id -> status, para el filtro de activos/inactivos — get_situacion_
+  // clientes() no devuelve status, así que se trae aparte de clients (mismo
+  // scope es_interno=false que ya aplica la RPC server-side).
+  const [statusByClient, setStatusByClient] = useState<Record<string, ClientStatus>>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Mismo patrón/componente que Salud de la cartera (Clientes.tsx) — default
+  // solo activos, el switch revela Pausado/Finalizado/Cancelado.
+  const [showInactive, setShowInactive] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('get_situacion_clientes');
-    if (error) {
-      console.error('[ToriiClientes] get_situacion_clientes failed:', error.message);
+    const [situacionRes, clientsRes] = await Promise.all([
+      supabase.rpc('get_situacion_clientes'),
+      supabase.from('clients').select('id, status').eq('es_interno', false),
+    ]);
+    if (situacionRes.error) {
+      console.error('[ToriiClientes] get_situacion_clientes failed:', situacionRes.error.message);
     } else {
-      setRows((data ?? []) as SituacionRow[]);
+      setRows((situacionRes.data ?? []) as SituacionRow[]);
+    }
+    if (clientsRes.error) {
+      console.error('[ToriiClientes] clients status fetch failed:', clientsRes.error.message);
+    } else {
+      const byId: Record<string, ClientStatus> = {};
+      for (const c of clientsRes.data ?? []) byId[c.id as string] = c.status as ClientStatus;
+      setStatusByClient(byId);
     }
     setLoading(false);
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      const status = statusByClient[r.client_id];
+      // Sin status resuelto todavía (fetch en carrera) — se muestra igual,
+      // no se pierde una fila por una condición de carrera de 2 queries.
+      if (!status) return true;
+      return showInactive ? status !== 'active' : status === 'active';
+    });
+  }, [rows, statusByClient, showInactive]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -71,17 +102,25 @@ export default function ToriiClientes() {
           <h1 className="text-2xl font-bold">Clientes</h1>
           <p className="text-muted-foreground">Situación de cartera — pagos, campaña, ROAS/ROI, cierres y cuellos de botella</p>
         </div>
-        <Button className="bg-primary" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />Nuevo Cliente
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch checked={showInactive} onCheckedChange={setShowInactive} id="show-inactive" />
+            <Label htmlFor="show-inactive" className="text-sm text-muted-foreground cursor-pointer">Mostrar inactivos</Label>
+          </div>
+          <Button className="bg-primary" onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />Nuevo Cliente
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-card border-border/50">
         <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-muted-foreground text-sm">Cargando…</div>
-          ) : rows.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">Sin clientes cargados.</div>
+          ) : filteredRows.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground text-sm">
+              {showInactive ? 'Sin clientes inactivos.' : 'Sin clientes activos.'}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -104,7 +143,7 @@ export default function ToriiClientes() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {filteredRows.map((r) => (
                   <tr
                     key={r.client_id}
                     className="border-b border-border/30 hover:bg-secondary/30 cursor-pointer"

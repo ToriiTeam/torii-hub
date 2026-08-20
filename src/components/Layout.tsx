@@ -109,7 +109,13 @@ const AUDITOR_ITEMS: NavItem[] = [
 // cliente al clickear VSL o Reportes — bug de navegación, ver punto C.
 function clientNavItems(clientId: string): NavItem[] {
   return [
-    { name: 'Dashboard', href: `/c/${clientId}`, icon: LayoutDashboard },
+    // Dashboard apunta a su propio segmento de tab ('/dashboard'), NO a la
+    // URL bare /c/:id — esa URL bare es la que ClienteDetalle.tsx resuelve
+    // como el tab default, que es 'delivery-os' (ver DEFAULT_TAB), no
+    // 'dashboard'. Antes Dashboard usaba la URL bare, lo que hacía que
+    // clickearlo aterrizara en Delivery OS > Resumen en vez del dashboard
+    // real (TabDashboardCliente) — bug fijado acá.
+    { name: 'Dashboard', href: `/c/${clientId}/dashboard`, icon: LayoutDashboard },
     { name: 'Delivery OS', href: `/c/${clientId}/delivery-os`, icon: MapIcon },
     { name: 'Closing', href: `/c/${clientId}/closing`, icon: Handshake },
     { name: 'Setting', href: `/c/${clientId}/setting`, icon: PhoneCall },
@@ -236,7 +242,12 @@ export default function Layout({ children }: LayoutProps) {
         </p>
       )}
       {navItemsToRender.map((item) => {
-        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+        // Delivery OS es el tab default de ClienteDetalle.tsx (URL limpia
+        // /c/:id sin segmento de tab) — así que la vista "bare" también
+        // cuenta como Delivery OS activo, no solo /c/:id/delivery-os.
+        const isActive = item.name === 'Delivery OS' && mode === 'client' && clientId
+          ? location.pathname === item.href || location.pathname.startsWith(`${item.href}/`) || location.pathname === `/c/${clientId}`
+          : location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
         return (
           <NavLink
             key={item.name}
@@ -267,14 +278,40 @@ export default function Layout({ children }: LayoutProps) {
           collapsed ? 'w-16' : 'w-64'
         )}
       >
-        {/* El logo TORII se mudó al header (punto C) — acá solo queda el
-            colapsar/expandir del sidebar. */}
-        <div className="h-16 flex items-center justify-end px-4 border-b border-border">
+        {/* Logo + botón "Salud de la cartera" — vuelven al sidebar (estaban
+            acá antes de 733841e, que los mudó al header por error). Siempre
+            apuntan a '/', sin importar la subcuenta activa. */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
+          {!collapsed && (
+            <div className="flex items-center gap-1 min-w-0">
+              <button
+                type="button"
+                onClick={goHome}
+                className="text-xl font-bold tracking-wider hover:text-primary transition-colors flex-shrink-0"
+              >
+                TORII
+              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={goHome}
+                    aria-label="Salud de la cartera"
+                    className="h-8 w-8 text-muted-foreground hover:text-primary flex-shrink-0"
+                  >
+                    <HeartPulse className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Salud de la cartera</TooltipContent>
+              </Tooltip>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setCollapsed(!collapsed)}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
           >
             <ChevronLeft className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
           </Button>
@@ -311,8 +348,23 @@ export default function Layout({ children }: LayoutProps) {
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-border">
-          <div className="h-16 flex items-center px-4 border-b border-border">
-            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Menú</span>
+          <div className="h-16 flex items-center gap-1 px-4 border-b border-border">
+            <button
+              type="button"
+              onClick={() => { setSidebarOpen(false); goHome(); }}
+              className="text-xl font-bold tracking-wider hover:text-primary transition-colors"
+            >
+              TORII
+            </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { setSidebarOpen(false); goHome(); }}
+              aria-label="Salud de la cartera"
+              className="h-8 w-8 text-muted-foreground hover:text-primary flex-shrink-0"
+            >
+              <HeartPulse className="h-4 w-4" />
+            </Button>
           </div>
           {!isAuditor && (
             <div className="px-3 pt-3">
@@ -338,10 +390,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header — punto B/C del rediseño: logo + botón "Salud de la
-            cartera" a la izquierda, y (debajo del top bar, ver
-            HeaderNavRows) las filas de subsección/sub-subsección que antes
-            vivían como TabsList duplicadas en el contenido. */}
+        {/* Header — las filas de subsección/sub-subsección (ver
+            HeaderNavRows) viven debajo del top bar; logo y botón "Salud de
+            la cartera" volvieron al sidebar (punto 1 del fix). */}
         <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="h-16 flex items-center justify-between px-4 lg:px-6 gap-4">
           <div className="flex items-center gap-1 min-w-0">
@@ -357,32 +408,6 @@ export default function Layout({ children }: LayoutProps) {
                 </Button>
               </SheetTrigger>
             </Sheet>
-
-            {/* Logo — mudado acá desde el sidebar (punto C). Siempre vuelve
-                a Salud de la cartera, sin importar la subcuenta activa. */}
-            <button
-              type="button"
-              onClick={goHome}
-              className="text-lg font-bold tracking-wider hover:text-primary transition-colors flex-shrink-0"
-            >
-              TORII
-            </button>
-
-            {/* Botón distinto del logo, mismo destino ('/') — ver punto C. */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={goHome}
-                  aria-label="Salud de la cartera"
-                  className="text-muted-foreground hover:text-primary flex-shrink-0"
-                >
-                  <HeartPulse className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Salud de la cartera</TooltipContent>
-            </Tooltip>
           </div>
 
           <div className="flex items-center gap-2">

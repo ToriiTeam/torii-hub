@@ -5,6 +5,10 @@ import type { Market } from '../types/audit'
 
 interface AccountContextType {
   accounts:           AdAccount[]
+  // Lista completa sin filtrar por fixedClientId — usada por el buscador de
+  // "Vincular cuenta" (punto 6) para poder elegir manualmente CUALQUIER
+  // cuenta, no solo las que ya matchean por nombre.
+  rawAccounts:        AdAccount[]
   selectedAccount:    AdAccount | null
   setSelectedAccount: (account: AdAccount | null) => void
   loading: boolean
@@ -18,10 +22,18 @@ interface AccountContextType {
   // cliente) — Header.tsx lo usa para ocultar el selector de cuenta, mismo
   // criterio que ya usaba para isAuditor.
   fixedClientId: string | null
+  // clients.meta_ad_account_id del cliente fijo, si ya fue vinculado
+  // manualmente (punto 6) — null si todavía depende del matching por nombre.
+  linkedAccountId: string | null
+  // Persiste la vinculación manual en clients.meta_ad_account_id y actualiza
+  // el estado local — no-op si no hay fixedClientId. Pasar null para
+  // desvincular (vuelve al matching automático por nombre).
+  setLinkedAccountId: (accountId: string | null) => Promise<void>
 }
 
 const AccountContext = createContext<AccountContextType>({
   accounts:           [],
+  rawAccounts:        [],
   selectedAccount:    null,
   setSelectedAccount: () => {},
   loading:            true,
@@ -29,6 +41,8 @@ const AccountContext = createContext<AccountContextType>({
   market:             'latam',
   clientId:           null,
   fixedClientId:      null,
+  linkedAccountId:    null,
+  setLinkedAccountId: async () => {},
 })
 
 // The Meta ad account name is whatever the business typed into Business
@@ -83,7 +97,9 @@ export function AccountProvider({ children, fixedClientId }: AccountProviderProp
   const [clientId,        setClientId]        = useState<string | null>(null)
   // Solo se resuelve cuando fixedClientId está seteado — nombre/país del
   // cliente activo, para matchear cuentas por nombre y fijar el país.
-  const [fixedClient, setFixedClient] = useState<{ id: string; name: string; country: string | null } | null>(null)
+  // meta_ad_account_id: vinculación manual (punto 6) — cuando está seteada,
+  // gana por sobre el matching por nombre (ver `accounts` más abajo).
+  const [fixedClient, setFixedClient] = useState<{ id: string; name: string; country: string | null; meta_ad_account_id: string | null } | null>(null)
 
   useEffect(() => {
     supabase.functions
@@ -112,7 +128,7 @@ export function AccountProvider({ children, fixedClientId }: AccountProviderProp
     let cancelled = false
     supabase
       .from('clients')
-      .select('id, name, country')
+      .select('id, name, country, meta_ad_account_id')
       .eq('id', fixedClientId)
       .maybeSingle()
       .then(({ data, error: fetchErr }) => {
@@ -127,13 +143,18 @@ export function AccountProvider({ children, fixedClientId }: AccountProviderProp
     return () => { cancelled = true }
   }, [fixedClientId])
 
-  // Cuentas visibles: todas (modo Torii) o solo las que matchean el cliente
-  // fijo por nombre (mismo matchClientToAccount de siempre). Las cuentas
+  // Cuentas visibles: todas (modo Torii) o solo las del cliente fijo. Si el
+  // cliente tiene meta_ad_account_id vinculado manualmente (punto 6), esa
+  // vinculación gana siempre — sin heurística de nombre. Si no, cae al
+  // matching por nombre de siempre (matchClientToAccount). Las cuentas
   // "house" de Torii (HARDCODED_ACCOUNT_MARKETS) nunca matchean un cliente
   // real, así que quedan afuera del modo fixedClientId sin lógica extra.
   const accounts = useMemo(() => {
     if (!fixedClientId) return rawAccounts
     if (!fixedClient) return []
+    if (fixedClient.meta_ad_account_id) {
+      return rawAccounts.filter((a) => a.account_id === fixedClient.meta_ad_account_id)
+    }
     return rawAccounts.filter((a) => matchClientToAccount(a.name, [fixedClient]).length > 0)
   }, [rawAccounts, fixedClientId, fixedClient])
 
@@ -218,8 +239,38 @@ export function AccountProvider({ children, fixedClientId }: AccountProviderProp
     }
   }, [selectedAccount, fixedClientId, fixedClient])
 
+  // Persiste la vinculación manual (punto 6) — UPDATE directo a
+  // clients.meta_ad_account_id, después actualiza fixedClient en memoria
+  // para que `accounts` se recalcule sin esperar un refetch.
+  async function setLinkedAccountId(accountId: string | null) {
+    if (!fixedClientId) return
+    const { error: updateErr } = await supabase
+      .from('clients')
+      .update({ meta_ad_account_id: accountId })
+      .eq('id', fixedClientId)
+    if (updateErr) {
+      console.error('[AccountContext] failed to link meta ad account:', updateErr.message)
+      return
+    }
+    setFixedClient((prev) => (prev ? { ...prev, meta_ad_account_id: accountId } : prev))
+  }
+
   return (
-    <AccountContext.Provider value={{ accounts, selectedAccount, setSelectedAccount, loading, error, market, clientId, fixedClientId: fixedClientId ?? null }}>
+    <AccountContext.Provider
+      value={{
+        accounts,
+        rawAccounts,
+        selectedAccount,
+        setSelectedAccount,
+        loading,
+        error,
+        market,
+        clientId,
+        fixedClientId: fixedClientId ?? null,
+        linkedAccountId: fixedClient?.meta_ad_account_id ?? null,
+        setLinkedAccountId,
+      }}
+    >
       {children}
     </AccountContext.Provider>
   )

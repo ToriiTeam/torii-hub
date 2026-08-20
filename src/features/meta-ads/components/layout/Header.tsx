@@ -4,6 +4,7 @@ import { useDateRange } from '../../context/DateRangeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { DateRangePicker } from '../common/DateRangePicker'
 import { CompareSelector } from '../common/CompareSelector'
+import { LinkMetaAccountButton } from '../common/LinkMetaAccountButton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 export function Header() {
@@ -31,10 +32,15 @@ export function Header() {
             <span className="header-account-locked">{selectedAccount?.name ?? 'LM Social Constructions'}</span>
           ) : fixedClientId ? (
             // Subcuenta de un cliente puntual (/c/:id/meta-ads) — sin
-            // selector, igual que el resto de las secciones fixedClientId.
-            <span className="header-account-locked">
-              {selectedAccount?.name ?? (accounts.length === 0 ? 'Sin cuenta de Meta Ads matcheada' : 'Cargando…')}
-            </span>
+            // selector automático, igual que el resto de las secciones
+            // fixedClientId. El botón de vinculación manual (punto 6) sí
+            // vive acá, al lado del estado de detección.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="header-account-locked">
+                {selectedAccount?.name ?? (accounts.length === 0 ? 'Sin cuenta de Meta Ads matcheada' : 'Cargando…')}
+              </span>
+              <LinkMetaAccountButton />
+            </div>
           ) : (
             <Select
               value={selectedAccount?.account_id ?? ''}
