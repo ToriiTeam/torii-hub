@@ -94,7 +94,7 @@ export default function ClienteDetalle() {
   const effectiveTab = urlTab && TABS.some((t) => t.value === urlTab) ? urlTab : DEFAULT_TAB;
 
   function handleTabChange(value: string) {
-    navigate(value === DEFAULT_TAB ? `/clientes/${id}` : `/clientes/${id}/${value}`);
+    navigate(value === DEFAULT_TAB ? `/c/${id}` : `/c/${id}/${value}`);
   }
 
   // Segundo nivel de deep-link, solo para Delivery OS — 'resumen' es su
@@ -102,7 +102,7 @@ export default function ClienteDetalle() {
   const effectiveSubtab = urlSubtab && DELIVERY_OS_SUBTABS.includes(urlSubtab) ? urlSubtab : 'resumen';
 
   function handleSubtabChange(subtab: string) {
-    navigate(subtab === 'resumen' ? `/clientes/${id}` : `/clientes/${id}/delivery-os/${subtab}`);
+    navigate(subtab === 'resumen' ? `/c/${id}` : `/c/${id}/delivery-os/${subtab}`);
   }
 
   useEffect(() => {
@@ -137,7 +137,7 @@ export default function ClienteDetalle() {
   if (!client) return (
     <div className="flex flex-col items-center justify-center h-64 gap-4">
       <p className="text-muted-foreground">Cliente no encontrado</p>
-      <Button variant="outline" onClick={() => navigate('/clientes')}>
+      <Button variant="outline" onClick={() => navigate('/')}>
         <ArrowLeft className="h-4 w-4 mr-2" />Volver
       </Button>
     </div>
@@ -147,7 +147,7 @@ export default function ClienteDetalle() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/clientes')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -165,7 +165,7 @@ export default function ClienteDetalle() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/clientes/${id}/delivery-os/informacion`); }}
+            onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/c/${id}/delivery-os/informacion`); }}
           >
             <Edit2 className="h-4 w-4 mr-1.5" />Editar
           </Button>

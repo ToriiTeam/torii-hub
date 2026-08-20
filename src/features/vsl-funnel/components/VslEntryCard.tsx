@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight, Pencil, Trash2, Loader2, Save } from 'lucide-react';
+import { ChevronRight, Trash2, Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { PegarCodigoField } from './PegarCodigoField';
 import { RichTextEditor } from './RichTextEditor';
+import { LandingHtmlPreview } from './LandingHtmlPreview';
 import { VslMetricasResumen } from './VslMetricasResumen';
 import { LandingVariantCard } from './LandingVariantCard';
 import { AddLandingTile } from './AddLandingTile';
@@ -59,6 +60,7 @@ export function VslEntryCard({ entry, variants, trackedLandings, expanded, onTog
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Resetea el form local cada vez que se re-expande (o cuando cambian los
   // datos del servidor, ej. después de guardar) — evita arrastrar ediciones
@@ -144,12 +146,19 @@ export function VslEntryCard({ entry, variants, trackedLandings, expanded, onTog
       {expanded && (
         <div className="px-4 pb-4 border-t border-border/50 pt-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <PegarCodigoField
-              label="Video (código pegado)"
-              codigoPegado={form.codigo_pegado ?? ''}
-              videoEmbedUrl={videoEmbedUrl}
-              onChange={(codigo, video) => { setForm({ ...form, codigo_pegado: codigo }); setVideoEmbedUrl(video); }}
-            />
+            <div className="space-y-2">
+              <PegarCodigoField
+                label="Video (código pegado)"
+                codigoPegado={form.codigo_pegado ?? ''}
+                videoEmbedUrl={videoEmbedUrl}
+                onChange={(codigo, video) => { setForm({ ...form, codigo_pegado: codigo }); setVideoEmbedUrl(video); }}
+              />
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full justify-center" onClick={() => setShowPreview((v) => !v)}>
+                {showPreview ? <EyeOff className="h-3.5 w-3.5 mr-1.5" /> : <Eye className="h-3.5 w-3.5 mr-1.5" />}
+                {showPreview ? 'Ocultar preview de la landing' : 'Ver preview completo de la landing'}
+              </Button>
+              {showPreview && <LandingHtmlPreview html={form.codigo_pegado ?? ''} title={entry.titulo} />}
+            </div>
             <div>
               <Label className="text-xs text-muted-foreground">Copy</Label>
               <Textarea rows={7} value={form.copy ?? ''} onChange={(e) => setForm({ ...form, copy: e.target.value })} className="bg-secondary/50 mt-1 resize-none" />

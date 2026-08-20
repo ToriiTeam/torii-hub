@@ -1,6 +1,9 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Pencil, Trash2, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { LandingHtmlPreview } from './LandingHtmlPreview';
 import type { LandingVariant } from '@/features/vsl-funnel/lib/vslFunnelRepo';
 
 const TIPO_LABEL: Record<string, string> = {
@@ -29,10 +32,21 @@ interface Props {
 }
 
 export function LandingVariantCard({ variant, onEdit, onDelete }: Props) {
+  const [previewOpen, setPreviewOpen] = useState(false);
   const activo = activoDesdeHasta(variant.fecha_desde, variant.fecha_hasta);
   return (
     <div className="relative bg-secondary/20 border border-border/50 rounded-xl p-3 group">
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="bg-card border-border max-w-3xl">
+          <DialogHeader><DialogTitle>{variant.titulo}</DialogTitle></DialogHeader>
+          <LandingHtmlPreview html={variant.codigo_pegado ?? ''} title={variant.titulo} />
+        </DialogContent>
+      </Dialog>
+
       <div className="absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button type="button" onClick={() => setPreviewOpen(true)} className="h-6 w-6 rounded-md border border-border/60 bg-card flex items-center justify-center text-muted-foreground hover:text-foreground" title="Preview de la landing">
+          <Eye className="h-3 w-3" />
+        </button>
         <button type="button" onClick={onEdit} className="h-6 w-6 rounded-md border border-border/60 bg-card flex items-center justify-center text-muted-foreground hover:text-foreground" title="Editar">
           <Pencil className="h-3 w-3" />
         </button>

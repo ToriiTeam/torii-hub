@@ -164,7 +164,7 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
 
           <BitacoraHipotesis clientId={clientId} hipotesis={hipotesis} onChanged={loadAll} />
 
-          <CalendarioSection processes={processes} />
+          <CalendarioSection processes={processes} onChanged={loadAll} />
 
           <BitacoraTimeline clientId={clientId} activityLog={activityLog} cuellos={cuellos} onChanged={loadAll} />
         </div>

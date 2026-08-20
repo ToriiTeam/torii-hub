@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { ClientNavSection } from '@/components/ClientNavSection';
+import { SubaccountSwitcher } from '@/components/SubaccountSwitcher';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { format, isToday, isTomorrow, isPast, addDays, isBefore } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   CheckSquare,
@@ -17,7 +17,6 @@ import {
   PhoneCall,
   Handshake,
   FileText,
-  Users,
   Menu,
   LogOut,
   Bell,
@@ -32,6 +31,8 @@ import {
   Globe,
   GraduationCap,
   ListTree,
+  LayoutDashboard,
+  Map as MapIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -50,83 +51,93 @@ interface Task {
   priority: string | null;
 }
 
-// 3 bloques visuales — "Torii" (vistas de portfolio completo, cada una con
-// su propio selector interno de cliente/Torii), "Clientes" (la ficha por
-// asesor, con sus tabs internos), "Otros" (el resto). Puramente de
-// presentación: ninguna de estas rutas cambia de comportamiento por estar
-// agrupada distinto.
+// Rutas canónicas nuevas: /torii/... para portafolio (Dashboard Ejecutivo +
+// lo que antes era la sección "Otros", fusionado en una sola lista — ver
+// punto D), /c/:id/... para un cliente puntual. Las rutas viejas
+// (/dashboard, /clientes/:id, etc.) siguen existiendo en App.tsx como
+// redirects, así que un bookmark viejo o un navigate() que quedó apuntando
+// a la ruta vieja en algún rincón del código sigue funcionando — solo el
+// sidebar y el switcher usan las rutas nuevas directamente.
 const navigationTorii: NavItem[] = [
-  { name: 'Dashboard Ejecutivo', href: '/dashboard', icon: Gauge },
-  { name: 'Finanzas', href: '/finanzas', icon: DollarSign },
-  { name: 'Closing', href: '/closers', icon: Handshake },
-  { name: 'Setting', href: '/setters', icon: PhoneCall },
-  { name: 'VSL', href: '/vsl-tracking', icon: Video },
-  { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
-  { name: 'Máquina de Cierres', href: '/maquina-cierres', icon: ShoppingCart },
-  { name: 'Contenido Orgánico', href: '/contenido', icon: Sprout },
-  { name: 'Tareas', href: '/tareas', icon: CheckSquare },
-];
-
-const navigationClientes: NavItem[] = [
-  { name: 'Clientes', href: '/clientes', icon: Users },
-];
-
-const navigationOtros: NavItem[] = [
-  { name: 'Portal', href: '/portal', icon: Globe },
-  { name: 'Reportes', href: '/reportes', icon: FileText },
-  { name: 'Landings', href: '/landings', icon: ListTree },
+  { name: 'Dashboard Ejecutivo', href: '/torii/dashboard', icon: Gauge },
+  { name: 'Finanzas', href: '/torii/finanzas', icon: DollarSign },
+  { name: 'Closing', href: '/torii/closing', icon: Handshake },
+  { name: 'Setting', href: '/torii/setting', icon: PhoneCall },
+  { name: 'VSL', href: '/torii/vsl-tracking', icon: Video },
+  { name: 'Meta Ads', href: '/torii/meta-ads', icon: BarChart2 },
+  { name: 'Máquina de Cierres', href: '/torii/maquina-cierres', icon: ShoppingCart },
+  { name: 'Contenido Orgánico', href: '/torii/contenido', icon: Sprout },
+  { name: 'Tareas', href: '/torii/tareas', icon: CheckSquare },
+  { name: 'Portal', href: '/torii/portal', icon: Globe },
+  { name: 'Reportes', href: '/torii/reportes', icon: FileText },
+  { name: 'Landings', href: '/torii/landings', icon: ListTree },
   // academy.* RLS only recognizes profiles.role='admin' (via
   // academy.is_portal_admin()), not moderator — see AuthContext's isAdmin
   // comment. Gated narrower than the rest of the sidebar on purpose.
-  { name: 'Academia', href: '/academia', icon: GraduationCap, adminOnly: true },
+  { name: 'Academia', href: '/torii/academia', icon: GraduationCap, adminOnly: true },
 ];
 
-const navSections = [
-  { label: 'Torii', items: navigationTorii },
-  { label: 'Clientes', items: navigationClientes },
-  { label: 'Otros', items: navigationOtros },
+// Auditor role: exactamente estas 3 rutas existen para este usuario — no
+// solo ocultas del sidebar, genuinamente inalcanzables (ver App.tsx). Se
+// dejaron sin tocar en la ruta vieja (/dashboard, /meta-ads, /vsl-tracking)
+// a propósito: es un flujo separado, angosto y sensible en permisos — no
+// forma parte de este rediseño de navegación de staff.
+const AUDITOR_ITEMS: NavItem[] = [
+  { name: 'Dashboard', href: '/dashboard', icon: Gauge },
+  { name: 'Meta Ads', href: '/meta-ads', icon: BarChart2 },
+  { name: 'VSL', href: '/vsl-tracking', icon: Video },
 ];
+
+function clientNavItems(clientId: string): NavItem[] {
+  return [
+    { name: 'Dashboard', href: `/c/${clientId}`, icon: LayoutDashboard },
+    { name: 'Delivery OS', href: `/c/${clientId}/delivery-os`, icon: MapIcon },
+  ];
+}
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-// Auditor role sees exactly these 2 sections — see App.tsx, which also
-// makes every other route unreachable for them, not just hidden here.
-const AUDITOR_NAV_HREFS = ['/dashboard', '/meta-ads', '/vsl-tracking'];
-
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut, isAuditor, isAdmin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [clientName, setClientName] = useState<string | null>(null);
 
-  const visibleSections = navSections
-    .map((section) => ({
-      ...section,
-      items: isAuditor
-        ? section.items.filter((item) => AUDITOR_NAV_HREFS.includes(item.href))
-        : section.items.filter((item) => !item.adminOnly || isAdmin),
-    }))
-    .filter((section) => section.items.length > 0);
+  // Subcuenta activa derivada 100% de la URL — nunca de estado propio, así
+  // refrescar la página o llegar por link directo deja el sidebar
+  // consistente sin ningún efecto de hidratación. Layout vive por encima
+  // del <Routes> anidado en App.tsx, así que no puede leer :id vía
+  // useParams (ese contexto no llega hasta acá) — se extrae del pathname
+  // con el mismo criterio que ya usaba el viejo ClientNavSection.tsx.
+  const clientIdMatch = location.pathname.match(/^\/c\/([^/]+)/);
+  const clientId = clientIdMatch?.[1] ?? null;
+  const mode: 'home' | 'torii' | 'client' = clientId ? 'client' : location.pathname === '/' ? 'home' : 'torii';
+
+  useEffect(() => {
+    if (!clientId) { setClientName(null); return; }
+    let cancelled = false;
+    supabase.from('clients').select('name').eq('id', clientId).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setClientName(data?.name ?? null); });
+    return () => { cancelled = true; };
+  }, [clientId]);
+
+  const visibleTorii = useMemo(
+    () => navigationTorii.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin],
+  );
 
   useEffect(() => {
     if (isAuditor) return; // auditor has no Tareas access — nothing to notify about
     fetchTasks();
-    
-    // Subscribe to real-time updates
+
     const channel = supabase
       .channel('tasks-notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tasks'
-        },
-        () => fetchTasks()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
       .subscribe();
 
     return () => {
@@ -137,7 +148,7 @@ export default function Layout({ children }: LayoutProps) {
   const fetchTasks = async () => {
     const today = new Date();
     const nextWeek = addDays(today, 7);
-    
+
     const { data, error } = await supabase
       .from('tasks')
       .select('id, title, due_date, status, priority')
@@ -155,7 +166,7 @@ export default function Layout({ children }: LayoutProps) {
     return tasks.map(task => {
       let urgency = '';
       let icon = null;
-      
+
       if (task.due_date) {
         const dueDate = new Date(task.due_date);
         if (isPast(dueDate) && !isToday(dueDate)) {
@@ -171,72 +182,54 @@ export default function Layout({ children }: LayoutProps) {
         }
       }
 
-      return {
-        id: task.id,
-        title: task.title,
-        urgency,
-        icon,
-        priority: task.priority
-      };
+      return { id: task.id, title: task.title, urgency, icon, priority: task.priority };
     });
   };
 
   const notifications = getNotifications();
 
+  function goHome() {
+    navigate('/');
+  }
+
+  // Auditor: flujo simple y aislado, sin switcher ni modos — no forma
+  // parte de este rediseño (ver comentario en AUDITOR_ITEMS).
+  const navItemsToRender: NavItem[] = isAuditor
+    ? AUDITOR_ITEMS
+    : mode === 'torii'
+    ? visibleTorii
+    : mode === 'client' && clientId
+    ? clientNavItems(clientId)
+    : [];
+
+  const switcherLabel = mode === 'client' ? (clientName ?? 'Cargando…') : mode === 'torii' ? 'Torii' : 'Elegir cuenta';
+
   const NavItems = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <nav className="px-2">
-      {visibleSections.map((section) => (
-        <div
-          key={section.label}
-          className="space-y-1 pt-4 mt-1 border-t border-sidebar-border first:border-t-0 first:mt-0 first:pt-0"
-        >
-          {!collapsed && (
-            <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-              {section.label}
-            </div>
-          )}
-          {section.label === 'Clientes' ? (
-            collapsed ? (
-              // Selector rico no entra en modo colapsado — fallback simple,
-              // mismo comportamiento que tenía el NavLink único de antes.
-              <NavLink
-                to="/clientes"
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                  location.pathname.startsWith('/clientes')
-                    ? 'bg-primary/15 text-primary border border-primary/30'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                )}
-              >
-                <Users className="h-5 w-5 flex-shrink-0" />
-              </NavLink>
-            ) : (
-              <ClientNavSection />
-            )
-          ) : (
-            section.items.map((item) => {
-              const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-primary/15 text-primary border border-primary/30'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  )}
-                >
-                  <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
-                  {!collapsed && <span>{item.name}</span>}
-                </NavLink>
-              );
-            })
-          )}
-        </div>
-      ))}
+    <nav className="px-2 space-y-1">
+      {mode === 'home' && !isAuditor && !collapsed && (
+        <p className="px-3 py-2 text-xs text-muted-foreground/70 leading-relaxed">
+          Elegí Torii o un cliente arriba para navegar dentro de esa cuenta.
+        </p>
+      )}
+      {navItemsToRender.map((item) => {
+        const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+        return (
+          <NavLink
+            key={item.name}
+            to={item.href}
+            onClick={onNavigate}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+              isActive
+                ? 'bg-primary/15 text-primary border border-primary/30'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <item.icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary')} />
+            {!collapsed && <span>{item.name}</span>}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 
@@ -249,10 +242,12 @@ export default function Layout({ children }: LayoutProps) {
           collapsed ? 'w-16' : 'w-64'
         )}
       >
-        {/* Logo */}
+        {/* Logo — siempre vuelve a Salud de la cartera, sin importar la subcuenta activa */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-border">
           {!collapsed && (
-            <h1 className="text-xl font-bold tracking-wider">TORII</h1>
+            <button type="button" onClick={goHome} className="text-xl font-bold tracking-wider hover:text-primary transition-colors">
+              TORII
+            </button>
           )}
           <Button
             variant="ghost"
@@ -263,6 +258,13 @@ export default function Layout({ children }: LayoutProps) {
             <ChevronLeft className={cn('h-4 w-4 transition-transform', collapsed && 'rotate-180')} />
           </Button>
         </div>
+
+        {/* Switcher de subcuenta — no aplica al flujo de auditor */}
+        {!isAuditor && !collapsed && (
+          <div className="px-3 pt-3">
+            <SubaccountSwitcher currentLabel={switcherLabel} />
+          </div>
+        )}
 
         {/* Navigation */}
         <ScrollArea className="flex-1 py-4">
@@ -289,8 +291,19 @@ export default function Layout({ children }: LayoutProps) {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-border">
           <div className="h-16 flex items-center px-4 border-b border-border">
-            <h1 className="text-xl font-bold tracking-wider">TORII</h1>
+            <button
+              type="button"
+              onClick={() => { setSidebarOpen(false); goHome(); }}
+              className="text-xl font-bold tracking-wider hover:text-primary transition-colors"
+            >
+              TORII
+            </button>
           </div>
+          {!isAuditor && (
+            <div className="px-3 pt-3">
+              <SubaccountSwitcher currentLabel={switcherLabel} />
+            </div>
+          )}
           <ScrollArea className="flex-1 py-4 h-[calc(100vh-8rem)]">
             <NavItems onNavigate={() => setSidebarOpen(false)} />
           </ScrollArea>

@@ -33,7 +33,7 @@ export function VslMetricasResumen({ landingId }: Props) {
       <Stat label="Tasa de play" value={`${summary.playRate}%`} />
       <Stat label="Conversión" value={`${summary.conversionRate}%`} />
       <Link
-        to={`/vsl-tracking?landing=${encodeURIComponent(landingId)}`}
+        to={`/torii/vsl-tracking?landing=${encodeURIComponent(landingId)}`}
         className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
       >
         Ver métricas completas <ArrowRight className="h-3 w-3" />

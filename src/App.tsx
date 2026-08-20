@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
@@ -26,6 +26,27 @@ import Landings from "@/pages/Landings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+// Redirects de compatibilidad para las rutas viejas (/clientes/:id/...) —
+// preserva :tab/:subtab al saltar a la ruta canónica nueva (/c/:id/...).
+// Cualquier navigate()/Link que haya quedado apuntando a /clientes/*
+// (bookmarks, o algún rincón del código que no se tocó en el rediseño)
+// sigue funcionando, solo con un hop de redirect extra.
+function RedirectClientPath() {
+  const { id, tab, subtab } = useParams<{ id: string; tab?: string; subtab?: string }>();
+  let path = `/c/${id}`;
+  if (tab) path += `/${tab}`;
+  if (subtab) path += `/${subtab}`;
+  return <Navigate to={path} replace />;
+}
+
+// Igual que <Navigate> pero preservando el query string — necesario para
+// /vsl-tracking?landing=X (el deep-link del mini-resumen de métricas de
+// VSL Funnel), que un <Navigate to="/torii/vsl-tracking"> simple pisaría.
+function RedirectPreserveQuery({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}`} replace />;
+}
 
 function Unauthorized() {
   const { signOut } = useAuth();
@@ -99,25 +120,52 @@ function AppContent() {
       <Route path="*" element={
         <Layout>
           <Routes>
-            <Route path="/" element={<ExecutiveDashboard />} />
-            <Route path="/dashboard" element={<ExecutiveDashboard />} />
-            <Route path="/clientes" element={<Clientes />} />
+            {/* Home — Salud de la cartera (Vista Global), sin ninguna
+                subcuenta elegida todavía. Antes "/" era el Dashboard
+                Ejecutivo; ese ahora vive en /torii/dashboard. */}
+            <Route path="/" element={<Clientes />} />
+
+            {/* Torii (portafolio) — rutas canónicas */}
+            <Route path="/torii" element={<Navigate to="/torii/dashboard" replace />} />
+            <Route path="/torii/dashboard" element={<ExecutiveDashboard />} />
+            <Route path="/torii/finanzas" element={<Finanzas />} />
+            <Route path="/torii/closing" element={<Closers />} />
+            <Route path="/torii/setting" element={<Setters />} />
+            <Route path="/torii/vsl-tracking" element={<VslTracking />} />
+            <Route path="/torii/meta-ads" element={<MetaAds />} />
+            <Route path="/torii/maquina-cierres" element={<MaquinaCierres />} />
+            <Route path="/torii/contenido" element={<ContenidoOrganico />} />
+            <Route path="/torii/tareas" element={<Tareas />} />
+            <Route path="/torii/portal" element={<Portal />} />
+            <Route path="/torii/reportes" element={<Reportes />} />
+            <Route path="/torii/landings" element={<Landings />} />
+            <Route path="/torii/academia" element={<Academia />} />
+
+            {/* Clientes (subcuenta puntual) — rutas canónicas */}
+            <Route path="/c/:id" element={<ClienteDetalle />} />
+            <Route path="/c/:id/:tab" element={<ClienteDetalle />} />
+            <Route path="/c/:id/:tab/:subtab" element={<ClienteDetalle />} />
+
+            {/* Redirects de compatibilidad — rutas viejas, ver
+                RedirectClientPath/RedirectPreserveQuery arriba. */}
+            <Route path="/dashboard" element={<Navigate to="/torii/dashboard" replace />} />
+            <Route path="/finanzas" element={<Navigate to="/torii/finanzas" replace />} />
+            <Route path="/closers" element={<Navigate to="/torii/closing" replace />} />
+            <Route path="/setters" element={<Navigate to="/torii/setting" replace />} />
+            <Route path="/vsl-tracking" element={<RedirectPreserveQuery to="/torii/vsl-tracking" />} />
+            <Route path="/maquina-cierres" element={<Navigate to="/torii/maquina-cierres" replace />} />
+            <Route path="/contenido" element={<Navigate to="/torii/contenido" replace />} />
+            <Route path="/tareas" element={<Navigate to="/torii/tareas" replace />} />
+            <Route path="/portal" element={<Navigate to="/torii/portal" replace />} />
+            <Route path="/reportes" element={<Navigate to="/torii/reportes" replace />} />
+            <Route path="/landings" element={<Navigate to="/torii/landings" replace />} />
+            <Route path="/academia" element={<Navigate to="/torii/academia" replace />} />
+            <Route path="/clientes" element={<Navigate to="/" replace />} />
             <Route path="/clientes/global" element={<ClientesGlobalDashboard />} />
-            <Route path="/clientes/:id" element={<ClienteDetalle />} />
-            <Route path="/clientes/:id/:tab" element={<ClienteDetalle />} />
-            <Route path="/clientes/:id/:tab/:subtab" element={<ClienteDetalle />} />
-            <Route path="/setters" element={<Setters />} />
-            <Route path="/closers" element={<Closers />} />
-            <Route path="/finanzas" element={<Finanzas />} />
-            <Route path="/reportes" element={<Reportes />} />
-            <Route path="/vsl-tracking" element={<VslTracking />} />
-            <Route path="/maquina-cierres" element={<MaquinaCierres />} />
-            <Route path="/landings" element={<Landings />} />
-            <Route path="/tareas" element={<Tareas />} />
-            <Route path="/meta-ads" element={<MetaAds />} />
-            <Route path="/contenido" element={<ContenidoOrganico />} />
-            <Route path="/portal" element={<Portal />} />
-            <Route path="/academia" element={<Academia />} />
+            <Route path="/clientes/:id" element={<RedirectClientPath />} />
+            <Route path="/clientes/:id/:tab" element={<RedirectClientPath />} />
+            <Route path="/clientes/:id/:tab/:subtab" element={<RedirectClientPath />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>

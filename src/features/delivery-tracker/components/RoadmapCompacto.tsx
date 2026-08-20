@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ChevronRight, Check, Clock, AlertTriangle, Circle, FileText, Map as MapIcon, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { fetchSteps, toggleStep, fetchDocuments, activateRoadmap } from '@/features/roadmap/lib/roadmapRepo';
+import { fetchSteps, toggleStep, fetchDocuments, activateRoadmap, updateProcess } from '@/features/roadmap/lib/roadmapRepo';
 import { STATUS_LABELS } from '@/features/roadmap/types';
 import type { RoadmapPhase, RoadmapProcess, RoadmapProcessStep, RoadmapDocument, ProcessStatus } from '@/features/roadmap/types';
 import type { PhaseTemplateRow } from '@/features/delivery-tracker/lib/roadmap';
+
+const STATUSES = Object.keys(STATUS_LABELS) as ProcessStatus[];
 
 const STATUS_COLOR: Record<ProcessStatus, string> = {
   completado: 'text-success bg-success/15',
@@ -141,6 +144,27 @@ function ProcessRow({ clientId, process, onChanged }: { clientId: string; proces
   const [steps, setSteps] = useState<RoadmapProcessStep[] | null>(null);
   const [documents, setDocuments] = useState<RoadmapDocument[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  // Guardado directo al cambiar — es un solo campo, no hace falta un botón
+  // "Guardar" aparte para esto (a diferencia de ProcessDetailPanel, que
+  // junta varios campos en un mismo submit). ProcessDetailPanel tampoco
+  // valida dependencias antes de guardar el status — dependsOn/dependedBy
+  // ahí son solo enlaces informativos, no gatean la transición — así que
+  // no hay ninguna lógica de validación que reusar más allá del Select en
+  // sí y el PATCH a updateProcess.
+  async function handleStatusChange(status: ProcessStatus) {
+    setSavingStatus(true);
+    try {
+      await updateProcess(process.id, { status });
+      onChanged();
+    } catch (err) {
+      console.error('[ProcessRow] status change failed:', err);
+      toast.error('Error al actualizar el estado');
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   async function handleToggle() {
     const next = !open;
@@ -196,14 +220,24 @@ function ProcessRow({ clientId, process, onChanged }: { clientId: string; proces
           </span>
           <span className="text-sm font-medium truncate">{process.nombre}</span>
         </div>
-        <div className="flex items-center gap-2.5 flex-shrink-0">
+        <div className="flex items-center gap-2.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {process.fecha_fin && (
             <span className="text-xs text-muted-foreground/70">{format(parseISO(process.fecha_fin), 'd MMM', { locale: es })}</span>
           )}
-          <span className={cn('inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full', STATUS_COLOR[process.status])}>
-            <Icon className="h-3 w-3" />
-            {STATUS_LABELS[process.status]}
-          </span>
+          <Select value={process.status} onValueChange={(v) => handleStatusChange(v as ProcessStatus)} disabled={savingStatus}>
+            <SelectTrigger
+              className={cn(
+                'h-auto w-auto gap-1.5 border-0 text-[11px] font-semibold px-2.5 py-1 rounded-full [&>svg]:h-3 [&>svg]:w-3 [&>svg]:opacity-60',
+                STATUS_COLOR[process.status],
+              )}
+            >
+              <Icon className="h-3 w-3" />
+              <SelectValue>{STATUS_LABELS[process.status]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </button>
 

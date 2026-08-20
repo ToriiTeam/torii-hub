@@ -102,7 +102,7 @@ export default function TabFichaOperativa({ client, onClientUpdate }: Props) {
   const [showAllBottlenecks, setShowAllBottlenecks] = useState(false);
 
   function goToDeliveryOsResumen() {
-    navigate(`/clientes/${client.id}`);
+    navigate(`/c/${client.id}`);
   }
 
   // ── Torii OS (delivery_phases) ──────────────────────────────────────────

@@ -376,7 +376,7 @@ export default function Clientes() {
                     'bg-[radial-gradient(120%_100%_at_0%_0%,var(--card-glow)_0%,hsl(var(--card))_55%)]',
                   ],
                 )}
-                onClick={() => navigate(`/clientes/${client.id}`)}
+                onClick={() => navigate(`/c/${client.id}`)}
               >
                 <CardContent className="p-[22px] space-y-3 flex-1">
                   <div className="flex items-center justify-between gap-2">

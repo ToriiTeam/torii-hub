@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
@@ -29,15 +29,19 @@ export function CalendarioVslFunnel({ clientId }: Props) {
   const [cursor] = useState(() => new Date());
   const [estadoFilter, setEstadoFilter] = useState<ProcessStatus | 'todos'>('todos');
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
     setLoading(true);
-    fetchClientRoadmap(clientId)
-      .then(({ processes }) => { if (!cancelled) setProcesses(processes); })
-      .catch((err) => console.error('[CalendarioVslFunnel] load failed:', err))
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    try {
+      const { processes } = await fetchClientRoadmap(clientId);
+      setProcesses(processes);
+    } catch (err) {
+      console.error('[CalendarioVslFunnel] load failed:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [clientId]);
+
+  useEffect(() => { load(); }, [load]);
 
   // Deadlines "del mes visible" — como CalendarioSection maneja su propio
   // cursor de navegación internamente (no expuesto), esta lista usa el mes
@@ -61,7 +65,7 @@ export function CalendarioVslFunnel({ clientId }: Props) {
 
   return (
     <div className="space-y-4">
-      <CalendarioSection processes={processes} />
+      <CalendarioSection processes={processes} onChanged={load} />
 
       <div>
         <div className="flex items-center justify-between mb-3">

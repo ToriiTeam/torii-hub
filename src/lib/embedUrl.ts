@@ -3,8 +3,12 @@
 // TabPortalCreativos.tsx.
 
 export function getYoutubeId(url: string): string | null {
+  // e(?:mbed(?:ded)?)? cubre /e/, /embed/ y /embedded/ — el original solo
+  // cubría /e/ y /embedded/, nunca /embed/ (el formato real que generan
+  // casi todos los builders de landing), confirmado corriendo la función
+  // contra un embed real antes de tocar esto.
   const match = url.match(
-    /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbedded)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
+    /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed(?:ded)?)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/
   );
   return match ? match[1] : null;
 }
