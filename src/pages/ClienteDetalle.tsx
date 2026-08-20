@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,13 +165,14 @@ export default function ClienteDetalle() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
+      {/* Header — sin el nombre del cliente como heading (punto B.3): ya se
+          sabe qué cliente es por el SubaccountSwitcher del sidebar/header.
+          Se conserva el resto (email/país/fase, badge de estado, acciones). */}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{client.name}</h1>
           <p className="text-muted-foreground text-sm">
             {client.email || 'Sin email'}
             {client.country && ` • ${client.country}`}
@@ -204,16 +205,12 @@ export default function ClienteDetalle() {
         onCancelled={fetchClient}
       />
 
-      {/* Tabs */}
+      {/* La navegación de nivel 1 (Dashboard/Delivery OS/Closing/Setting/
+          VSL/Meta Ads/Reportes) ya vive en el sidebar (Layout.tsx::
+          clientNavItems) — esta TabsList quedaba 100% duplicada en el
+          contenido, ver punto B.1 del rediseño de header. <Tabs> se
+          conserva sin TabsList visible, solo para el switching por :tab. */}
       <Tabs value={effectiveTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
-          {TABS.map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
         <TabsContent value="dashboard">
           <TabDashboardCliente clientId={client.id} />
         </TabsContent>

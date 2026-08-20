@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRegisterSubsection, useRegisterSubsubsection } from '@/contexts/HeaderNavContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ALL_CHANNELS, CHANNELS, CHANNEL_LABELS,
@@ -25,16 +26,33 @@ const TABS = [
   { value: 'metricas', label: 'Métricas por Tanda', Component: TabMetricasTanda },
 ];
 
+// Fila del header — misma lista que TABS, sin el campo Component (no forma
+// parte de HeaderNavRow). Constante a nivel de módulo (referencia estable)
+// para que useRegisterSubsection/useRegisterSubsubsection no re-publiquen
+// en cada render.
+const HEADER_ITEMS = TABS.map(({ value, label }) => ({ value, label }));
+
 // fixedClientId: cuando viene de la ficha de un cliente puntual
 // (ClienteDetalle.tsx → /clientes/:id/contenido) en vez del modo "Torii"
 // del sidebar — fija el cliente y oculta el selector correspondiente.
-interface ContenidoOrganicoProps { fixedClientId?: string }
+interface ContenidoOrganicoProps {
+  fixedClientId?: string;
+  // Punto B del rediseño de header — mismo criterio que TabVSLFunnel.tsx:
+  // "Social Funnel" es una subsección de Delivery OS para un cliente real
+  // (sus 5 tabs son sub-subsección, segunda fila), pero un ítem de sidebar
+  // de primer nivel para Torii (ToriiSocialFunnel.tsx pasa "subsection").
+  headerLevel?: 'subsection' | 'subsubsection';
+}
 
-export default function ContenidoOrganico({ fixedClientId }: ContenidoOrganicoProps = {}) {
+export default function ContenidoOrganico({ fixedClientId, headerLevel = 'subsubsection' }: ContenidoOrganicoProps = {}) {
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>(fixedClientId ?? TORII);
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>(ALL_CHANNELS);
   const [activeTab, setActiveTab] = useState('pilares');
+
+  const headerRow = { items: HEADER_ITEMS, activeValue: activeTab, onChange: setActiveTab };
+  useRegisterSubsection(headerLevel === 'subsection' ? headerRow : null);
+  useRegisterSubsubsection(headerLevel === 'subsubsection' ? headerRow : null);
 
   const [pillars, setPillars] = useState<ContentPillar[]>([]);
   const [mechanisms, setMechanisms] = useState<ContentMechanism[]>([]);
@@ -140,14 +158,6 @@ export default function ContenidoOrganico({ fixedClientId }: ContenidoOrganicoPr
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
-          {TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
         {TABS.map(({ value, Component }) => (
           <TabsContent key={value} value={value}>
             <Component {...tabProps} />

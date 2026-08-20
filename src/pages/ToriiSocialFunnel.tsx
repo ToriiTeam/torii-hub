@@ -9,5 +9,8 @@ import ContenidoOrganico from '@/pages/ContenidoOrganico';
 // componente ni requerir el cliente-casillero (a diferencia de VSL Funnel,
 // que sí lo necesita — ver ToriiVslFunnel.tsx).
 export default function ToriiSocialFunnel() {
-  return <ContenidoOrganico fixedClientId="torii" />;
+  // headerLevel="subsection": mismo criterio que ToriiVslFunnel.tsx — sin
+  // wrapper de Delivery OS acá, así que las 5 tabs van en la primera fila
+  // extra del header.
+  return <ContenidoOrganico fixedClientId="torii" headerLevel="subsection" />;
 }

@@ -29,7 +29,10 @@ async function fetchClientRevenue(clientId: string, since: string, until: string
 
 export interface RawAdsRow { fecha: string; inversion: number | null; impresiones: number | null; clics: number | null; leads: number | null; ctr: number | null; cpm: number | null; cpc: number | null; campaign_name: string | null; }
 
-async function fetchAdsRows(clientId: string, since: string, until: string): Promise<RawAdsRow[]> {
+// Exported — also used by fetchClientVslFunnel.ts to feed VslFunnelView
+// (the "Funnel" sub-subsección of VSL Funnel) with the same per-client ads
+// query this file already uses for the Dashboard Ejecutivo client view.
+export async function fetchAdsRows(clientId: string, since: string, until: string): Promise<RawAdsRow[]> {
   const { data, error } = await supabase
     .from('ads_metricas_diarias')
     .select('fecha, inversion, impresiones, clics, leads, ctr, cpm, cpc, ads_campanas!inner(client_id, nombre)')
@@ -68,7 +71,8 @@ export function summarizeAds(rows: RawAdsRow[]): AdsMetrics {
 
 export interface RawClosingRow { fecha_llamada: string | null; se_presento: boolean | null; califico: boolean | null; cerro: boolean | null; closer: string | null; loss_reason: string | null; }
 
-async function fetchClosingRows(clientId: string, since: string, until: string): Promise<RawClosingRow[]> {
+// Exported — see fetchAdsRows above, same reuse rationale.
+export async function fetchClosingRows(clientId: string, since: string, until: string): Promise<RawClosingRow[]> {
   const { data, error } = await supabase
     .from('client_closer_calls')
     .select('fecha_llamada, se_presento, califico, cerro, closer, loss_reason')

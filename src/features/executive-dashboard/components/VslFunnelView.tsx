@@ -40,17 +40,26 @@ interface VslFunnelViewProps {
   metrics: VslFunnelMetrics;
   vslFunnelData: VslFunnelData;
   nuevoToriiOnly: boolean;
+  // Overrides for the two callers that don't fit Torii's own "Nuevo Torii"
+  // date-floor / torii-principal landing story — the per-client mount in
+  // TabVSLFunnel.tsx's "Funnel" sub-subsección (see FunnelSection.tsx and
+  // fetchClientVslFunnel.ts), used for both real clients and the Torii
+  // casillero. Regular Torii/Auditor callers omit these and keep the
+  // original scope text.
+  adsScopeLabel?: string;
+  landingScopeLabel?: string;
 }
 
 const LANDING_SCOPE = "landing_id = 'torii-principal'";
 
-export function VslFunnelView({ metrics, vslFunnelData, nuevoToriiOnly }: VslFunnelViewProps) {
+export function VslFunnelView({ metrics, vslFunnelData, nuevoToriiOnly, adsScopeLabel, landingScopeLabel }: VslFunnelViewProps) {
   const { ads, closing } = metrics;
   const v = vslFunnelData;
 
-  const adsScope = nuevoToriiOnly
+  const adsScope = adsScopeLabel ?? (nuevoToriiOnly
     ? "Piso 'Nuevo Torii': 2026-06-01 en adelante"
-    : 'Sin filtro adicional — usa el período seleccionado arriba';
+    : 'Sin filtro adicional — usa el período seleccionado arriba');
+  const landingScope = landingScopeLabel ?? LANDING_SCOPE;
 
   const cpbc = calcCostoPorLlamadaCalificada(ads.inversion, metrics.qualifiedAdsCalls);
 
@@ -89,25 +98,25 @@ export function VslFunnelView({ metrics, vslFunnelData, nuevoToriiOnly }: VslFun
       />
       <MiniKpi
         label="Plays" value={fmtN(v.plays)}
-        info={{ formula: 'Sesiones con al menos un evento VSL_Play.', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        info={{ formula: 'Sesiones con al menos un evento VSL_Play.', source: 'vsl_events', scopeLabel: landingScope }}
       />
 
       {/* Video %: acumulativo — cada uno incluye a quienes llegaron hasta ahí o más lejos */}
       <MiniKpi
         label="25%+" value={fmtPct(v.p25, v.plays)} sub={`${fmtN(v.p25)} sesiones · acumulativo`}
-        info={{ formula: '% de sesiones con Play que alcanzaron 25% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        info={{ formula: '% de sesiones con Play que alcanzaron 25% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: landingScope }}
       />
       <MiniKpi
         label="50%+" value={fmtPct(v.p50, v.plays)} sub={`${fmtN(v.p50)} sesiones · acumulativo`}
-        info={{ formula: '% de sesiones con Play que alcanzaron 50% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        info={{ formula: '% de sesiones con Play que alcanzaron 50% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: landingScope }}
       />
       <MiniKpi
         label="75%+" value={fmtPct(v.p75, v.plays)} sub={`${fmtN(v.p75)} sesiones · acumulativo`}
-        info={{ formula: '% de sesiones con Play que alcanzaron 75% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        info={{ formula: '% de sesiones con Play que alcanzaron 75% o más (acumulativo, no exclusivo por etapa).', source: 'vsl_events', scopeLabel: landingScope }}
       />
       <MiniKpi
         label="100%" value={fmtPct(v.p100, v.plays)} sub={`${fmtN(v.p100)} sesiones`}
-        info={{ formula: '% de sesiones con Play que completaron el video.', source: 'vsl_events', scopeLabel: LANDING_SCOPE }}
+        info={{ formula: '% de sesiones con Play que completaron el video.', source: 'vsl_events', scopeLabel: landingScope }}
       />
 
       <MiniKpi

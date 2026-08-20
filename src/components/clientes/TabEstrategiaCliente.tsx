@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { useRegisterSubsubsection } from '@/contexts/HeaderNavContext';
 import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
 import TabFichaBasica from '@/components/clientes/TabFichaBasica';
 import TabOnboarding from '@/components/clientes/TabOnboarding';
@@ -36,16 +37,13 @@ export default function TabEstrategiaCliente({ client, onClientUpdate, autoEditT
     if (autoEditTrigger) setActiveSubTab('basica');
   }, [autoEditTrigger]);
 
+  // Punto B del rediseño de header — "Información" siempre está anidada
+  // bajo Delivery OS (no existe versión "Torii" de esta sección), así que
+  // sus 6 tabs son siempre sub-subsección (segunda fila del header).
+  useRegisterSubsubsection({ items: SUB_TABS, activeValue: activeSubTab, onChange: setActiveSubTab });
+
   return (
     <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="space-y-4">
-      <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
-        {SUB_TABS.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
       <TabsContent value="ficha">
         <TabFichaOperativa client={client} onClientUpdate={onClientUpdate} />
       </TabsContent>

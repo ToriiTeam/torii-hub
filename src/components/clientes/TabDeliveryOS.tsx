@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { useRegisterSubsection } from '@/contexts/HeaderNavContext';
 import { supabase } from '@/integrations/supabase/client';
 import { fetchClientRoadmap } from '@/features/roadmap/lib/roadmapRepo';
 import type { RoadmapPhase, RoadmapProcess } from '@/features/roadmap/types';
@@ -56,7 +57,6 @@ const EMPTY_STATE: State = { scorecard: undefined, phases: [], processes: [], ph
 
 export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger, activeSubtab, onSubtabChange }: Props) {
   const clientId = client.id;
-  const clientName = client.name;
   const [state, setState] = useState<State>(EMPTY_STATE);
   const [loading, setLoading] = useState(true);
 
@@ -90,6 +90,13 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Punto B.2 del rediseño de header: esta fila de sub-tabs (Resumen/
+  // Información/VSL Funnel/Social Funnel) ya no se pinta acá — se publica
+  // para que Layout.tsx la pinte en el header gris. Se registra siempre
+  // (no solo post-loading) para que la fila no parpadee al cambiar de
+  // sub-tab mientras loadAll() está en vuelo.
+  useRegisterSubsection({ items: SUB_TABS, activeValue: activeSubtab, onChange: onSubtabChange });
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -109,32 +116,27 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
 
   return (
     <Tabs value={activeSubtab} onValueChange={onSubtabChange} className="space-y-5">
-      <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
-        {SUB_TABS.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
       <TabsContent value="resumen">
         <div className="space-y-7">
-          {/* Header + scorecard */}
+          {/* Scorecard — sin el nombre del cliente como heading (punto
+              B.3, ya se sabe qué cliente es por el switcher), solo los
+              badges de fase/atraso si corresponden. */}
           <div className="flex justify-between items-start gap-5 flex-wrap">
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2.5 flex-wrap">
-                {clientName}
-                {currentPhase && (
-                  <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-warning/10 text-warning">
-                    {currentPhase.nombre}
-                  </span>
-                )}
-                {atraso != null && atraso > 0 && (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold bg-destructive/12 text-destructive">
-                    <AlertTriangle className="h-3 w-3" />{atraso} días atrasado vs. plan
-                  </span>
-                )}
-              </h1>
+              {(currentPhase || (atraso != null && atraso > 0)) && (
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {currentPhase && (
+                    <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-warning/10 text-warning">
+                      {currentPhase.nombre}
+                    </span>
+                  )}
+                  {atraso != null && atraso > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full font-semibold bg-destructive/12 text-destructive">
+                      <AlertTriangle className="h-3 w-3" />{atraso} días atrasado vs. plan
+                    </span>
+                  )}
+                </div>
+              )}
               <p className="text-sm text-muted-foreground mt-1">
                 {diasCampana != null ? `Día ${diasCampana} de campaña` : 'Sin campaña activa'}
               </p>

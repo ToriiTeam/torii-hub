@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { useRegisterSubsection, useRegisterSubsubsection } from '@/contexts/HeaderNavContext';
 import TabCreativos from '@/components/clientes/TabCreativos';
 import { HipotesisSection } from '@/features/vsl-funnel/components/HipotesisSection';
 import { HistorialIteraciones } from '@/features/vsl-funnel/components/HistorialIteraciones';
@@ -33,21 +34,28 @@ interface Props {
   clientId: string;
   // "Ver métricas completas" dentro de Funnel — ver FunnelSection.tsx.
   vslTrackingHref?: string;
+  // Punto B del rediseño de header: para un cliente real, este componente
+  // vive anidado bajo Delivery OS ("VSL Funnel" es una subsección de
+  // Delivery OS), así que sus 7 tabs son una SUB-subsección (segunda fila
+  // del header). Para el VSL Funnel de Torii (ToriiVslFunnel.tsx) no hay
+  // wrapper de Delivery OS — es directamente un ítem de sidebar de primer
+  // nivel — así que ahí sus tabs pasan a ser la subsección (primera fila).
+  // Default 'subsubsection' porque el caso cliente es el más común.
+  headerLevel?: 'subsection' | 'subsubsection';
 }
 
-export default function TabVSLFunnel({ clientId, vslTrackingHref }: Props) {
+export default function TabVSLFunnel({ clientId, vslTrackingHref, headerLevel = 'subsubsection' }: Props) {
   const [activeSubTab, setActiveSubTab] = useState('funnel');
+
+  // Both hooks are always called (rules-of-hooks) — only the one matching
+  // headerLevel actually registers a row, the other gets null and is a
+  // no-op.
+  const row = { items: SUB_TABS, activeValue: activeSubTab, onChange: setActiveSubTab };
+  useRegisterSubsection(headerLevel === 'subsection' ? row : null);
+  useRegisterSubsubsection(headerLevel === 'subsubsection' ? row : null);
 
   return (
     <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="space-y-4">
-      <TabsList className="bg-secondary/50 flex-wrap h-auto gap-1">
-        {SUB_TABS.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="text-sm">
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
       <TabsContent value="funnel">
         <FunnelSection clientId={clientId} moreHref={vslTrackingHref} />
       </TabsContent>

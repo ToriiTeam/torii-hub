@@ -17,7 +17,15 @@ const TORII_CASILLERO_CLIENT_ID = '5de1753a-69bd-45f7-8f0d-e871026446dd';
 export default function ToriiVslFunnel() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <TabVSLFunnel clientId={TORII_CASILLERO_CLIENT_ID} />
+      {/* headerLevel="subsection": acá no hay wrapper de Delivery OS como
+          para un cliente real — VSL Funnel es un ítem de sidebar de primer
+          nivel, así que sus 7 tabs van en la primera fila extra del header
+          en vez de la segunda. Ver TabVSLFunnel.tsx. */}
+      {/* vslTrackingHref explícito: sin esto, el link "Ver métricas
+          completas por landing/campaña" de la sub-subsección Funnel no
+          tiene a dónde mandar — antes de este rediseño FunnelSection.tsx
+          defaulteaba a esta misma ruta para el caso Torii. */}
+      <TabVSLFunnel clientId={TORII_CASILLERO_CLIENT_ID} headerLevel="subsection" vslTrackingHref="/torii/vsl-tracking" />
     </div>
   );
 }

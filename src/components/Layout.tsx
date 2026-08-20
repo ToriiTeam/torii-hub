@@ -34,8 +34,11 @@ import {
   LayoutDashboard,
   Map as MapIcon,
   Users,
+  HeartPulse,
   type LucideIcon,
 } from 'lucide-react';
+import { HeaderNavProvider, useHeaderNav } from '@/contexts/HeaderNavContext';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NavItem {
   name: string;
@@ -255,6 +258,7 @@ export default function Layout({ children }: LayoutProps) {
   );
 
   return (
+    <HeaderNavProvider>
     <div className="min-h-screen flex w-full bg-background">
       {/* Desktop Sidebar */}
       <aside
@@ -263,13 +267,9 @@ export default function Layout({ children }: LayoutProps) {
           collapsed ? 'w-16' : 'w-64'
         )}
       >
-        {/* Logo — siempre vuelve a Salud de la cartera, sin importar la subcuenta activa */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-border">
-          {!collapsed && (
-            <button type="button" onClick={goHome} className="text-xl font-bold tracking-wider hover:text-primary transition-colors">
-              TORII
-            </button>
-          )}
+        {/* El logo TORII se mudó al header (punto C) — acá solo queda el
+            colapsar/expandir del sidebar. */}
+        <div className="h-16 flex items-center justify-end px-4 border-b border-border">
           <Button
             variant="ghost"
             size="icon"
@@ -312,13 +312,7 @@ export default function Layout({ children }: LayoutProps) {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar border-border">
           <div className="h-16 flex items-center px-4 border-b border-border">
-            <button
-              type="button"
-              onClick={() => { setSidebarOpen(false); goHome(); }}
-              className="text-xl font-bold tracking-wider hover:text-primary transition-colors"
-            >
-              TORII
-            </button>
+            <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Menú</span>
           </div>
           {!isAuditor && (
             <div className="px-3 pt-3">
@@ -344,21 +338,51 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
-          <div className="flex items-center gap-4">
+        {/* Header — punto B/C del rediseño: logo + botón "Salud de la
+            cartera" a la izquierda, y (debajo del top bar, ver
+            HeaderNavRows) las filas de subsección/sub-subsección que antes
+            vivían como TabsList duplicadas en el contenido. */}
+        <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="h-16 flex items-center justify-between px-4 lg:px-6 gap-4">
+          <div className="flex items-center gap-1 min-w-0">
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="lg:hidden"
+                  className="lg:hidden mr-2"
                   onClick={() => setSidebarOpen(true)}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
             </Sheet>
+
+            {/* Logo — mudado acá desde el sidebar (punto C). Siempre vuelve
+                a Salud de la cartera, sin importar la subcuenta activa. */}
+            <button
+              type="button"
+              onClick={goHome}
+              className="text-lg font-bold tracking-wider hover:text-primary transition-colors flex-shrink-0"
+            >
+              TORII
+            </button>
+
+            {/* Botón distinto del logo, mismo destino ('/') — ver punto C. */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={goHome}
+                  aria-label="Salud de la cartera"
+                  className="text-muted-foreground hover:text-primary flex-shrink-0"
+                >
+                  <HeartPulse className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Salud de la cartera</TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-2">
@@ -415,12 +439,74 @@ export default function Layout({ children }: LayoutProps) {
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
+        </div>
+
+        {/* Filas de subsección/sub-subsección — solo se pintan cuando la
+            página activa publicó alguna (ver HeaderNavContext.tsx). Scroll
+            horizontal en mobile en vez de un dropdown — más simple y
+            suficiente para las listas cortas que hay hoy (máximo 7 ítems). */}
+        <HeaderNavRows />
         </header>
 
         {/* Page content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
+      </div>
+    </div>
+    </HeaderNavProvider>
+  );
+}
+
+// Segundo/tercer nivel de navegación del header — ver HeaderNavContext.tsx.
+// Componente aparte (no inline en Layout) porque necesita estar DEBAJO de
+// HeaderNavProvider en el árbol para poder leer el contexto; Layout ya
+// envuelve todo su return con el provider (ver el "min-h-screen" más
+// arriba), así que esto simplemente consume lo que los componentes de
+// contenido publicaron.
+function HeaderNavRows() {
+  const { subsectionRow, subsubsectionRow } = useHeaderNav();
+  if (!subsectionRow && !subsubsectionRow) return null;
+
+  return (
+    <div className="border-t border-border/60">
+      {subsectionRow && <HeaderNavRowBar items={subsectionRow.items} activeValue={subsectionRow.activeValue} onChange={subsectionRow.onChange} />}
+      {subsubsectionRow && (
+        <HeaderNavRowBar
+          items={subsubsectionRow.items}
+          activeValue={subsubsectionRow.activeValue}
+          onChange={subsubsectionRow.onChange}
+          className="border-t border-border/40"
+        />
+      )}
+    </div>
+  );
+}
+
+function HeaderNavRowBar({ items, activeValue, onChange, className }: {
+  items: { value: string; label: string }[];
+  activeValue: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn('overflow-x-auto', className)}>
+      <div className="flex items-center gap-1 px-4 lg:px-6 py-1.5 min-w-max">
+        {items.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors',
+              activeValue === item.value
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     </div>
   );
