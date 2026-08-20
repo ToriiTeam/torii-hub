@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -113,17 +113,22 @@ export default function ClienteDetalle() {
   // cliente — fetchClient solo depende de :id.
   const effectiveTab = urlTab && TABS.some((t) => t.value === urlTab) ? urlTab : DEFAULT_TAB;
 
-  function handleTabChange(value: string) {
+  // Memoizados con useCallback: identidad estable entre renders para que el
+  // useEffect de registro en HeaderNavContext (useRegisterSubsection, dep en
+  // row.onChange) no dispare un cleanup+re-registro de más — un re-render de
+  // ClienteDetalle/TabDeliveryOS (ej. por un refetch vía canal realtime) no
+  // debe hacer parpadear/desaparecer la fila de subsección en el header.
+  const handleTabChange = useCallback((value: string) => {
     navigate(value === DEFAULT_TAB ? `/c/${id}` : `/c/${id}/${value}`);
-  }
+  }, [navigate, id]);
 
   // Segundo nivel de deep-link, solo para Delivery OS — 'resumen' es su
   // default (URL limpia, mismo criterio que el nivel de arriba).
   const effectiveSubtab = urlSubtab && DELIVERY_OS_SUBTABS.includes(urlSubtab) ? urlSubtab : 'resumen';
 
-  function handleSubtabChange(subtab: string) {
+  const handleSubtabChange = useCallback((subtab: string) => {
     navigate(subtab === 'resumen' ? `/c/${id}` : `/c/${id}/delivery-os/${subtab}`);
-  }
+  }, [navigate, id]);
 
   useEffect(() => {
     if (id) fetchClient();
@@ -167,35 +172,25 @@ export default function ClienteDetalle() {
     <div className="space-y-6 animate-fade-in">
       {/* Header — sin el nombre del cliente como heading (punto B.3): ya se
           sabe qué cliente es por el SubaccountSwitcher del sidebar/header.
-          Se conserva el resto (email/país/fase, badge de estado, acciones). */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-          <ArrowLeft className="h-5 w-5" />
+          Email/país/fase y la flecha "volver" se sacaron (ya redundantes
+          con el sidebar/switcher) — solo queda el badge de estado y las
+          acciones, alineados a la derecha. */}
+      <div className="flex items-center justify-end gap-2">
+        <Badge className={cn('text-sm border-0', statusColors[client.status])}>
+          {statusLabels[client.status]}
+        </Badge>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/c/${id}/delivery-os/informacion`); }}
+        >
+          <Edit2 className="h-4 w-4 mr-1.5" />Editar
         </Button>
-        <div className="flex-1 min-w-0">
-          <p className="text-muted-foreground text-sm">
-            {client.email || 'Sin email'}
-            {client.country && ` • ${client.country}`}
-            {client.task_phase && ` • ${client.task_phase}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge className={cn('text-sm border-0', statusColors[client.status])}>
-            {statusLabels[client.status]}
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/c/${id}/delivery-os/informacion`); }}
-          >
-            <Edit2 className="h-4 w-4 mr-1.5" />Editar
+        {client.status !== 'cancelled' && (
+          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelDialogOpen(true)}>
+            <Ban className="h-4 w-4 mr-1.5" />Cancelar cliente
           </Button>
-          {client.status !== 'cancelled' && (
-            <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelDialogOpen(true)}>
-              <Ban className="h-4 w-4 mr-1.5" />Cancelar cliente
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       <CancelClientDialog
