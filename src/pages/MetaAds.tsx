@@ -34,9 +34,15 @@ function MetaAdsContent() {
   )
 }
 
-export default function MetaAds() {
+// fixedClientId: cuando viene de la subcuenta de un cliente puntual
+// (/c/:id/meta-ads, ver ClienteDetalle.tsx) en vez del modo "Torii" del
+// sidebar — mismo patrón que Closers/ContenidoOrganico/VslSection/
+// VslTracking. Ver AccountContext.tsx para el filtrado real.
+interface MetaAdsProps { fixedClientId?: string }
+
+export default function MetaAds({ fixedClientId }: MetaAdsProps = {}) {
   return (
-    <AccountProvider>
+    <AccountProvider fixedClientId={fixedClientId}>
       <DateRangeProvider>
         <SelectionProvider>
           <SensitiveDataProvider>

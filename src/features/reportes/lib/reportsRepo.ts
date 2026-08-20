@@ -25,9 +25,15 @@ function toReport(row: any): Report {
   };
 }
 
-export async function listReports(): Promise<ReportWithClient[]> {
+// clientId: scopea a la subcuenta de un cliente puntual (/c/:id/reportes,
+// ver ClienteDetalle.tsx) en vez de listar toda la cartera — mismo patrón
+// fixedClientId que el resto de las secciones.
+export async function listReports(clientId?: string): Promise<ReportWithClient[]> {
+  let reportsQuery = supabase.from('reports').select('*').order('created_at', { ascending: false });
+  if (clientId) reportsQuery = reportsQuery.eq('client_id', clientId);
+
   const [{ data: reports, error: reportsErr }, { data: clients, error: clientsErr }] = await Promise.all([
-    supabase.from('reports').select('*').order('created_at', { ascending: false }),
+    reportsQuery,
     // es_interno = false: el casillero interno de Torii no genera reportes
     // de cliente.
     supabase.from('clients').select('id, name, email').eq('es_interno', false),

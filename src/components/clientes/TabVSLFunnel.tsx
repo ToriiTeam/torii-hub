@@ -5,6 +5,7 @@ import { HipotesisSection } from '@/features/vsl-funnel/components/HipotesisSect
 import { HistorialIteraciones } from '@/features/vsl-funnel/components/HistorialIteraciones';
 import { VslSection } from '@/features/vsl-funnel/components/VslSection';
 import { CalendarioVslFunnel } from '@/features/vsl-funnel/components/CalendarioVslFunnel';
+import { FunnelSection } from '@/features/vsl-funnel/components/FunnelSection';
 
 // Reemplaza a TabCreativosCliente.tsx (Árbol de Iteraciones/Ángulos/
 // Creativos) dentro de Delivery OS > VSL Funnel. "Creativos" es el mismo
@@ -13,7 +14,13 @@ import { CalendarioVslFunnel } from '@/features/vsl-funnel/components/Calendario
 // antiguos sub-tabs separados VSL+Landing (vsl_entries + landing_variants,
 // con landings sueltas asociables a varios VSL). "Calendario" reusa
 // CalendarioSection.tsx de Delivery OS. Precall queda como placeholder.
+// "Funnel" es nuevo (métricas agregadas de vsl_events por cliente, ver
+// FunnelSection.tsx) — vive primero porque es la vista de resumen. Este
+// componente se usa tanto para un cliente real (TabDeliveryOS.tsx) como
+// para el VSL Funnel de Torii (ToriiVslFunnel.tsx, fijado al
+// cliente-casillero interno) — mismo componente, sin duplicar.
 const SUB_TABS = [
+  { value: 'funnel', label: 'Funnel' },
   { value: 'historial', label: 'Historial' },
   { value: 'hipotesis', label: 'Hipótesis' },
   { value: 'creativos', label: 'Creativos' },
@@ -24,10 +31,12 @@ const SUB_TABS = [
 
 interface Props {
   clientId: string;
+  // "Ver métricas completas" dentro de Funnel — ver FunnelSection.tsx.
+  vslTrackingHref?: string;
 }
 
-export default function TabVSLFunnel({ clientId }: Props) {
-  const [activeSubTab, setActiveSubTab] = useState('historial');
+export default function TabVSLFunnel({ clientId, vslTrackingHref }: Props) {
+  const [activeSubTab, setActiveSubTab] = useState('funnel');
 
   return (
     <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="space-y-4">
@@ -39,6 +48,9 @@ export default function TabVSLFunnel({ clientId }: Props) {
         ))}
       </TabsList>
 
+      <TabsContent value="funnel">
+        <FunnelSection clientId={clientId} moreHref={vslTrackingHref} />
+      </TabsContent>
       <TabsContent value="historial">
         <HistorialIteraciones clientId={clientId} />
       </TabsContent>

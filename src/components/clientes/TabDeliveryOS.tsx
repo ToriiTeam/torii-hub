@@ -175,7 +175,7 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
       </TabsContent>
 
       <TabsContent value="vsl-funnel">
-        <TabVSLFunnel clientId={clientId} />
+        <TabVSLFunnel clientId={clientId} vslTrackingHref={`/c/${clientId}/vsl`} />
       </TabsContent>
 
       <TabsContent value="social-funnel">

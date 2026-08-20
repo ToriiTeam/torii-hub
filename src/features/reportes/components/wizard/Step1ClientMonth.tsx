@@ -29,6 +29,9 @@ const PERIOD_TABS: { value: PeriodType; label: string }[] = [
 
 interface Step1Props {
   clientId: string;
+  // Subcuenta de un cliente puntual — ver ReportWizard.tsx/Reportes.tsx.
+  // Bloquea el picker de cliente en vez de mostrarlo.
+  fixedClientId?: string;
   periodType: PeriodType;
   year: number;
   month: number;
@@ -44,6 +47,7 @@ interface Step1Props {
 
 export function Step1ClientMonth({
   clientId,
+  fixedClientId,
   periodType,
   year,
   month,
@@ -86,18 +90,24 @@ export function Step1ClientMonth({
       <CardContent className="space-y-5">
         <div className="space-y-1.5 max-w-sm">
           <Label className="text-xs text-muted-foreground">Cliente</Label>
-          <Select
-            value={clientId}
-            onValueChange={(id) => {
-              const c = clients.find((c) => c.id === id);
-              onClientChange(id, c?.name ?? '');
-            }}
-          >
-            <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccioná un cliente" /></SelectTrigger>
-            <SelectContent>
-              {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {fixedClientId ? (
+            <div className="flex items-center px-3 h-9 rounded-md border border-input bg-secondary/50 text-sm">
+              {clients.find((c) => c.id === fixedClientId)?.name ?? '—'}
+            </div>
+          ) : (
+            <Select
+              value={clientId}
+              onValueChange={(id) => {
+                const c = clients.find((c) => c.id === id);
+                onClientChange(id, c?.name ?? '');
+              }}
+            >
+              <SelectTrigger className="bg-secondary/50"><SelectValue placeholder="Seleccioná un cliente" /></SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="space-y-3">

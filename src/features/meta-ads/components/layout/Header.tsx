@@ -7,7 +7,7 @@ import { CompareSelector } from '../common/CompareSelector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 export function Header() {
-  const { accounts, selectedAccount, setSelectedAccount, loading, error } = useAccount()
+  const { accounts, selectedAccount, setSelectedAccount, loading, error, fixedClientId } = useAccount()
   const { isHidden, toggle } = useSensitiveData()
   const { datePreset } = useDateRange()
   const { isAuditor } = useAuth()
@@ -29,6 +29,12 @@ export function Header() {
             // (meta-ads-proxy already only ever returns this one account
             // for them) — a plain label, not a disabled-looking dropdown.
             <span className="header-account-locked">{selectedAccount?.name ?? 'LM Social Constructions'}</span>
+          ) : fixedClientId ? (
+            // Subcuenta de un cliente puntual (/c/:id/meta-ads) — sin
+            // selector, igual que el resto de las secciones fixedClientId.
+            <span className="header-account-locked">
+              {selectedAccount?.name ?? (accounts.length === 0 ? 'Sin cuenta de Meta Ads matcheada' : 'Cargando…')}
+            </span>
           ) : (
             <Select
               value={selectedAccount?.account_id ?? ''}

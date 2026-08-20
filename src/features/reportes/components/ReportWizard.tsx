@@ -24,9 +24,13 @@ const STEP_LABELS = [
 interface ReportWizardProps {
   onClose: () => void;
   onSaved: () => void;
+  // Subcuenta de un cliente puntual — ver Reportes.tsx. Precarga y bloquea
+  // el cliente del paso 1 en vez de mostrar el selector.
+  fixedClientId?: string;
+  fixedClientName?: string;
 }
 
-export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
+export function ReportWizard({ onClose, onSaved, fixedClientId, fixedClientName }: ReportWizardProps) {
   const {
     draft,
     periodRange,
@@ -43,6 +47,10 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
   const [step, setStep] = useState(0);
   const [reportId, setReportId] = useState<string | null>(null);
   const [generatingNarrativa, setGeneratingNarrativa] = useState(false);
+
+  useEffect(() => {
+    if (fixedClientId && !draft.clientId) setClient(fixedClientId, fixedClientName ?? '');
+  }, [fixedClientId, fixedClientName, draft.clientId, setClient]);
 
   // Auto-fill once when the metrics step is first reached for a given
   // client/period — Step2 also has a manual "Auto-llenar de nuevo" button
@@ -112,6 +120,7 @@ export function ReportWizard({ onClose, onSaved }: ReportWizardProps) {
         return (
           <Step1ClientMonth
             clientId={draft.clientId}
+            fixedClientId={fixedClientId}
             periodType={draft.periodType}
             year={draft.year}
             month={draft.month}

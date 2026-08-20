@@ -485,18 +485,39 @@ function UtmBreakdownTable({ rows, labelHeader, truncateLabel, showCampaignColum
   );
 }
 
-export default function VslTracking() {
+// fixedClientId: cuando viene de la subcuenta de un cliente puntual (/c/:id/vsl,
+// ver ClienteDetalle.tsx) en vez del modo "Torii" del sidebar — mismo patrón
+// que Closers/ContenidoOrganico/VslSection. Restringe tracked_landings (y por
+// lo tanto el picker de landing y el agregado "todas las landings") a las
+// landings de ese cliente, sin ningún selector de cliente adentro.
+interface VslTrackingProps { fixedClientId?: string }
+
+export default function VslTracking({ fixedClientId }: VslTrackingProps = {}) {
   const { isAuditor } = useAuth();
   const [events, setEvents] = useState<VslEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [trackedLandings, setTrackedLandings] = useState<TrackedLanding[]>([]);
 
   useEffect(() => {
-    supabase.from('tracked_landings').select('*').eq('active', true).then(({ data, error }) => {
+    let query = supabase.from('tracked_landings').select('*').eq('active', true);
+    if (fixedClientId) query = query.eq('client_id', fixedClientId);
+    query.then(({ data, error }) => {
       if (error) { console.error('[VslTracking] Error loading tracked_landings:', error); return; }
       setTrackedLandings(data ?? []);
     });
-  }, []);
+  }, [fixedClientId]);
+
+  // Set de landing_id de este cliente — usado para recortar `events` (que
+  // se trae sin filtro server-side) al agregado "todas las landings" de
+  // SOLO este cliente, en vez de mezclar tráfico de toda la cartera.
+  const clientLandingIds = useMemo(
+    () => new Set(trackedLandings.map(l => l.landing_id)),
+    [trackedLandings],
+  );
+  const scopedEvents = useMemo(
+    () => (fixedClientId ? events.filter(e => e.landing_id != null && clientLandingIds.has(e.landing_id)) : events),
+    [events, fixedClientId, clientLandingIds],
+  );
 
   // Roots are the selectable top-level options (group_id null); parentOf/
   // childrenOf resolve the one-level rollup for both filtering and the
@@ -541,6 +562,11 @@ export default function VslTracking() {
       if (landingId !== ALL_LANDINGS) {
         const children = childrenLandingIdsOf.get(landingId);
         query = children?.length ? query.in('landing_id', [landingId, ...children]) : query.eq('landing_id', landingId);
+      } else if (fixedClientId) {
+        // "todas las landings" scopeado a un cliente puntual — sin esto la
+        // query trae la primera fecha de TODA la cartera, no de este cliente.
+        if (clientLandingIds.size === 0) { setTrackingSince(null); return; }
+        query = query.in('landing_id', Array.from(clientLandingIds));
       }
       if (!includeNoUtm) query = query.not('utm_source', 'is', null);
       const { data, error } = await query;
@@ -550,7 +576,7 @@ export default function VslTracking() {
     }
     loadEarliest();
     return () => { cancelled = true; };
-  }, [landingId, includeNoUtm, childrenLandingIdsOf]);
+  }, [landingId, includeNoUtm, childrenLandingIdsOf, fixedClientId, clientLandingIds]);
 
   async function loadData() {
     setLoading(true);
@@ -582,17 +608,17 @@ export default function VslTracking() {
   // Only the date range triggers a refetch — landing/campaign filters and
   // the trend granularity toggle all operate on the already-loaded window.
   const campaignOptions = useMemo(() => {
-    const scoped = events.filter(e => matchesLandingFilter(e.landing_id, landingId, parentLandingIdOf));
+    const scoped = scopedEvents.filter(e => matchesLandingFilter(e.landing_id, landingId, parentLandingIdOf));
     return Array.from(new Set(scoped.map(e => e.utm_campaign).filter((v): v is string => !!v))).sort();
-  }, [events, landingId, parentLandingIdOf]);
+  }, [scopedEvents, landingId, parentLandingIdOf]);
 
   const filteredEvents = useMemo(() => {
-    return events.filter(e => {
+    return scopedEvents.filter(e => {
       if (!matchesLandingFilter(e.landing_id, landingId, parentLandingIdOf)) return false;
       if (utmCampaign !== ALL_CAMPAIGNS && e.utm_campaign !== utmCampaign) return false;
       return true;
     });
-  }, [events, landingId, utmCampaign, parentLandingIdOf]);
+  }, [scopedEvents, landingId, utmCampaign, parentLandingIdOf]);
 
   const sessionSummaries = useMemo(
     () => Array.from(buildSessionSummaries(filteredEvents).values()),

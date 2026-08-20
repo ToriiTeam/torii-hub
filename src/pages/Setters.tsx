@@ -5,7 +5,15 @@ import { PhoneCall } from 'lucide-react';
 // Supabase) isn't wired up yet — this is a placeholder until it is. The
 // previous setter CRM (people/performance/payments) that used to live here
 // was moved to SettersLegacy.tsx (unrouted) rather than deleted.
-export default function Setters() {
+//
+// fixedClientId: aceptado por paridad con Closers/ContenidoOrganico/
+// VslSection/VslTracking/MetaAds/Reportes (patrón de subcuenta de cliente,
+// ver punto B) — hoy no cambia nada porque esta pantalla todavía no tiene
+// ningún dato ni selector que scopear; cuando el flujo automático se
+// conecte, cablear el filtro acá.
+interface SettersProps { fixedClientId?: string }
+
+export default function Setters(_props: SettersProps = {}) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>

@@ -97,24 +97,22 @@ const AUDITOR_ITEMS: NavItem[] = [
   { name: 'VSL', href: '/vsl-tracking', icon: Video },
 ];
 
-// Setting/VSL/Meta Ads/Reportes todavía no tienen una versión "sin selector
-// de cliente" — hoy son páginas Torii-wide con su propio picker interno de
-// cuenta/cliente (AccountContext, etc.). Hasta que se les agregue el mismo
-// patrón fixedClientId que ya usan Closers/ContenidoOrganico/VslSection,
-// estos 4 ítems navegan a esas páginas globales (con su picker de siempre)
-// en vez de a una vista genuinamente scopeada por :id — ver nota de
-// desviación en el resumen final. Closing sí es 100% real: reusa
-// TabClosingCliente (Closers con fixedClientId) como tab de primer nivel
-// en ClienteDetalle.tsx.
+// Setting/VSL/Meta Ads/Reportes ahora tienen su versión "sin selector de
+// cliente" (fixedClientId, ver Setters/VslTracking/MetaAds/Reportes.tsx) y
+// son tabs de primer nivel de ClienteDetalle.tsx (mismo patrón que
+// Dashboard/Delivery OS/Closing) — /c/:id/setting, /c/:id/vsl,
+// /c/:id/meta-ads, /c/:id/reportes. Antes apuntaban a las páginas globales
+// de Torii (/torii/...), lo que sacaba al usuario de la subcuenta del
+// cliente al clickear VSL o Reportes — bug de navegación, ver punto C.
 function clientNavItems(clientId: string): NavItem[] {
   return [
     { name: 'Dashboard', href: `/c/${clientId}`, icon: LayoutDashboard },
     { name: 'Delivery OS', href: `/c/${clientId}/delivery-os`, icon: MapIcon },
     { name: 'Closing', href: `/c/${clientId}/closing`, icon: Handshake },
-    { name: 'Setting', href: '/torii/setting', icon: PhoneCall },
-    { name: 'VSL', href: '/torii/vsl-tracking', icon: Video },
-    { name: 'Meta Ads', href: '/torii/meta-ads', icon: BarChart2 },
-    { name: 'Reportes', href: '/torii/reportes', icon: FileText },
+    { name: 'Setting', href: `/c/${clientId}/setting`, icon: PhoneCall },
+    { name: 'VSL', href: `/c/${clientId}/vsl`, icon: Video },
+    { name: 'Meta Ads', href: `/c/${clientId}/meta-ads`, icon: BarChart2 },
+    { name: 'Reportes', href: `/c/${clientId}/reportes`, icon: FileText },
   ];
 }
 

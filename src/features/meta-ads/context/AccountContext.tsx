@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react'
 import { supabase } from '../../../integrations/supabase/client'
 import type { AdAccount } from '../types/meta'
 import type { Market } from '../types/audit'
@@ -14,6 +14,10 @@ interface AccountContextType {
   // house accounts / unmatched accounts. Used to stamp ads_campanas.client_id
   // when syncing — separate from `market`, which only cares about country.
   clientId: string | null
+  // Set when AccountProvider was mounted with fixedClientId (subcuenta de
+  // cliente) — Header.tsx lo usa para ocultar el selector de cuenta, mismo
+  // criterio que ya usaba para isAuditor.
+  fixedClientId: string | null
 }
 
 const AccountContext = createContext<AccountContextType>({
@@ -24,6 +28,7 @@ const AccountContext = createContext<AccountContextType>({
   error:              null,
   market:             'latam',
   clientId:           null,
+  fixedClientId:      null,
 })
 
 // The Meta ad account name is whatever the business typed into Business
@@ -57,13 +62,28 @@ export function matchHardcodedAccount(accountName: string): Market | null {
   return HARDCODED_ACCOUNT_MARKETS[accountName.trim().toLowerCase()] ?? null
 }
 
-export function AccountProvider({ children }: { children: ReactNode }) {
-  const [accounts,        setAccounts]        = useState<AdAccount[]>([])
+interface AccountProviderProps {
+  children: ReactNode
+  // Cuando viene de la subcuenta de un cliente puntual (/c/:id/meta-ads, ver
+  // ClienteDetalle.tsx) en vez del modo "Torii" del sidebar — mismo patrón
+  // que Closers/ContenidoOrganico/VslSection/VslTracking. Recorta la lista
+  // de cuentas de Meta a las que matchean ese client_id (mismo
+  // matchClientToAccount que ya se usaba para resolver `market`, aplicado
+  // acá para filtrar en vez de solo para clasificar) y la fija como
+  // seleccionada, sin selector de cuenta visible (ver Header.tsx).
+  fixedClientId?: string
+}
+
+export function AccountProvider({ children, fixedClientId }: AccountProviderProps) {
+  const [rawAccounts,     setRawAccounts]      = useState<AdAccount[]>([])
   const [selectedAccount, setSelectedAccount] = useState<AdAccount | null>(null)
   const [loading,         setLoading]         = useState(true)
   const [error,           setError]           = useState<string | null>(null)
   const [market,          setMarket]          = useState<Market>('latam')
   const [clientId,        setClientId]        = useState<string | null>(null)
+  // Solo se resuelve cuando fixedClientId está seteado — nombre/país del
+  // cliente activo, para matchear cuentas por nombre y fijar el país.
+  const [fixedClient, setFixedClient] = useState<{ id: string; name: string; country: string | null } | null>(null)
 
   useEffect(() => {
     supabase.functions
@@ -77,10 +97,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         }
         const list: AdAccount[] = res?.data ?? []
         console.log('[AccountContext] accounts loaded:', list.length, list)
-        setAccounts(list)
-        // account_status can arrive as number or string from Meta — normalize.
-        const active = list.find((a) => Number(a.account_status) === 1) ?? list[0] ?? null
-        setSelectedAccount(active)
+        setRawAccounts(list)
         setLoading(false)
       })
       .catch((err: Error) => {
@@ -90,10 +107,63 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       })
   }, [])
 
+  useEffect(() => {
+    if (!fixedClientId) { setFixedClient(null); return }
+    let cancelled = false
+    supabase
+      .from('clients')
+      .select('id, name, country')
+      .eq('id', fixedClientId)
+      .maybeSingle()
+      .then(({ data, error: fetchErr }) => {
+        if (cancelled) return
+        if (fetchErr || !data) {
+          console.warn('[AccountContext] could not load fixed client:', fetchErr?.message)
+          setFixedClient(null)
+          return
+        }
+        setFixedClient(data)
+      })
+    return () => { cancelled = true }
+  }, [fixedClientId])
+
+  // Cuentas visibles: todas (modo Torii) o solo las que matchean el cliente
+  // fijo por nombre (mismo matchClientToAccount de siempre). Las cuentas
+  // "house" de Torii (HARDCODED_ACCOUNT_MARKETS) nunca matchean un cliente
+  // real, así que quedan afuera del modo fixedClientId sin lógica extra.
+  const accounts = useMemo(() => {
+    if (!fixedClientId) return rawAccounts
+    if (!fixedClient) return []
+    return rawAccounts.filter((a) => matchClientToAccount(a.name, [fixedClient]).length > 0)
+  }, [rawAccounts, fixedClientId, fixedClient])
+
+  // Auto-selecciona dentro de la lista visible cuando cambia (carga inicial,
+  // o al resolverse fixedClient) — en modo Torii, la primera cuenta activa;
+  // en modo fixedClientId, la única/primera cuenta de ese cliente.
+  useEffect(() => {
+    if (loading) return
+    if (selectedAccount && accounts.some((a) => a.account_id === selectedAccount.account_id)) return
+    if (fixedClientId) {
+      setSelectedAccount(accounts[0] ?? null)
+      return
+    }
+    // account_status can arrive as number or string from Meta — normalize.
+    const active = accounts.find((a) => Number(a.account_status) === 1) ?? accounts[0] ?? null
+    setSelectedAccount(active)
+  }, [accounts, loading, fixedClientId, selectedAccount])
+
   // Resolve which pricing market the selected account's client belongs to.
   // clients is a handful of rows, so fetching the whole table per account
-  // switch is cheap — no need for a server-side filter.
+  // switch is cheap — no need for a server-side filter. In fixedClientId
+  // mode, clientId/market are just the fixed client's — no need to
+  // re-resolve by name matching (fixedClient already gives us both).
   useEffect(() => {
+    if (fixedClientId) {
+      if (fixedClient) setMarket(fixedClient.country === 'Spain' ? 'spain' : 'latam')
+      setClientId(fixedClientId)
+      return
+    }
+
     if (!selectedAccount) {
       setMarket('latam')
       setClientId(null)
@@ -146,10 +216,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [selectedAccount])
+  }, [selectedAccount, fixedClientId, fixedClient])
 
   return (
-    <AccountContext.Provider value={{ accounts, selectedAccount, setSelectedAccount, loading, error, market, clientId }}>
+    <AccountContext.Provider value={{ accounts, selectedAccount, setSelectedAccount, loading, error, market, clientId, fixedClientId: fixedClientId ?? null }}>
       {children}
     </AccountContext.Provider>
   )

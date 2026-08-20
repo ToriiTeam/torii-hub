@@ -11,6 +11,10 @@ import { CancelClientDialog } from '@/features/clientes/components/CancelClientD
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
 import TabDeliveryOS from '@/components/clientes/TabDeliveryOS';
 import TabClosingCliente from '@/components/clientes/TabClosingCliente';
+import Setters from '@/pages/Setters';
+import VslTracking from '@/pages/VslTracking';
+import MetaAds from '@/pages/MetaAds';
+import Reportes from '@/pages/Reportes';
 
 export interface Client {
   id: string;
@@ -69,10 +73,21 @@ const statusLabels: Record<string, string> = {
 // que cuelga de ahí para adentro (ej. los 6 sub-sub-tabs de VSL Funnel) es
 // estado local sin ruta propia, mismo criterio que ya usaban
 // Estrategia/Creativos antes de esto.
+// Setting/VSL/Meta Ads/Reportes — punto B/C del rediseño de navegación:
+// antes el sidebar (Layout.tsx::clientNavItems) mandaba estos 4 ítems a las
+// páginas globales de Torii (con su propio selector de cliente), sacando al
+// usuario de la subcuenta activa. Ahora son tabs de primer nivel acá mismo,
+// que montan exactamente los mismos componentes que ya usa Torii
+// (Setters/VslTracking/MetaAds/Reportes) pero con fixedClientId — sin
+// selector adentro, sin salir de /c/:id.
 const TABS = [
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'delivery-os', label: 'Delivery OS' },
   { value: 'closing', label: 'Closing' },
+  { value: 'setting', label: 'Setting' },
+  { value: 'vsl', label: 'VSL' },
+  { value: 'meta-ads', label: 'Meta Ads' },
+  { value: 'reportes', label: 'Reportes' },
 ];
 
 // 'delivery-os' es el default — mantiene la URL limpia /clientes/:id.
@@ -215,6 +230,22 @@ export default function ClienteDetalle() {
 
         <TabsContent value="closing">
           <TabClosingCliente clientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="setting">
+          <Setters fixedClientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="vsl">
+          <VslTracking fixedClientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="meta-ads">
+          <MetaAds fixedClientId={client.id} />
+        </TabsContent>
+
+        <TabsContent value="reportes">
+          <Reportes fixedClientId={client.id} fixedClientName={client.name} />
         </TabsContent>
       </Tabs>
     </div>

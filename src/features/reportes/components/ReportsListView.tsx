@@ -13,6 +13,8 @@ import type { ReportWithClient } from '../types';
 interface ReportsListViewProps {
   onNewReport: () => void;
   refreshKey: number;
+  // Subcuenta de un cliente puntual — ver Reportes.tsx.
+  fixedClientId?: string;
 }
 
 function formatReportPeriod(report: ReportWithClient): string {
@@ -28,7 +30,7 @@ function formatReportPeriod(report: ReportWithClient): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProps) {
+export function ReportsListView({ onNewReport, refreshKey, fixedClientId }: ReportsListViewProps) {
   const [reports, setReports] = useState<ReportWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -36,14 +38,14 @@ export function ReportsListView({ onNewReport, refreshKey }: ReportsListViewProp
   const fetchReports = useCallback(async () => {
     setLoading(true);
     try {
-      setReports(await listReports());
+      setReports(await listReports(fixedClientId));
     } catch (err) {
       console.error(err);
       toast.error('Error al cargar los informes');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fixedClientId]);
 
   useEffect(() => { fetchReports(); }, [fetchReports, refreshKey]);
 
