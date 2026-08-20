@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { DateRangePicker } from '../common/DateRangePicker'
 import { CompareSelector } from '../common/CompareSelector'
 import { LinkMetaAccountButton } from '../common/LinkMetaAccountButton'
+import { LinkClientAccountFlow } from '../common/LinkClientAccountFlow'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 
 export function Header() {
@@ -42,24 +43,32 @@ export function Header() {
               <LinkMetaAccountButton />
             </div>
           ) : (
-            <Select
-              value={selectedAccount?.account_id ?? ''}
-              onValueChange={(val) => {
-                const found = accounts.find(a => a.account_id === val)
-                if (found) setSelectedAccount(found)
-              }}
-            >
-              <SelectTrigger className="account-select-trigger">
-                <SelectValue placeholder="Seleccionar cuenta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map(acc => (
-                  <SelectItem key={acc.account_id} value={acc.account_id}>
-                    {acc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            // Vista general (Torii, sin fixedClientId): el <Select> elige qué
+            // cuenta ver en el dashboard actual. LinkClientAccountFlow es una
+            // herramienta aparte — deja resolver el matching manual de
+            // cualquier cliente (paso 1: elegir cliente, paso 2: vincular su
+            // cuenta) sin tener que salir a su ficha individual.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Select
+                value={selectedAccount?.account_id ?? ''}
+                onValueChange={(val) => {
+                  const found = accounts.find(a => a.account_id === val)
+                  if (found) setSelectedAccount(found)
+                }}
+              >
+                <SelectTrigger className="account-select-trigger">
+                  <SelectValue placeholder="Seleccionar cuenta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map(acc => (
+                    <SelectItem key={acc.account_id} value={acc.account_id}>
+                      {acc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <LinkClientAccountFlow />
+            </div>
           )}
         </div>
       </div>

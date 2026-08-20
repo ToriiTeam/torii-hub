@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react'
 import { supabase } from '../../../integrations/supabase/client'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import type { AdAccount } from '../types/meta'
 import type { Market } from '../types/audit'
 
@@ -104,10 +105,25 @@ export function AccountProvider({ children, fixedClientId }: AccountProviderProp
   useEffect(() => {
     supabase.functions
       .invoke('meta-ads-proxy', { body: { type: 'accounts' } })
-      .then(({ data: res, error: fnErr }) => {
+      .then(async ({ data: res, error: fnErr }) => {
         if (fnErr) {
           console.error('[AccountContext] edge function error:', fnErr)
-          setError(fnErr.message)
+          // fnErr.message del cliente de supabase-js es siempre el string
+          // genérico "Edge Function returned a non-2xx status code" — el
+          // mensaje real que la edge function meta-ads-proxy manda en su
+          // body ({ error: msg }, ver supabase/functions/meta-ads-proxy/
+          // index.ts) solo está disponible parseando fnErr.context, que en
+          // un FunctionsHttpError es el Response crudo.
+          let realMsg = fnErr.message
+          if (fnErr instanceof FunctionsHttpError) {
+            try {
+              const body = await fnErr.context.json()
+              if (body?.error) realMsg = body.error
+            } catch {
+              // body no era JSON o ya fue consumido — nos quedamos con fnErr.message
+            }
+          }
+          setError(realMsg)
           setLoading(false)
           return
         }
