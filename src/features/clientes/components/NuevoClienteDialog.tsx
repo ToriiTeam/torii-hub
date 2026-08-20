@@ -7,18 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { statusLabels, type ClientStatus } from '@/lib/clientStatus';
 
-type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
 type PaymentType = 'Upfront' | 'Mensual' | 'Cuotas';
 type PaymentPlatform = 'Stripe' | 'Binance' | 'Transfer';
-
-const statusLabels: Record<ClientStatus, string> = {
-  active: 'Activo',
-  paused: 'Pausado',
-  finished: 'Finalizado',
-  cancelled: 'Cancelado',
-};
 
 const emptyForm = {
   name: '', email: '', phone: '', offer_type: 'DFY' as OfferType,

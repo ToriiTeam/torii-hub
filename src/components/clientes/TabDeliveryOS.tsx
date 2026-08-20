@@ -38,7 +38,6 @@ const SUB_TABS = [
 interface Props {
   client: Client;
   onClientUpdate: () => void;
-  autoEditTrigger?: number;
   activeSubtab: string;
   onSubtabChange: (subtab: string) => void;
 }
@@ -55,7 +54,7 @@ interface State {
 
 const EMPTY_STATE: State = { scorecard: undefined, phases: [], processes: [], phaseTemplate: [], cuellos: [], activityLog: [], hipotesis: [] };
 
-export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger, activeSubtab, onSubtabChange }: Props) {
+export default function TabDeliveryOS({ client, onClientUpdate, activeSubtab, onSubtabChange }: Props) {
   const clientId = client.id;
   const [state, setState] = useState<State>(EMPTY_STATE);
   const [loading, setLoading] = useState(true);
@@ -173,7 +172,7 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
       </TabsContent>
 
       <TabsContent value="informacion">
-        <TabEstrategiaCliente client={client} onClientUpdate={onClientUpdate} autoEditTrigger={autoEditTrigger} />
+        <TabEstrategiaCliente client={client} onClientUpdate={onClientUpdate} />
       </TabsContent>
 
       <TabsContent value="vsl-funnel">

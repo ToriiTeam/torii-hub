@@ -55,6 +55,18 @@ export function useHeaderNav(): HeaderNavContextValue {
 export function useRegisterSubsection(row: HeaderNavRow | null) {
   const { setSubsectionRow } = useHeaderNav();
   useEffect(() => {
+    // row === null significa "no soy dueño de esta fila ahora mismo" (ej.
+    // TabVSLFunnel/ContenidoOrganico cuando headerLevel !== 'subsection') —
+    // NO hay que tocar el estado compartido en ese caso: si lo hiciéramos
+    // (setSubsectionRow(null) eager en el mount), pisaríamos lo que el
+    // dueño real de la fila (ej. TabDeliveryOS) ya había registrado, y la
+    // fila de subsección desaparecería al entrar a una sub-subsección.
+    // El cleanup de abajo solo se registra (y por lo tanto solo puede
+    // correr) cuando este mismo effect corrió antes con un row no-nulo —
+    // así, si este componente pasa legítimamente de tener la fila a no
+    // tenerla más (unmount, o row vuelve a null en un re-render), React
+    // ejecuta ese cleanup previo antes de este nuevo run y limpia bien.
+    if (!row) return;
     setSubsectionRow(row);
     return () => setSubsectionRow(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,6 +78,8 @@ export function useRegisterSubsection(row: HeaderNavRow | null) {
 export function useRegisterSubsubsection(row: HeaderNavRow | null) {
   const { setSubsubsectionRow } = useHeaderNav();
   useEffect(() => {
+    // Mismo criterio que useRegisterSubsection arriba.
+    if (!row) return;
     setSubsubsectionRow(row);
     return () => setSubsubsectionRow(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps

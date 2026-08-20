@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { useRegisterSubsubsection } from '@/contexts/HeaderNavContext';
 import TabFichaOperativa from '@/components/clientes/TabFichaOperativa';
@@ -24,18 +24,10 @@ const SUB_TABS = [
 interface Props {
   client: Client;
   onClientUpdate: () => void;
-  // Contador bumpeado por el atajo "Editar" del header de ClienteDetalle —
-  // fuerza el sub-tab a "basica" (Ficha Básica no es el default) para que
-  // el modo edición de TabFichaBasica quede a la vista.
-  autoEditTrigger?: number;
 }
 
-export default function TabEstrategiaCliente({ client, onClientUpdate, autoEditTrigger }: Props) {
+export default function TabEstrategiaCliente({ client, onClientUpdate }: Props) {
   const [activeSubTab, setActiveSubTab] = useState('ficha');
-
-  useEffect(() => {
-    if (autoEditTrigger) setActiveSubTab('basica');
-  }, [autoEditTrigger]);
 
   // Punto B del rediseño de header — "Información" siempre está anidada
   // bajo Delivery OS (no existe versión "Torii" de esta sección), así que
@@ -48,7 +40,7 @@ export default function TabEstrategiaCliente({ client, onClientUpdate, autoEditT
         <TabFichaOperativa client={client} onClientUpdate={onClientUpdate} />
       </TabsContent>
       <TabsContent value="basica">
-        <TabFichaBasica client={client} onClientUpdate={onClientUpdate} autoEditTrigger={autoEditTrigger} />
+        <TabFichaBasica client={client} onClientUpdate={onClientUpdate} />
       </TabsContent>
       <TabsContent value="onboarding">
         <TabOnboarding clientId={client.id} />

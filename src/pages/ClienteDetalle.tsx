@@ -2,12 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Edit2, Ban } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
+import { ArrowLeft } from 'lucide-react';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
 import TabDeliveryOS from '@/components/clientes/TabDeliveryOS';
 import TabClosingCliente from '@/components/clientes/TabClosingCliente';
@@ -49,20 +46,6 @@ export interface Client {
   profile_id?: string | null;
 }
 
-const statusColors: Record<string, string> = {
-  active: 'bg-success/20 text-success',
-  paused: 'bg-warning/20 text-warning',
-  finished: 'bg-info/20 text-info',
-  cancelled: 'bg-destructive/20 text-destructive',
-};
-
-const statusLabels: Record<string, string> = {
-  active: 'Activo',
-  paused: 'Pausado',
-  finished: 'Finalizado',
-  cancelled: 'Cancelado',
-};
-
 // Delivery OS es la pantalla principal — absorbe Estrategia (como sub-tab
 // "Información"), Creativos (como "VSL Funnel") y Contenido Orgánico (como
 // "Social Funnel") como sub-navegación propia, ver TabDeliveryOS.tsx.
@@ -102,11 +85,6 @@ export default function ClienteDetalle() {
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
-  // Contador (no boolean) para que el atajo del header dispare el modo
-  // edición de TabFichaBasica cada vez que se clickea, incluso si ya
-  // estabas en Delivery OS/Información/Ficha Básica y el valor "no cambiaría".
-  const [autoEditTrigger, setAutoEditTrigger] = useState(0);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   // Los 2 tabs son deep-linkeables — la URL es la única fuente de verdad,
   // sin estado local propio. Cambiar de tab NO dispara un re-fetch del
@@ -170,36 +148,6 @@ export default function ClienteDetalle() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header — sin el nombre del cliente como heading (punto B.3): ya se
-          sabe qué cliente es por el SubaccountSwitcher del sidebar/header.
-          Email/país/fase y la flecha "volver" se sacaron (ya redundantes
-          con el sidebar/switcher) — solo queda el badge de estado y las
-          acciones, alineados a la derecha. */}
-      <div className="flex items-center justify-end gap-2">
-        <Badge className={cn('text-sm border-0', statusColors[client.status])}>
-          {statusLabels[client.status]}
-        </Badge>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => { setAutoEditTrigger((n) => n + 1); navigate(`/c/${id}/delivery-os/informacion`); }}
-        >
-          <Edit2 className="h-4 w-4 mr-1.5" />Editar
-        </Button>
-        {client.status !== 'cancelled' && (
-          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelDialogOpen(true)}>
-            <Ban className="h-4 w-4 mr-1.5" />Cancelar cliente
-          </Button>
-        )}
-      </div>
-
-      <CancelClientDialog
-        client={client}
-        open={cancelDialogOpen}
-        onOpenChange={setCancelDialogOpen}
-        onCancelled={fetchClient}
-      />
-
       {/* La navegación de nivel 1 (Dashboard/Delivery OS/Closing/Setting/
           VSL/Meta Ads/Reportes) ya vive en el sidebar (Layout.tsx::
           clientNavItems) — esta TabsList quedaba 100% duplicada en el
@@ -214,7 +162,6 @@ export default function ClienteDetalle() {
           <TabDeliveryOS
             client={client}
             onClientUpdate={fetchClient}
-            autoEditTrigger={autoEditTrigger}
             activeSubtab={effectiveSubtab}
             onSubtabChange={handleSubtabChange}
           />

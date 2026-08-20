@@ -15,8 +15,8 @@ import {
   entregaSeverity, conversionSeverity, type ScorecardSalud, type VeredictoColor, type PillSeverity,
 } from '@/features/clientes/lib/scorecardVeredicto';
 import { NuevoClienteDialog } from '@/features/clientes/components/NuevoClienteDialog';
+import { statusColors, statusLabels, type ClientStatus } from '@/lib/clientStatus';
 
-type ClientStatus = 'active' | 'paused' | 'finished' | 'cancelled';
 type OfferType = 'DWY' | 'DFY';
 type PaymentType = 'Upfront' | 'Mensual' | 'Cuotas';
 type PaymentPlatform = 'Stripe' | 'Binance' | 'Transfer';
@@ -46,20 +46,6 @@ interface Client {
   motivo_cancelacion?: string;
   fecha_cancelacion?: string;
 }
-
-const statusColors: Record<ClientStatus, string> = {
-  active: 'bg-success/20 text-success',
-  paused: 'bg-warning/20 text-warning',
-  finished: 'bg-info/20 text-info',
-  cancelled: 'bg-destructive/20 text-destructive',
-};
-
-const statusLabels: Record<ClientStatus, string> = {
-  active: 'Activo',
-  paused: 'Pausado',
-  finished: 'Finalizado',
-  cancelled: 'Cancelado',
-};
 
 // Acento de la tarjeta (fondo degradé + borde + glow del dot) según el
 // veredicto de Scorecard de Salud — variables CSS seteadas en la Card raíz

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -8,13 +9,15 @@ import {
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
-import { DollarSign, CreditCard, Calendar, Edit2, X, Check } from 'lucide-react';
+import { DollarSign, CreditCard, Calendar, Edit2, X, Check, Ban } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, differenceInDays, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { type Client } from '@/pages/ClienteDetalle';
 import { cn } from '@/lib/utils';
+import { statusColors, statusLabels } from '@/lib/clientStatus';
+import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
 
 interface Installment {
   installment_number: number;
@@ -115,19 +118,13 @@ function toForm(client: Client): FormState {
 interface Props {
   client: Client;
   onClientUpdate: () => void;
-  // Contador bumpeado desde el atajo "Editar" del header de ClienteDetalle
-  // (vía TabEstrategiaCliente) — cualquier cambio de valor fuerza modo edición.
-  autoEditTrigger?: number;
 }
 
-export default function TabFichaBasica({ client, onClientUpdate, autoEditTrigger }: Props) {
+export default function TabFichaBasica({ client, onClientUpdate }: Props) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormState>(toForm(client));
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (autoEditTrigger) setEditing(true);
-  }, [autoEditTrigger]);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [loadingInstallments, setLoadingInstallments] = useState(true);
@@ -200,6 +197,33 @@ export default function TabFichaBasica({ client, onClientUpdate, autoEditTrigger
     : (client.total_installments > 0 ? (client.paid_installments / client.total_installments) * 100 : 0);
 
   return (
+    <div className="space-y-4">
+      {/* Header propio de Ficha Básica — antes vivía en ClienteDetalle.tsx y
+          se pintaba en TODAS las pantallas de la ficha de cliente (Resumen,
+          VSL Funnel, Social Funnel, Closing, etc.), aunque solo tenía
+          sentido acá. Movido para que solo aparezca en Información > Ficha
+          Básica. */}
+      <div className="flex items-center justify-end gap-2">
+        <Badge className={cn('text-sm border-0', statusColors[client.status])}>
+          {statusLabels[client.status]}
+        </Badge>
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Edit2 className="h-4 w-4 mr-1.5" />Editar
+        </Button>
+        {client.status !== 'cancelled' && (
+          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => setCancelDialogOpen(true)}>
+            <Ban className="h-4 w-4 mr-1.5" />Cancelar cliente
+          </Button>
+        )}
+      </div>
+
+      <CancelClientDialog
+        client={client}
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        onCancelled={onClientUpdate}
+      />
+
     <div className="grid grid-cols-3 gap-4">
       {/* ── Datos del cliente ── */}
       <Card className="col-span-3 bg-card border-border/50">
@@ -384,6 +408,7 @@ export default function TabFichaBasica({ client, onClientUpdate, autoEditTrigger
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }
