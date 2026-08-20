@@ -32,6 +32,7 @@ export function LinkClientAccountFlow() {
     supabase
       .from('clients')
       .select('id, name')
+      .eq('status', 'active')
       .eq('es_interno', false)
       .order('name')
       .then(({ data, error }) => {
