@@ -14,7 +14,7 @@ import type { Client } from '@/pages/ClienteDetalle';
 const SUB_TABS = [
   { value: 'ficha', label: 'Ficha Operativa' },
   { value: 'basica', label: 'Ficha Básica' },
-  { value: 'onboarding', label: 'Onboarding' },
+  { value: 'onboarding', label: 'Formularios Onboarding' },
   { value: 'roadmap', label: 'Roadmap' },
   { value: 'csb', label: 'CSB' },
   { value: 'csl', label: 'CSL' },

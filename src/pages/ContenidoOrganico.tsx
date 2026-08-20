@@ -48,7 +48,10 @@ export default function ContenidoOrganico({ fixedClientId }: ContenidoOrganicoPr
   const clientId = selectedClient === TORII ? null : selectedClient;
 
   useEffect(() => {
-    supabase.from('clients').select('id, name').eq('status', 'active').order('name')
+    // es_interno = false: el casillero interno de Torii no debe listarse acá
+    // — su propio contenido orgánico ya vive bajo el sentinel TORII
+    // (clientId null), no bajo un client_id real.
+    supabase.from('clients').select('id, name').eq('status', 'active').eq('es_interno', false).order('name')
       .then(({ data }) => setClients(data ?? []));
   }, []);
 

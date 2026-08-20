@@ -28,7 +28,9 @@ export function SubaccountSwitcher({ currentLabel }: Props) {
   useEffect(() => {
     if (!open) return;
     setRecents(getRecentClients());
-    supabase.from('clients').select('id, name').eq('status', 'active').order('name')
+    // es_interno = false: el casillero interno de Torii nunca debe aparecer
+    // como subcuenta seleccionable en el switcher.
+    supabase.from('clients').select('id, name').eq('status', 'active').eq('es_interno', false).order('name')
       .then(({ data }) => setClients(data ?? []));
   }, [open]);
 

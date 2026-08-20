@@ -1335,7 +1335,9 @@ export default function Closers({ fixedClientId }: ClosersProps = {}) {
   // 3-entry OWNERS array. Fetched once; Torii is a fixed sentinel, not
   // part of this list.
   useEffect(() => {
-    supabase.from('clients').select('id, name').eq('status', 'active').order('name')
+    // es_interno = false: el casillero interno de Torii no es un cliente
+    // real con calls de closer.
+    supabase.from('clients').select('id, name').eq('status', 'active').eq('es_interno', false).order('name')
       .then(({ data }) => setClients(data ?? []));
   }, []);
 

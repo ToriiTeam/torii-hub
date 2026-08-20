@@ -28,7 +28,9 @@ function toReport(row: any): Report {
 export async function listReports(): Promise<ReportWithClient[]> {
   const [{ data: reports, error: reportsErr }, { data: clients, error: clientsErr }] = await Promise.all([
     supabase.from('reports').select('*').order('created_at', { ascending: false }),
-    supabase.from('clients').select('id, name, email'),
+    // es_interno = false: el casillero interno de Torii no genera reportes
+    // de cliente.
+    supabase.from('clients').select('id, name, email').eq('es_interno', false),
   ]);
   if (reportsErr) throw reportsErr;
   if (clientsErr) throw clientsErr;

@@ -108,9 +108,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false
+    // es_interno = false: el casillero interno de Torii no tiene cuenta de
+    // ads propia que matchear acá.
     supabase
       .from('clients')
       .select('id, name, country')
+      .eq('es_interno', false)
       .then(({ data, error: fetchErr }) => {
         if (cancelled) return
         if (fetchErr || !data) {

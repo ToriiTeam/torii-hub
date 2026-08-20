@@ -76,7 +76,9 @@ function FinanzasContent() {
     ] = await Promise.all([
       supabase.from('incomes').select('*').order('date', { ascending: false }),
       supabase.from('expenses').select('*').order('date', { ascending: false }),
-      supabase.from('clients').select('*').order('name'),
+      // es_interno = false: el casillero interno de Torii no es un cliente
+      // real de finanzas — ver migración clients_es_interno_and_torii_casillero.
+      supabase.from('clients').select('*').eq('es_interno', false).order('name'),
       supabase.from('client_installments').select('*, clients(name)').order('due_date'),
       supabase.from('debts').select('*').order('due_date'),
       supabase.from('finance_targets').select('*').limit(1).maybeSingle(),

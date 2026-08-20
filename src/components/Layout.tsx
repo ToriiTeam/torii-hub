@@ -33,6 +33,7 @@ import {
   ListTree,
   LayoutDashboard,
   Map as MapIcon,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,23 +59,31 @@ interface Task {
 // redirects, así que un bookmark viejo o un navigate() que quedó apuntando
 // a la ruta vieja en algún rincón del código sigue funcionando — solo el
 // sidebar y el switcher usan las rutas nuevas directamente.
+// Orden y set exactos pedidos para la subcuenta Torii — Contenido Orgánico
+// y Tareas salen del sidebar (Contenido Orgánico se reemplaza por "Social
+// Funnel", que monta el mismo componente fijado al modo "Torii"; Tareas
+// sigue existiendo como ruta, solo deja de estar en este listado). VSL
+// Funnel/Social Funnel/Clientes son nuevos (ver ToriiVslFunnel.tsx,
+// ToriiSocialFunnel.tsx, ToriiClientes.tsx).
 const navigationTorii: NavItem[] = [
   { name: 'Dashboard Ejecutivo', href: '/torii/dashboard', icon: Gauge },
   { name: 'Finanzas', href: '/torii/finanzas', icon: DollarSign },
-  { name: 'Closing', href: '/torii/closing', icon: Handshake },
   { name: 'Setting', href: '/torii/setting', icon: PhoneCall },
+  { name: 'Closing', href: '/torii/closing', icon: Handshake },
   { name: 'VSL', href: '/torii/vsl-tracking', icon: Video },
   { name: 'Meta Ads', href: '/torii/meta-ads', icon: BarChart2 },
   { name: 'Máquina de Cierres', href: '/torii/maquina-cierres', icon: ShoppingCart },
-  { name: 'Contenido Orgánico', href: '/torii/contenido', icon: Sprout },
-  { name: 'Tareas', href: '/torii/tareas', icon: CheckSquare },
-  { name: 'Portal', href: '/torii/portal', icon: Globe },
+  { name: 'VSL Funnel', href: '/torii/vsl-funnel', icon: Video },
+  { name: 'Social Funnel', href: '/torii/social-funnel', icon: Sprout },
+  { name: 'Clientes', href: '/torii/clientes', icon: Users },
   { name: 'Reportes', href: '/torii/reportes', icon: FileText },
-  { name: 'Landings', href: '/torii/landings', icon: ListTree },
+  // Bloque "Otros" — sin cambios de comportamiento, solo movidos al final.
+  { name: 'Portal', href: '/torii/portal', icon: Globe },
   // academy.* RLS only recognizes profiles.role='admin' (via
   // academy.is_portal_admin()), not moderator — see AuthContext's isAdmin
   // comment. Gated narrower than the rest of the sidebar on purpose.
   { name: 'Academia', href: '/torii/academia', icon: GraduationCap, adminOnly: true },
+  { name: 'Landings', href: '/torii/landings', icon: ListTree },
 ];
 
 // Auditor role: exactamente estas 3 rutas existen para este usuario — no
@@ -88,10 +97,24 @@ const AUDITOR_ITEMS: NavItem[] = [
   { name: 'VSL', href: '/vsl-tracking', icon: Video },
 ];
 
+// Setting/VSL/Meta Ads/Reportes todavía no tienen una versión "sin selector
+// de cliente" — hoy son páginas Torii-wide con su propio picker interno de
+// cuenta/cliente (AccountContext, etc.). Hasta que se les agregue el mismo
+// patrón fixedClientId que ya usan Closers/ContenidoOrganico/VslSection,
+// estos 4 ítems navegan a esas páginas globales (con su picker de siempre)
+// en vez de a una vista genuinamente scopeada por :id — ver nota de
+// desviación en el resumen final. Closing sí es 100% real: reusa
+// TabClosingCliente (Closers con fixedClientId) como tab de primer nivel
+// en ClienteDetalle.tsx.
 function clientNavItems(clientId: string): NavItem[] {
   return [
     { name: 'Dashboard', href: `/c/${clientId}`, icon: LayoutDashboard },
     { name: 'Delivery OS', href: `/c/${clientId}/delivery-os`, icon: MapIcon },
+    { name: 'Closing', href: `/c/${clientId}/closing`, icon: Handshake },
+    { name: 'Setting', href: '/torii/setting', icon: PhoneCall },
+    { name: 'VSL', href: '/torii/vsl-tracking', icon: Video },
+    { name: 'Meta Ads', href: '/torii/meta-ads', icon: BarChart2 },
+    { name: 'Reportes', href: '/torii/reportes', icon: FileText },
   ];
 }
 

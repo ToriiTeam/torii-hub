@@ -8,9 +8,13 @@ const EMPTY_ADS: AdsMetrics = { inversion: 0, impresiones: 0, clics: 0, leads: 0
 const EMPTY_CLOSING: ClosingMetrics = { reuniones: 0, asistieron: 0, calificados: 0, cierres: 0, showRate: null, closeRate: null, lossReasons: [], byCloser: [] };
 
 async function fetchClients(): Promise<ClientBase[]> {
+  // es_interno = false: excluye el cliente-casillero interno de Torii (VSL
+  // Funnel propio) de toda métrica agregada de cartera — ver migración
+  // clients_es_interno_and_torii_casillero.
   const { data, error } = await supabase
     .from('clients')
     .select('id, name, country, renewal_risk, mrr, start_date, canal_captacion')
+    .eq('es_interno', false)
     .order('name');
   if (error) throw error;
   const clients = data ?? [];

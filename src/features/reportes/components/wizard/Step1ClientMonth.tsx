@@ -59,9 +59,12 @@ export function Step1ClientMonth({
   const [clients, setClients] = useState<ClientOption[]>([]);
 
   useEffect(() => {
+    // es_interno = false: el casillero interno de Torii no es elegible para
+    // el wizard de reportes de cliente.
     supabase
       .from('clients')
       .select('id, name')
+      .eq('es_interno', false)
       .order('name')
       .then(({ data }) => setClients(data ?? []));
   }, []);

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { CancelClientDialog } from '@/features/clientes/components/CancelClientDialog';
 import TabDashboardCliente from '@/components/clientes/TabDashboardCliente';
 import TabDeliveryOS from '@/components/clientes/TabDeliveryOS';
+import TabClosingCliente from '@/components/clientes/TabClosingCliente';
 
 export interface Client {
   id: string;
@@ -58,24 +59,28 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Cancelado',
 };
 
-// Delivery OS es ahora la pantalla principal — absorbe Estrategia (como
-// sub-tab "Información"), Creativos (como "VSL Funnel"), Contenido Orgánico
-// (como "Social Funnel") y Closing como sub-navegación propia, ver
-// TabDeliveryOS.tsx. Solo estos 2 son deep-linkeables vía /clientes/:id/:tab
-// — los sub-tabs de Delivery OS tienen su propio nivel de URL
-// (/clientes/:id/delivery-os/:subtab), todo lo que cuelga de ahí para
-// adentro (ej. los 6 sub-sub-tabs de VSL Funnel) es estado local sin ruta
-// propia, mismo criterio que ya usaban Estrategia/Creativos antes de esto.
+// Delivery OS es la pantalla principal — absorbe Estrategia (como sub-tab
+// "Información"), Creativos (como "VSL Funnel") y Contenido Orgánico (como
+// "Social Funnel") como sub-navegación propia, ver TabDeliveryOS.tsx.
+// Closing es su propio tab de primer nivel (movido fuera de Delivery OS por
+// el rediseño de navegación — reusa TabClosingCliente sin cambios). Estos 3
+// son deep-linkeables vía /clientes/:id/:tab — los sub-tabs de Delivery OS
+// tienen su propio nivel de URL (/clientes/:id/delivery-os/:subtab), todo lo
+// que cuelga de ahí para adentro (ej. los 6 sub-sub-tabs de VSL Funnel) es
+// estado local sin ruta propia, mismo criterio que ya usaban
+// Estrategia/Creativos antes de esto.
 const TABS = [
   { value: 'dashboard', label: 'Dashboard' },
   { value: 'delivery-os', label: 'Delivery OS' },
+  { value: 'closing', label: 'Closing' },
 ];
 
 // 'delivery-os' es el default — mantiene la URL limpia /clientes/:id.
 const DEFAULT_TAB = 'delivery-os';
 
-// Sub-tabs de Delivery OS — ver TabDeliveryOS.tsx.
-const DELIVERY_OS_SUBTABS = ['resumen', 'informacion', 'vsl-funnel', 'social-funnel', 'closing'];
+// Sub-tabs de Delivery OS — ver TabDeliveryOS.tsx. 'closing' ya no vive acá,
+// ver TABS arriba.
+const DELIVERY_OS_SUBTABS = ['resumen', 'informacion', 'vsl-funnel', 'social-funnel'];
 
 export default function ClienteDetalle() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams<{ id: string; tab?: string; subtab?: string }>();
@@ -206,6 +211,10 @@ export default function ClienteDetalle() {
             activeSubtab={effectiveSubtab}
             onSubtabChange={handleSubtabChange}
           />
+        </TabsContent>
+
+        <TabsContent value="closing">
+          <TabClosingCliente clientId={client.id} />
         </TabsContent>
       </Tabs>
     </div>

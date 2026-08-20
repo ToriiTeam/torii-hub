@@ -23,15 +23,15 @@ import { AlertTriangle } from 'lucide-react';
 import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
 import TabVSLFunnel from '@/components/clientes/TabVSLFunnel';
 import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
-import TabClosingCliente from '@/components/clientes/TabClosingCliente';
 import type { Client } from '@/pages/ClienteDetalle';
 
+// Closing salió de acá — ahora es su propio tab de primer nivel en
+// ClienteDetalle.tsx (ver TABS ahí), no una subsección de Delivery OS.
 const SUB_TABS = [
   { value: 'resumen', label: 'Resumen' },
   { value: 'informacion', label: 'Información' },
   { value: 'vsl-funnel', label: 'VSL Funnel' },
   { value: 'social-funnel', label: 'Social Funnel' },
-  { value: 'closing', label: 'Closing' },
 ];
 
 interface Props {
@@ -180,10 +180,6 @@ export default function TabDeliveryOS({ client, onClientUpdate, autoEditTrigger,
 
       <TabsContent value="social-funnel">
         <TabContenidoCliente clientId={clientId} />
-      </TabsContent>
-
-      <TabsContent value="closing">
-        <TabClosingCliente clientId={clientId} />
       </TabsContent>
     </Tabs>
   );

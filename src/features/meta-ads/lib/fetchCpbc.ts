@@ -26,7 +26,9 @@ export async function fetchCpbc(accountName: string, adsInversion: string | numb
   if (isHouseAccount) {
     qualifiedCallsQuery = qualifiedCallsQuery.eq('owner_type', 'torii').eq('fuente', 'ADS')
   } else {
-    const { data: clients, error: clientsErr } = await supabase.from('clients').select('id, name, country')
+    // es_interno = false: el casillero interno de Torii no tiene cuenta de
+    // ads propia que matchear acá.
+    const { data: clients, error: clientsErr } = await supabase.from('clients').select('id, name, country').eq('es_interno', false)
     if (clientsErr) throw clientsErr
     const matches = matchClientToAccount(accountName, clients ?? [])
     if (matches.length !== 1) return null // no match, or ambiguous — CPBC undefined for this account

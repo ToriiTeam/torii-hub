@@ -85,7 +85,10 @@ async function fetchBusinessHealthInputs(since: string, until: string): Promise<
   const [incomesRes, expensesRes, clientsRes, installmentsRes, callsRes] = await Promise.all([
     supabase.from('incomes').select('*').gte('date', since).lte('date', until),
     supabase.from('expenses').select('*').gte('date', since).lte('date', until),
-    supabase.from('clients').select('id, start_date, status, fecha_cancelacion, canal_captacion'),
+    // es_interno = false: excluye el cliente-casillero interno de Torii de
+    // los totales de salud del negocio (ver migración
+    // clients_es_interno_and_torii_casillero).
+    supabase.from('clients').select('id, start_date, status, fecha_cancelacion, canal_captacion').eq('es_interno', false),
     supabase.from('client_installments').select('*'),
     // Reservas = every booked call in the period, regardless of funnel
     // (Torii's own or a client's) — Adquisición spend isn't split by funnel.

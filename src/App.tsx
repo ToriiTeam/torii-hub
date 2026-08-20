@@ -19,6 +19,9 @@ import VslTracking from "@/pages/VslTracking";
 import MaquinaCierres from "@/pages/MaquinaCierres";
 import MetaAds from "@/pages/MetaAds";
 import ContenidoOrganico from "@/pages/ContenidoOrganico";
+import ToriiVslFunnel from "@/pages/ToriiVslFunnel";
+import ToriiSocialFunnel from "@/pages/ToriiSocialFunnel";
+import ToriiClientes from "@/pages/ToriiClientes";
 import Portal from "@/pages/Portal";
 import Academia from "@/pages/Academia";
 import AuditorVslFunnel from "@/pages/AuditorVslFunnel";
@@ -135,6 +138,9 @@ function AppContent() {
             <Route path="/torii/meta-ads" element={<MetaAds />} />
             <Route path="/torii/maquina-cierres" element={<MaquinaCierres />} />
             <Route path="/torii/contenido" element={<ContenidoOrganico />} />
+            <Route path="/torii/vsl-funnel" element={<ToriiVslFunnel />} />
+            <Route path="/torii/social-funnel" element={<ToriiSocialFunnel />} />
+            <Route path="/torii/clientes" element={<ToriiClientes />} />
             <Route path="/torii/tareas" element={<Tareas />} />
             <Route path="/torii/portal" element={<Portal />} />
             <Route path="/torii/reportes" element={<Reportes />} />
