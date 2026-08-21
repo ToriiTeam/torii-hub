@@ -5,7 +5,76 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
+  /* Modo claro (default de shadcn: :root = claro, .dark = oscuro). Paleta
+     diseñada para mantener el mismo significado de cada token que en oscuro
+     — mismo primary/destructive/success/warning/info "hue", ajustados de
+     luminosidad para contraste AA sobre fondos claros. El Hub sigue
+     arrancando en oscuro por default (ver ThemeProvider en App.tsx,
+     defaultTheme="dark") — esta paleta solo se ve si el usuario togglea. */
   :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+
+    --primary: 0 72% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 38%;
+
+    --accent: 0 72% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 74% 42%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 72% 45%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 25%;
+    --sidebar-primary: 0 72% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 72% 45%;
+
+    /* Custom Torii tokens */
+    --torii-red: 0 72% 45%;
+    --torii-red-glow: 0 72% 55%;
+    --torii-dark: 0 0% 100%;
+    --torii-card: 0 0% 100%;
+    --torii-card-hover: 0 0% 96%;
+    --success: 142 76% 28%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 38%;
+    --info-foreground: 0 0% 100%;
+
+    /* Quinto color categórico para series de gráficos (revenue, etc.) sin
+       token semántico propio — los otros 4 slots reusan primary/info/
+       success/warning para no duplicar significado. */
+    --chart-purple: 262 83% 58%;
+    --chart-cyan: 189 94% 38%;
+    --chart-pink: 330 81% 55%;
+  }
+
+  /* Modo oscuro — valores originales del Hub (default histórico), sin
+     cambios de significado ni de tono respecto a antes de esta migración. */
+  .dark {
     --background: 0 0% 4%;
     --foreground: 0 0% 95%;
 
@@ -34,8 +103,6 @@
     --input: 0 0% 15%;
     --ring: 0 72% 51%;
 
-    --radius: 0.5rem;
-
     --sidebar-background: 0 0% 5%;
     --sidebar-foreground: 0 0% 80%;
     --sidebar-primary: 0 72% 51%;
@@ -45,7 +112,6 @@
     --sidebar-border: 0 0% 12%;
     --sidebar-ring: 0 72% 51%;
 
-    /* Custom Torii tokens */
     --torii-red: 0 72% 51%;
     --torii-red-glow: 0 72% 60%;
     --torii-dark: 0 0% 4%;
@@ -57,11 +123,10 @@
     --warning-foreground: 0 0% 0%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-  }
 
-  .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 95%;
+    --chart-purple: 262 83% 66%;
+    --chart-cyan: 189 94% 48%;
+    --chart-pink: 330 81% 65%;
   }
 }
 

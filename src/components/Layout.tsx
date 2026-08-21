@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTheme } from 'next-themes';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { SubaccountSwitcher } from '@/components/SubaccountSwitcher';
@@ -35,6 +36,8 @@ import {
   Map as MapIcon,
   Users,
   HeartPulse,
+  Sun,
+  Moon,
   type LucideIcon,
 } from 'lucide-react';
 import { HeaderNavProvider, useHeaderNav } from '@/contexts/HeaderNavContext';
@@ -131,6 +134,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut, isAuditor, isAdmin } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -453,6 +457,22 @@ export default function Layout({ children }: LayoutProps) {
               </PopoverContent>
             </Popover>
             )}
+
+            {/* Toggle claro/oscuro */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                  aria-label="Cambiar tema"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {resolvedTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{resolvedTheme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</TooltipContent>
+            </Tooltip>
 
             {/* Logout */}
             <Button

@@ -1,3 +1,4 @@
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -180,18 +181,26 @@ function AppContent() {
   );
 }
 
+// defaultTheme="dark" preserva la experiencia actual (el Hub siempre fue
+// oscuro) para cualquiera que entre sin preferencia guardada todavía;
+// enableSystem queda apagado a propósito — el toggle del header es el único
+// mecanismo de cambio de tema, no queremos que un cambio de tema del SO le
+// mueva el piso a alguien a mitad de sesión. next-themes persiste en
+// localStorage bajo la key "theme" por default.
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppContent />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
