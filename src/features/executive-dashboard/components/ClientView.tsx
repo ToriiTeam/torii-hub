@@ -21,7 +21,15 @@ import { PHASE_LABELS, PHASE_DEFAULT_DAYS } from '@/features/delivery-os/types';
 import type { DeliveryPhase, PhaseChecklistItem } from '@/features/delivery-os/types';
 import type { ClientDetailData } from '../types';
 
-const COLORS = { inversion: '#e5182b', leads: '#3b82f6', reuniones: '#10b981', cierres: '#f59e0b', revenue: '#8b5cf6' };
+// Colores de series vía CSS vars (hsl(var(--x))) — SVG fill/stroke soporta
+// var() nativamente, así que estos siguen el theme claro/oscuro sin JS extra.
+const COLORS = {
+  inversion: 'hsl(var(--primary))',
+  leads: 'hsl(var(--info))',
+  reuniones: 'hsl(var(--success))',
+  cierres: 'hsl(var(--warning))',
+  revenue: 'hsl(var(--chart-purple))',
+};
 
 function fmtMoney(v: number | null): string {
   return v == null ? '—' : `$${Math.round(v).toLocaleString()}`;

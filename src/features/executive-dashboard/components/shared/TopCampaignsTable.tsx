@@ -32,7 +32,7 @@ export function TopCampaignsTable({ campaigns }: TopCampaignsTableProps) {
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${(c.inversion / maxInversion) * 100}%`, background: '#e5182b' }}
+              style={{ width: `${(c.inversion / maxInversion) * 100}%`, background: 'hsl(var(--primary))' }}
             />
           </div>
           <p className="text-xs text-muted-foreground">${Math.round(c.inversion).toLocaleString()} invertidos · CPL ${c.cpl != null ? Math.round(c.cpl) : '—'}</p>

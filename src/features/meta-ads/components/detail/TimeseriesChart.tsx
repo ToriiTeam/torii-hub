@@ -63,7 +63,7 @@ function formatValue(value: number, format?: MetricFormat): string {
 // Fixed color for the compared entity's line when comparing the same metric
 // across two entities — m1 and m1b would otherwise share metrics.ts's color
 // for that metric.
-const COMPARE_ENTITY_COLOR = '#a78bfa'
+const COMPARE_ENTITY_COLOR = 'var(--accent-purple)'
 
 interface TooltipPayloadEntry {
   dataKey: string

@@ -17,7 +17,7 @@ export interface MotivoGrupo {
 export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   {
     categoria: 'Media Buying / Anuncios',
-    color: '#e5182b',
+    color: '--primary',
     items: [
       { key: 'volumen', label: 'Volumen bajo — pocas agendas para tener datos', planContingencia: 'Aumentar presupuesto de testeo + activar 2 ángulos nuevos en paralelo' },
       { key: 'angulo', label: 'Ángulo/oferta no conecta', planContingencia: "Aislar variable de oferta — testear 'construir patrimonio' vs 'impuestos'" },
@@ -29,7 +29,7 @@ export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   },
   {
     categoria: 'VSL / Landing',
-    color: '#60a5fa',
+    color: '--info',
     items: [
       { key: 'vsl', label: 'VSL no convierte (mucho tráfico, poca agenda)', planContingencia: 'Revisar hook de los primeros 15s + agregar CTA intermedio' },
       { key: 'landing_lenta', label: 'Landing carga lenta', planContingencia: 'Optimizar peso de imágenes/video, revisar hosting' },
@@ -40,7 +40,7 @@ export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   },
   {
     categoria: 'Agendamiento / Show up',
-    color: '#f2c94c',
+    color: '--warning',
     items: [
       { key: 'show', label: 'Show rate bajo', planContingencia: 'Activar recordatorio SMS 1h antes + cambiar copy de confirmación' },
       { key: 'sin_recordatorio', label: 'No hay recordatorio automático configurado', planContingencia: 'Configurar workflow de GHL con 2 touchpoints antes de la cita' },
@@ -49,7 +49,7 @@ export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   },
   {
     categoria: 'Ventas / Cierre',
-    color: '#34d399',
+    color: '--success',
     items: [
       { key: 'cierre', label: 'Agenda bien, cierra mal', planContingencia: 'Sesión de roleplay de objeciones + revisar guion de descubrimiento' },
       { key: 'objeciones', label: 'Objeciones recurrentes sin resolver', planContingencia: 'Documentar las 3 objeciones más frecuentes + guion de respuesta' },
@@ -59,7 +59,7 @@ export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   },
   {
     categoria: 'Configuración técnica',
-    color: '#a78bfa',
+    color: '--chart-purple',
     items: [
       { key: 'pixel', label: 'Pixel de Meta mal configurado', planContingencia: 'Verificar eventos en Events Manager, testear con Pixel Helper' },
       { key: 'cuenta_sin_verificar', label: 'Cuenta de Ads sin verificar / restringida', planContingencia: 'Revisar estado en Business Manager, contactar soporte de Meta' },
@@ -68,7 +68,7 @@ export const MOTIVO_GRUPOS: MotivoGrupo[] = [
   },
   {
     categoria: 'Cliente / Relación',
-    color: '#f472b6',
+    color: '--chart-pink',
     items: [
       { key: 'sin_respuesta', label: 'Cliente no responde a pedidos de información', planContingencia: 'Escalar por otro canal, ofrecer llamada corta de 5 min' },
       { key: 'sin_contenido', label: 'Cliente no graba el contenido pedido (VSL, testimonios)', planContingencia: 'Ofrecer grabarlo por videollamada con guion asistido' },

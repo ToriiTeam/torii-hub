@@ -65,7 +65,14 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'roi', label: 'ROI' },
 ];
 
-const CHART_COLORS = ['#e5182b', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4'];
+const CHART_COLORS = [
+  'hsl(var(--primary))',
+  'hsl(var(--info))',
+  'hsl(var(--success))',
+  'hsl(var(--warning))',
+  'hsl(var(--chart-purple))',
+  'hsl(var(--chart-cyan))',
+];
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -277,8 +284,8 @@ export function PortfolioView({ data, showToriiRevenue = true }: PortfolioViewPr
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} axisLine={false} tickLine={false} />
                   <ChartTooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Inversión" fill="#e5182b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Revenue" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Inversión" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Revenue" fill="hsl(var(--chart-purple))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -298,8 +305,8 @@ export function PortfolioView({ data, showToriiRevenue = true }: PortfolioViewPr
                   <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} axisLine={false} tickLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} axisLine={false} tickLine={false} />
                   <ChartTooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }} />
-                  <ReferenceLine y={avgTarget} stroke="#f59e0b" strokeDasharray="4 4" />
-                  <Bar dataKey="cpbc" name="CPBC" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <ReferenceLine y={avgTarget} stroke="hsl(var(--warning))" strokeDasharray="4 4" />
+                  <Bar dataKey="cpbc" name="CPBC" fill="hsl(var(--info))" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

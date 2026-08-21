@@ -20,10 +20,12 @@ import {
 // horizontal + ramas curvas alternando arriba/abajo, mismo cálculo de
 // posiciones. Adaptado: acá no hay categorías (no hay un "cuello de
 // botella" del que colgar un color), así que todas las ramas usan un único
-// acento fijo — el rojo de marca (#e5182b, mismo que ya usa el resto del
-// proyecto: btn-apply, dot de "Nota" en BitacoraTimeline, etc.). Rama =
-// tiene reemplaza_a_id; tronco = no reemplaza nada.
-const ACCENT = '#e5182b';
+// acento fijo — el primary/rojo de marca (mismo que ya usa el resto del
+// proyecto: btn-apply, dot de "Nota" en BitacoraTimeline, etc.), vía
+// hsl(var(--primary)) para que responda al toggle de tema. Rama = tiene
+// reemplaza_a_id; tronco = no reemplaza nada.
+const ACCENT = 'hsl(var(--primary))';
+const ACCENT_SOFT = 'hsl(var(--primary) / 0.15)';
 const STEP_X = 110;
 const PAD_X = 50;
 const MID_Y = 70;
@@ -220,7 +222,7 @@ export function HistorialIteraciones({ clientId }: Props) {
               }
               return (
                 <g key={node.id} className="cursor-pointer" onClick={() => selectNode(node.id)}>
-                  <circle cx={x} cy={MID_Y} r={6} fill="#5b5f70" stroke="hsl(var(--card))" strokeWidth={2} />
+                  <circle cx={x} cy={MID_Y} r={6} fill="hsl(var(--muted-foreground))" stroke="hsl(var(--card))" strokeWidth={2} />
                   <text x={x} y={MID_Y - 16} textAnchor="middle" className="fill-muted-foreground text-[9px] font-semibold">
                     Iteración
                   </text>
@@ -238,7 +240,7 @@ export function HistorialIteraciones({ clientId }: Props) {
             <div className="flex items-start justify-between gap-2">
               <span
                 className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-1.5"
-                style={{ background: `${ACCENT}26`, color: ACCENT }}
+                style={{ background: ACCENT_SOFT, color: ACCENT }}
               >
                 {selected.isBranch ? 'Reemplazo' : 'Iteración'}
               </span>

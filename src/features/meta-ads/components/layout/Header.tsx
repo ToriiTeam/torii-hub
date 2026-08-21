@@ -23,7 +23,7 @@ export function Header() {
           {loading ? (
             <div className="skeleton-cell" style={{ width: 180, height: 32 }} />
           ) : error ? (
-            <span style={{ fontSize: 12, color: '#fc8181' }} title={error}>
+            <span style={{ fontSize: 12, color: 'var(--accent-red)' }} title={error}>
               Error al cargar cuentas
             </span>
           ) : isAuditor ? (

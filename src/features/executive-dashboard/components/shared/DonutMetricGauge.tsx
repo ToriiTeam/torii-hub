@@ -7,17 +7,17 @@ interface DonutMetricGaugeProps {
   okThreshold: number; // >= this (but < good) → yellow; below → red
 }
 
-const TRACK_COLOR = '#e5e7eb'; // neutral gray track for the remainder of the ring
+const TRACK_COLOR = 'hsl(var(--muted))'; // neutral track for the remainder of the ring
 
 function colorFor(value: number, good: number, ok: number): string {
-  if (value >= good) return '#10b981'; // verde
-  if (value >= ok) return '#f59e0b'; // amarillo
-  return '#e5182b'; // rojo
+  if (value >= good) return 'hsl(var(--success))'; // verde
+  if (value >= ok) return 'hsl(var(--warning))'; // amarillo
+  return 'hsl(var(--destructive))'; // rojo
 }
 
 export function DonutMetricGauge({ label, value, goodThreshold, okThreshold }: DonutMetricGaugeProps) {
   const pct = value != null ? Math.round(value * 100) : null;
-  const color = value != null ? colorFor(value, goodThreshold, okThreshold) : '#9ca3af';
+  const color = value != null ? colorFor(value, goodThreshold, okThreshold) : 'hsl(var(--muted-foreground))';
   const data = value != null
     ? [{ name: 'value', value: value * 100 }, { name: 'rest', value: 100 - value * 100 }]
     : [{ name: 'value', value: 0 }, { name: 'rest', value: 100 }];

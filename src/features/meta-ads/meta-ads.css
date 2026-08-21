@@ -14,12 +14,12 @@
   --border-focus:    hsl(var(--primary) / 0.5);
   --text-primary:    hsl(var(--foreground));
   --text-secondary:  hsl(var(--muted-foreground));
-  --text-tertiary:   #4a5568;
+  --text-tertiary:   hsl(var(--muted-foreground) / 0.7);
   --accent-blue:     hsl(var(--primary));
-  --accent-green:    #68d391;
-  --accent-yellow:   #f6e05e;
-  --accent-red:      #fc8181;
-  --accent-purple:   #b794f4;
+  --accent-green:    hsl(var(--success));
+  --accent-yellow:   hsl(var(--warning));
+  --accent-red:      hsl(var(--destructive));
+  --accent-purple:   hsl(var(--chart-purple));
   --shadow-card:     0 4px 20px rgba(0, 0, 0, 0.4);
   --radius:          var(--radius);
   --font-mono:       'SF Mono', 'Fira Mono', monospace;
@@ -128,14 +128,17 @@
   border-radius: var(--radius);
   min-width: 140px;
 }
-/* SelectContent renders via Radix Portal — outside .meta-ads-root.
-   Must be global and declare its own CSS vars so they don't need to inherit. */
+/* SelectContent renders via Radix Portal — outside .meta-ads-root, pero los
+   tokens hsl(var(--x)) siguen resolviendo bien porque están definidos en
+   :root/.dark (globales), no en .meta-ads-root — así que puede reusarlos
+   directo en vez de tener su propia paleta fija (que antes ignoraba el
+   modo claro). */
 .select-content {
-  --bg-card:      #1a2035;
-  --bg-hover:     #1e2740;
-  --border:       rgba(255, 255, 255, 0.07);
-  --text-primary: #e2e8f0;
-  --text-tertiary:#4a5568;
+  --bg-card:      hsl(var(--card));
+  --bg-hover:     hsl(var(--muted));
+  --border:       hsl(var(--border));
+  --text-primary: hsl(var(--foreground));
+  --text-tertiary:hsl(var(--muted-foreground) / 0.7);
   --shadow-card:  0 4px 20px rgba(0, 0, 0, 0.4);
   --radius:       8px;
 

@@ -10,6 +10,12 @@ import { addHito, type ActivityLogRow, type CuelloBotella } from '@/features/del
 import { MOTIVO_GRUPOS } from '@/features/delivery-tracker/lib/motivos';
 
 const CATEGORY_COLOR = new Map(MOTIVO_GRUPOS.map((g) => [g.categoria, g.color]));
+// g.color guarda el nombre de la CSS var pelado (ej. '--primary') para poder
+// componer tanto el color sólido como una variante con alpha (fondo del
+// badge) sin depender de manipular un hex fijo — funciona igual en claro y
+// oscuro porque la var se resuelve en runtime según el tema activo.
+const solidColor = (v: string | null) => (v ? `hsl(var(${v}))` : 'hsl(var(--muted-foreground))');
+const softColor = (v: string | null) => (v ? `hsl(var(${v}) / 0.15)` : 'hsl(var(--muted) / 0.5)');
 const STEP_X = 110;
 const PAD_X = 50;
 const MID_Y = 70;
@@ -50,7 +56,7 @@ export function BitacoraTimeline({ clientId, activityLog, cuellos, onChanged }: 
         texto: row.texto,
         fecha: row.fecha,
         branch: cuello ? cuello.categoria : null,
-        color: cuello ? CATEGORY_COLOR.get(cuello.categoria) ?? '#8b8fa3' : null,
+        color: cuello ? CATEGORY_COLOR.get(cuello.categoria) ?? null : null,
         auto: row.tipo === 'sistema',
       };
     }).sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -117,9 +123,9 @@ export function BitacoraTimeline({ clientId, activityLog, cuellos, onChanged }: 
                   <g key={node.id} className="cursor-pointer" onClick={() => setSelectedId(node.id)}>
                     <path
                       d={`M ${x - 38} ${MID_Y} C ${x - 18} ${MID_Y}, ${x - 18} ${y}, ${x} ${y} C ${x + 18} ${y}, ${x + 18} ${MID_Y}, ${x + 38} ${MID_Y}`}
-                      fill="none" stroke={node.color ?? '#8b8fa3'} strokeWidth={2.5} opacity={0.85}
+                      fill="none" stroke={solidColor(node.color)} strokeWidth={2.5} opacity={0.85}
                     />
-                    <circle cx={x} cy={y} r={6} fill={node.color ?? '#8b8fa3'} stroke="hsl(var(--card))" strokeWidth={2} />
+                    <circle cx={x} cy={y} r={6} fill={solidColor(node.color)} stroke="hsl(var(--card))" strokeWidth={2} />
                     <text x={x} y={y + (offset > 0 ? 20 : -12)} textAnchor="middle" className="fill-muted-foreground text-[9px] font-semibold">
                       {node.branch.split(' / ')[0]}
                     </text>
@@ -131,7 +137,7 @@ export function BitacoraTimeline({ clientId, activityLog, cuellos, onChanged }: 
               }
               return (
                 <g key={node.id} className="cursor-pointer" onClick={() => setSelectedId(node.id)}>
-                  <circle cx={x} cy={MID_Y} r={6} fill={node.auto ? '#5b5f70' : '#e5182b'} stroke="hsl(var(--card))" strokeWidth={2} />
+                  <circle cx={x} cy={MID_Y} r={6} fill={node.auto ? 'hsl(var(--muted-foreground))' : 'hsl(var(--primary))'} stroke="hsl(var(--card))" strokeWidth={2} />
                   <text x={x} y={MID_Y - 16} textAnchor="middle" className="fill-muted-foreground text-[9px] font-semibold">
                     {node.auto ? 'Sistema' : 'Nota'}
                   </text>
@@ -145,12 +151,12 @@ export function BitacoraTimeline({ clientId, activityLog, cuellos, onChanged }: 
         )}
 
         {selected && (
-          <div className="mt-3.5 p-3.5 rounded-xl bg-white/[0.03]">
+          <div className="mt-3.5 p-3.5 rounded-xl bg-muted/30">
             <span
               className="inline-block text-[10px] font-bold px-2 py-0.5 rounded mb-1.5"
               style={{
-                background: selected.color ? `${selected.color}26` : 'rgba(255,255,255,.08)',
-                color: selected.color ?? '#8b8fa3',
+                background: softColor(selected.color),
+                color: solidColor(selected.color),
               }}
             >
               {selected.branch || (selected.auto ? 'Evento del sistema' : 'Nota manual')}

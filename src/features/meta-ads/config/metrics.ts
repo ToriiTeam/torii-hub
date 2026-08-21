@@ -36,7 +36,7 @@ export const METRIC_OPTIONS: MetricConfig[] = [
   {
     key: 'reach', label: 'Alcance', group: 'Volumen',
     getValue: (row) => parseFloat(row.reach) || 0,
-    format: 'number', color: '#60a5fa',
+    format: 'number', color: 'var(--accent-blue)',
   },
   {
     key: 'clicks', label: 'Clicks', group: 'Volumen',
