@@ -29,6 +29,23 @@ function splitStartTime(startTime: string | undefined | null): { fecha: string |
 // deno-lint-ignore no-explicit-any
 type GhlPayload = Record<string, any>
 
+// A real GHL appointment id is never empty/"null"/"undefined" as text — but
+// when a Workflow's Custom Webhook JSON has a merge field like
+// "{{appointment.id}}" that fails to resolve, GHL can send back the literal
+// word "null" as a string instead of omitting the field or sending real
+// null. That string is truthy, so the old `ghlAppointmentId ? ... : null`
+// check let it through as if it were a valid id — and since the upsert
+// below matches on ghl_appointment_id (onConflict), two DIFFERENT
+// appointments that both hit this bug collide into the SAME row, silently
+// overwriting one of them. (Confirmed 2026-08-21: Carlos Diaz had 2 real
+// webhook calls 2.6s apart, both 200 OK, but only 1 row in
+// client_closer_calls — both carried ghl_appointment_id = "null".)
+function isReliableAppointmentId(raw: unknown): boolean {
+  if (raw === null || raw === undefined) return false
+  const s = String(raw).trim().toLowerCase()
+  return s.length > 0 && s !== 'null' && s !== 'undefined'
+}
+
 // GHL's exact webhook shape varies by trigger/version, so this reads a few
 // plausible paths for each field rather than assuming one fixed structure.
 // If real payloads turn out to differ, adjust these lookups — the rest of
@@ -43,7 +60,7 @@ function extractFields(body: GhlPayload) {
   const leadName = [firstName, lastName].filter(Boolean).join(' ') || contact.name || null
 
   const ghlContactId = contact.id ?? appointment.contactId ?? body.contactId ?? null
-  const ghlAppointmentId = appointment.id ?? body.appointmentId ?? body.id ?? null
+  const rawAppointmentId = appointment.id ?? body.appointmentId ?? body.id ?? null
   const startTime = appointment.startTime ?? appointment.start_time ?? body.startTime ?? null
   const calendarId = appointment.calendarId ?? body.calendarId ?? null
   // Solo viene si quien armó el Workflow en GHL agregó "locationId":
@@ -60,12 +77,24 @@ function extractFields(body: GhlPayload) {
     ?? body.customData?.ad_id
     ?? null
 
+  // If the id GHL sent isn't reliable, fall back to a synthetic one instead
+  // of letting an unreliable value (or letting it collide with another
+  // appointment's same unreliable value) reach the upsert's onConflict
+  // target. Prefixed so it's obviously not a real GHL id if seen later
+  // (e.g. while auditing client_closer_calls).
+  const appointmentIdReliable = isReliableAppointmentId(rawAppointmentId)
+  const ghlAppointmentId = appointmentIdReliable
+    ? String(rawAppointmentId)
+    : `synthetic:${crypto.randomUUID()}`
+
   return {
     leadName,
     leadPhone: contact.phone ?? null,
     leadEmail: contact.email ?? null,
     ghlContactId: ghlContactId ? String(ghlContactId) : null,
-    ghlAppointmentId: ghlAppointmentId ? String(ghlAppointmentId) : null,
+    ghlAppointmentId,
+    appointmentIdReliable,
+    rawAppointmentId,
     startTime,
     calendarId,
     locationId,
@@ -185,9 +214,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const fields = extractFields(body)
 
-  if (!fields.ghlAppointmentId) {
-    console.error('[ghl-appointment-webhook] missing appointment id — raw body:', JSON.stringify(body))
-    return json({ error: 'appointment.id is required' }, 400)
+  // fields.ghlAppointmentId is now always populated (real id or a synthetic
+  // fallback, see isReliableAppointmentId above) — so this never blocks the
+  // request. It logs the full raw payload instead, so whoever compares this
+  // client's GHL Workflow against a working one (e.g. Raul Galindo's) can
+  // see exactly which field came through empty/"null" and should carry the
+  // real appointment id (appointment.id / body.appointmentId / body.id).
+  if (!fields.appointmentIdReliable) {
+    console.error(
+      `[ghl-appointment-webhook] unreliable appointment id ("${String(fields.rawAppointmentId)}") — using synthetic id "${fields.ghlAppointmentId}" instead. Raw body:`,
+      JSON.stringify(body),
+    )
   }
 
   const supabase = createClient(
