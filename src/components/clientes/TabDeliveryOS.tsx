@@ -24,6 +24,7 @@ import { AlertTriangle } from 'lucide-react';
 import TabEstrategiaCliente from '@/components/clientes/TabEstrategiaCliente';
 import TabVSLFunnel from '@/components/clientes/TabVSLFunnel';
 import TabContenidoCliente from '@/components/clientes/TabContenidoCliente';
+import TabChatCliente from '@/components/clientes/TabChatCliente';
 import type { Client } from '@/pages/ClienteDetalle';
 
 // Closing salió de acá — ahora es su propio tab de primer nivel en
@@ -33,6 +34,7 @@ const SUB_TABS = [
   { value: 'informacion', label: 'Información' },
   { value: 'vsl-funnel', label: 'VSL Funnel' },
   { value: 'social-funnel', label: 'Social Funnel' },
+  { value: 'chat', label: 'Chat' },
 ];
 
 interface Props {
@@ -181,6 +183,10 @@ export default function TabDeliveryOS({ client, onClientUpdate, activeSubtab, on
 
       <TabsContent value="social-funnel">
         <TabContenidoCliente clientId={clientId} />
+      </TabsContent>
+
+      <TabsContent value="chat">
+        <TabChatCliente client={client} />
       </TabsContent>
     </Tabs>
   );

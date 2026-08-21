@@ -76,6 +76,30 @@ function extractFields(body: GhlPayload) {
   }
 }
 
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+
+// Texto del mensaje de sistema que se inserta en chat_messages cuando una
+// cita queda vinculada a un cliente. Formato calcado del mockup: "Cita
+// agendada con Rodrigo Serna — jueves 14:00 hs." (día de semana en
+// minúscula + hora, sin fecha numérica — ya es "formato legible" así).
+// fecha/hora vienen de splitStartTime ("YYYY-MM-DD"/"HH:MM", en la hora
+// local del calendario de GHL), así que el día de semana se calcula a mano
+// con los componentes de la fecha en vez de pasar por `new Date(fecha)`
+// (que interpretaría "YYYY-MM-DD" como medianoche UTC y podría correrse un
+// día según el huso horario del runtime).
+function buildChatMessage(leadName: string | null, fecha: string | null, hora: string | null): string {
+  const nombre = leadName ?? 'un lead'
+  const match = fecha?.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return `Cita agendada con ${nombre}.`
+
+  const [, y, m, d] = match
+  const dow = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d))).getUTCDay()
+  const diaSemana = DIAS_SEMANA[dow]
+  const horaTexto = hora ? ` ${hora}` : ''
+
+  return `Cita agendada con ${nombre} — ${diaSemana}${horaTexto} hs.`
+}
+
 interface OwnerMapping {
   clientId: string | null
   ownerType: 'torii' | 'client' | null
@@ -225,6 +249,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (error) {
     console.error('[ghl-appointment-webhook] upsert failed:', error.message, '| fields:', fields)
     return json({ error: error.message }, 500)
+  }
+
+  // Mensaje de sistema en el chat del cliente — best-effort. Solo tiene
+  // sentido si la cita quedó vinculada a un cliente real (mapping.clientId);
+  // si vino sin mapear (owner_type null) no hay a qué client_id engancharlo,
+  // así que se omite en silencio. Un fallo acá no debe tumbar la respuesta
+  // 200 del webhook: el upsert de client_closer_calls ya es lo crítico.
+  if (mapping.clientId) {
+    try {
+      const texto = buildChatMessage(fields.leadName, fecha, hora)
+      const { error: chatError } = await supabase.from('chat_messages').insert({
+        client_id: mapping.clientId,
+        sender_type: 'system',
+        sender_name: 'Automatización',
+        texto,
+        related_call_id: data.id,
+      })
+      if (chatError) {
+        console.error('[ghl-appointment-webhook] chat_messages insert failed:', chatError.message)
+      }
+    } catch (err) {
+      console.error('[ghl-appointment-webhook] chat_messages insert threw:', err)
+    }
   }
 
   return json({ success: true, id: data.id, unmapped: mapping.ownerType === null, referidoId })
