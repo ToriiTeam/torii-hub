@@ -78,7 +78,7 @@ const DEFAULT_TAB = 'delivery-os';
 
 // Sub-tabs de Delivery OS — ver TabDeliveryOS.tsx. 'closing' ya no vive acá,
 // ver TABS arriba.
-const DELIVERY_OS_SUBTABS = ['resumen', 'informacion', 'vsl-funnel', 'social-funnel'];
+const DELIVERY_OS_SUBTABS = ['resumen', 'informacion', 'vsl-funnel', 'social-funnel', 'chat'];
 
 export default function ClienteDetalle() {
   const { id, tab: urlTab, subtab: urlSubtab } = useParams<{ id: string; tab?: string; subtab?: string }>();
