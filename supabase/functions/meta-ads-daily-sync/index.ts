@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, FunctionsHttpError } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -216,7 +216,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { data, error: invokeErr } = await supabase.functions.invoke('meta-ads-proxy', {
         body: { type: 'campaigns_daily', account_id: accountId, since: date, until: date },
       })
-      if (invokeErr) throw new Error(invokeErr.message ?? String(invokeErr))
+      if (invokeErr) {
+        // invokeErr.message del cliente de supabase-js es siempre el string
+        // genérico "Edge Function returned a non-2xx status code" — el
+        // mensaje real que meta-ads-proxy manda en su body ({ error: msg })
+        // solo está disponible parseando invokeErr.context (el Response
+        // crudo), igual que en src/features/meta-ads/context/AccountContext.tsx.
+        // Sin esto, error_code_190 más abajo nunca matcheaba porque el texto
+        // real ("(code 190)") nunca llegaba a la variable `msg`.
+        let realMsg = invokeErr.message ?? String(invokeErr)
+        if (invokeErr instanceof FunctionsHttpError) {
+          try {
+            const body = await invokeErr.context.json()
+            if (body?.error) realMsg = body.error
+          } catch {
+            // body no era JSON o ya fue consumido — nos quedamos con invokeErr.message
+          }
+        }
+        throw new Error(realMsg)
+      }
       if (data?.error) throw new Error(String(data.error))
 
       const rows: DailyCampaignRow[] = data?.data ?? []
